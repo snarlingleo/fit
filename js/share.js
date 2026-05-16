@@ -11,49 +11,49 @@ const Share = {
       nom:         'Motivation Sport',
       description: 'Pour bien démarrer',
       emoji:       '🌱',
-      url:         'https://music.apple.com/fr/playlist/motivation-sport/pl.567c541878f94246',
+      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
       genre:       'Pop / Urban'
     },
     construction: {
       nom:         'Rap Français 2024',
       description: 'Pour les séances intenses',
       emoji:       '💪',
-      url:         'https://music.apple.com/fr/playlist/rap-fran%C3%A7ais/pl.d5a4c6d838fc4e0f',
+      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
       genre:       'Rap FR'
     },
     intensite: {
       nom:         'Électro Workout',
       description: 'Pour dépasser tes limites',
       emoji:       '🔥',
-      url:         'https://music.apple.com/fr/playlist/%C3%A9lectro-workout/pl.6bf4415de29a4d73',
+      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
       genre:       'Electronic / EDM'
     },
     peak: {
       nom:         'Hip-Hop Classiques',
       description: 'Pour les jours de PR',
       emoji:       '🏆',
-      url:         'https://music.apple.com/fr/playlist/hip-hop-classiques/pl.0af53e5a4e5749d7',
+      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
       genre:       'Hip-Hop'
     },
     jambes: {
       nom:         'Rap FR Essentiels',
       description: 'Pour les séances jambes',
       emoji:       '🦵',
-      url:         'https://music.apple.com/fr/playlist/rap-fr-essentiels/pl.aa9de0eeffd641d5',
+      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
       genre:       'Rap Français'
     },
     cardio: {
       nom:         'Dance Hits',
       description: 'Rythme parfait pour le cardio',
       emoji:       '🚴',
-      url:         'https://music.apple.com/fr/playlist/dance-hits/pl.6ce2c4b859c948c5',
+      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
       genre:       'Dance / Pop'
     },
     repos: {
       nom:         'Méditation & Bien-être',
       description: 'Stretching & récupération',
       emoji:       '😴',
-      url:         'https://music.apple.com/fr/playlist/m%C3%A9ditation-bien-%C3%AAtre/pl.e99c4b8a4f6f45a2',
+      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
       genre:       'Ambient / Chill'
     }
   },
