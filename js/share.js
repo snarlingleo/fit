@@ -11,7 +11,9 @@ const Share = {
       nom:         'Motivation Sport',
       description: 'Pour bien démarrer',
       emoji:       '🌱',
-      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
+      url: `https://music.apple.com/fr/search?term=${
+        encodeURIComponent(playlist.nom)
+      }`,
       genre:       'Pop / Urban'
     },
     construction: {
