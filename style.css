@@ -20,7 +20,31 @@
   --fd-lavender:    #bfa1ff;
   --fd-mint:        #8bf0bb;
 
-  /* ─── THÈME DARK (défaut) ─── */
+  /* ─── THÈME INDIGO ─────────────────────────── */
+[data-theme="indigo"] {
+  --bg-app:      #2a2a8a;
+  --bg-card:     #3333aa;
+  --bg-input:    #2222770;
+  --text-primary:   #ffffff;
+  --text-secondary: rgba(255,255,255,0.8);
+  --text-muted:     rgba(255,255,255,0.5);
+  --border-color:   rgba(255,255,255,0.15);
+  --fd-indigo-dim:  rgba(255,255,255,0.1);
+}
+
+/* ─── THÈME MIDNIGHT ───────────────────────── */
+[data-theme="midnight"] {
+  --bg-app:      #05051a;
+  --bg-card:     #0a0a2e;
+  --bg-input:    #0d0d3d;
+  --text-primary:   #ffffff;
+  --text-secondary: rgba(255,255,255,0.8);
+  --text-muted:     rgba(255,255,255,0.4);
+  --border-color:   rgba(75,75,249,0.2);
+  --fd-indigo-dim:  rgba(75,75,249,0.08);
+}
+   
+   /* ─── THÈME DARK (défaut) ─── */
   --bg-primary:     #09092d;
   --bg-secondary:   #0f0f3d;
   --bg-card:        rgba(255, 255, 255, 0.05);
