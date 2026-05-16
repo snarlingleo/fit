@@ -231,7 +231,7 @@ function naviguer(page) {
     case 'home':     renderAccueil();  break;
     case 'training': renderTraining(); break;
     case 'live':     renderLive();     break;
-    case 'stats':    Stats.render();   break;
+    case 'stats':    Charts.renderStatsTab(document.getElementById('page-content')); break;
     case 'profile':  renderProfil();   break;
     default:         renderAccueil();
   }
