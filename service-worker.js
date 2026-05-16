@@ -17,6 +17,7 @@ const CACHE_STATIC  = [
   './js/coach.js',
   './js/notifications.js',
   './js/charts.js',
+  './js/nutrition.js', 
   './js/app.js',
   './js/exercice-videos.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
