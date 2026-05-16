@@ -7,7 +7,6 @@ const Notifications = {
 
   CONFIG_CLE: 'ft_notifs_config',
 
-  // Config par défaut
   getConfig() {
     return Utils.storage.get(this.CONFIG_CLE, {
       active:           true,
@@ -20,7 +19,7 @@ const Notifications = {
       motivationMatin:  true,
       prProche:         true,
       semaineParf:      true,
-      ton:              'motivant', // motivant | doux | severe
+      ton:              'motivant',
       son:              true,
       vibration:        true
     });
@@ -38,14 +37,11 @@ const Notifications = {
       console.warn('[Notifs] Non supporté');
       return false;
     }
-
     if (Notification.permission === 'granted') return true;
-
     if (Notification.permission === 'denied') {
-      Utils.toast('Active les notifications dans les paramètres du navigateur', 'info');
+      Utils.toast('Active les notifications dans les paramètres', 'info');
       return false;
     }
-
     const result = await Notification.requestPermission();
     return result === 'granted';
   },
@@ -54,26 +50,27 @@ const Notifications = {
     return 'Notification' in window && Notification.permission === 'granted';
   },
 
-  // ─── ENVOYER VIA SERVICE WORKER ───────────────────────────
+  // ─── ENVOYER ──────────────────────────────────────────────
   async envoyer(titre, message, options = {}) {
     const config = this.getConfig();
     if (!config.active) return;
 
     const defauts = {
-      icon:    './assets/icons/icon-192.png',
-      badge:   './assets/icons/icon-72.png',
-      vibrate: config.vibration ? [200, 100, 200] : [],
-      tag:     options.tag || 'fittracker',
+      icon:     './assets/icons/icon-192.png',
+      badge:    './assets/icons/icon-72.png',
+      vibrate:  config.vibration ? [200, 100, 200] : [],
+      tag:      options.tag || 'fittracker',
       renotify: true,
-      actions: options.actions || []
+      actions:  options.actions || []
     };
 
     try {
       if ('serviceWorker' in navigator) {
         const sw = await navigator.serviceWorker.ready;
-        await sw.showNotification(titre, { body: message, ...defauts, ...options });
+        await sw.showNotification(titre, {
+          body: message, ...defauts, ...options
+        });
       } else {
-        // Fallback notification native
         new Notification(titre, { body: message, icon: defauts.icon });
       }
     } catch(e) {
@@ -180,11 +177,11 @@ const Notifications = {
         ],
         doux: [
           `Bravo ${nom} ! Semaine complète ! Tu peux être fier de toi 🌟`,
-          `Quelle belle semaine ${nom} ! Continue comme ça, tu es sur la bonne voie 💫`,
+          `Quelle belle semaine ${nom} ! Continue, tu es sur la bonne voie 💫`,
           `Semaine parfaite ! Tu le mérites vraiment ${nom} ✨`
         ],
         severe: [
-          `SEMAINE PARFAITE. Voilà comment on progresse. Recommence la semaine prochaine. 🔥`,
+          `SEMAINE PARFAITE. Voilà comment on progresse. Recommence. 🔥`,
           `5/5. C'est le minimum. On garde ce rythme. ⚡`,
           `BIEN. Semaine complète. C'est maintenant la norme. 💥`
         ]
@@ -196,7 +193,7 @@ const Notifications = {
           `${pr} : tu es à seulement quelques kilos du record ! Force ! 💪`
         ],
         doux: [
-          `${nom}, tu progresses bien sur ${pr} 🌟 Aujourd'hui tu pourrais battre ton record !`,
+          `${nom}, tu progresses bien sur ${pr} 🌟 Tu pourrais battre ton record !`,
           `Tu es proche de ton meilleur sur ${pr}. Essaie si tu te sens bien 💫`,
           `Belle progression sur ${pr} ! Ton record est accessible 🌸`
         ],
@@ -210,7 +207,6 @@ const Notifications = {
 
     const groupe = messages[type];
     if (!groupe) return `Hey ${nom}, ta séance t'attend !`;
-
     const liste = groupe[ton] || groupe.motivant;
     return Utils.random(liste);
   },
@@ -220,20 +216,18 @@ const Notifications = {
     const config = this.getConfig();
     if (!config.active) return;
 
-    const jours = Tracker.getJoursAbsence();
-    const profil = Tracker.getProfil();
-    const streak = Tracker.getStreak();
+    const jours   = Tracker.getJoursAbsence();
+    const profil  = Tracker.getProfil();
+    const streak  = Tracker.getStreak();
     const contexte = {
       jours,
       streak: streak.count,
       nom: profil.nom || 'Athlète'
     };
 
-    // Vérifier si on est sur un jour de repos planifié
-    const planning = PLANNING_SEMAINE[Utils.indexJourSemaine(Utils.aujourd_hui())];
+    const planning    = PLANNING_SEMAINE[Utils.indexJourSemaine(Utils.aujourd_hui())];
     const estJourRepos = !planning?.seanceId;
-
-    if (estJourRepos) return; // Pas de notif les jours de repos
+    if (estJourRepos) return;
 
     if (jours >= 5 && config.absence5j) {
       await this.envoyer(
@@ -243,7 +237,7 @@ const Notifications = {
           tag: 'absence-5j',
           actions: [
             { action: 'express', title: '⚡ Séance express' },
-            { action: 'go',      title: '▶ Je fonce'       }
+            { action: 'go',      title: '▶ Je fonce'        }
           ]
         }
       );
@@ -254,8 +248,8 @@ const Notifications = {
         {
           tag: 'absence-2j',
           actions: [
-            { action: 'go',    title: '▶ J\'y vais !'  },
-            { action: 'later', title: '⏰ Ce soir'     }
+            { action: 'go',    title: '▶ J\'y vais !' },
+            { action: 'later', title: '⏰ Ce soir'    }
           ]
         }
       );
@@ -265,9 +259,7 @@ const Notifications = {
         this.getMessage('absence_1', contexte),
         {
           tag: 'absence-1j',
-          actions: [
-            { action: 'go', title: '▶ J\'y vais !' }
-          ]
+          actions: [{ action: 'go', title: '▶ J\'y vais !' }]
         }
       );
     }
@@ -275,7 +267,7 @@ const Notifications = {
 
   // ─── RAPPEL QUOTIDIEN ─────────────────────────────────────
   async envoyerRappelQuotidien() {
-    const config = this.getConfig();
+    const config  = this.getConfig();
     if (!config.active || !config.rappelQuotidien) return;
 
     const profil  = Tracker.getProfil();
@@ -283,9 +275,7 @@ const Notifications = {
     const contexte = { nom: profil.nom || 'Athlète' };
 
     let message = this.getMessage('rappel_quotidien', contexte);
-    if (seance) {
-      message += `\n${seance.emoji} ${seance.nom}`;
-    }
+    if (seance) message += `\n${seance.emoji} ${seance.nom}`;
 
     await this.envoyer(
       `🌅 Bonjour ${profil.nom || 'Athlète'} !`,
@@ -293,8 +283,28 @@ const Notifications = {
       {
         tag: 'rappel-quotidien',
         actions: [
-          { action: 'go',    title: '💪 On y va !'  },
+          { action: 'go',    title: '💪 On y va !' },
           { action: 'later', title: '⏰ Plus tard'  }
+        ]
+      }
+    );
+  },
+
+  // ─── MOTIVATION MATIN ─────────────────────────────────────
+  async envoyerMotivationMatin() {
+    const config = this.getConfig();
+    if (!config.active || !config.motivationMatin) return;
+
+    const citation = Coach.getCitationDuJour();
+
+    await this.envoyer(
+      `🌅 Motivation du jour`,
+      `"${citation.texte}" — ${citation.auteur}`,
+      {
+        tag: 'motivation-matin',
+        actions: [
+          { action: 'go',    title: '💪 C\'est parti !' },
+          { action: 'later', title: '☕ Après le café'  }
         ]
       }
     );
@@ -309,7 +319,7 @@ const Notifications = {
     if (streak.count < 3) return;
 
     const heure = Utils.heureActuelle();
-    if (heure < 18) return; // Vérifier seulement en soirée
+    if (heure < 18) return;
 
     const seanceDuJour = Tracker.getSeanceDuJour();
     if (seanceDuJour?.complete) return;
@@ -324,7 +334,7 @@ const Notifications = {
       `⚠️ Streak en danger !`,
       this.getMessage('streak_danger', contexte),
       {
-        tag: 'streak-danger',
+        tag:     'streak-danger',
         vibrate: [300, 100, 300, 100, 300],
         actions: [{ action: 'go', title: '🔥 Je fonce !' }]
       }
@@ -338,20 +348,21 @@ const Notifications = {
 
     const objectif = Utils.storage.get('ft_objectif_seances_semaine', 4);
     const seances  = Tracker.getSeancesParSemaine();
+    if (seances < objectif) return;
 
-    if (seances >= objectif) {
-      const profil  = Tracker.getProfil();
-      const dejNotifie = Utils.storage.get('ft_notif_semaine_parf_' + Utils.debutSemaine(Utils.aujourd_hui()), false);
-      if (dejNotifie) return;
+    const profil     = Tracker.getProfil();
+    const cleNotif   = 'ft_notif_semaine_parf_' +
+                       Utils.debutSemaine(Utils.aujourd_hui());
+    const dejNotifie = Utils.storage.get(cleNotif, false);
+    if (dejNotifie) return;
 
-      await this.envoyer(
-        `🏆 Semaine PARFAITE !`,
-        this.getMessage('semaine_parfaite', { nom: profil.nom }),
-        { tag: 'semaine-parfaite', vibrate: [200, 100, 200, 100, 200, 100, 400] }
-      );
+    await this.envoyer(
+      `🏆 Semaine PARFAITE !`,
+      this.getMessage('semaine_parfaite', { nom: profil.nom }),
+      { tag: 'semaine-parfaite', vibrate: [200,100,200,100,200,100,400] }
+    );
 
-      Utils.storage.set('ft_notif_semaine_parf_' + Utils.debutSemaine(Utils.aujourd_hui()), true);
-    }
+    Utils.storage.set(cleNotif, true);
   },
 
   // ─── NOTIFICATION PR ──────────────────────────────────────
@@ -363,11 +374,68 @@ const Notifications = {
       `🏆 NOUVEAU RECORD !`,
       `${ex?.nom || exerciceRef} : ${poids}kg × ${reps} reps ! Incroyable ${profil.nom} !`,
       {
-        tag: `pr-${exerciceRef}`,
+        tag:     `pr-${exerciceRef}`,
         vibrate: [200, 100, 200, 100, 400],
         actions: [{ action: 'stats', title: '📊 Voir stats' }]
       }
     );
+  },
+
+  // ─── PR PROCHES ───────────────────────────────────────────
+  async verifierPRsProches() {
+    const config = this.getConfig();
+    if (!config.active || !config.prProche) return;
+
+    const prs    = Tracker.getAllPRs();
+    const profil = Tracker.getProfil();
+    const seance = Programme.getProchaineSeance();
+    if (!seance) return;
+
+    for (const exRef of (seance.exercices || [])) {
+      const pr = prs[exRef];
+      if (!pr?.rm1) continue;
+
+      const phase     = Programme.getPhaseActuelle();
+      const chargeObj = Math.round(pr.rm1 * phase.intensite);
+      const diff      = pr.rm1 - chargeObj;
+
+      if (diff <= 5 && diff >= 0) {
+        const ex = EXERCICES[exRef] || {};
+        await this.envoyer(
+          `📈 PR en vue !`,
+          this.getMessage('pr_proche', {
+            nom: profil.nom,
+            pr:  ex.nom || exRef
+          }),
+          {
+            tag:     `pr-proche-${exRef}`,
+            actions: [{ action: 'go', title: '🏆 Je vise le PR !' }]
+          }
+        );
+        break;
+      }
+    }
+  },
+
+  // ─── VÉRIFICATION AU LANCEMENT ────────────────────────────
+  async verifierAuLancement() {
+    const config = this.getConfig();
+    if (!config.active) return;
+
+    const jours = Tracker.getJoursAbsence();
+    const heure = Utils.heureActuelle();
+
+    if (jours >= 2 && heure >= 8 && heure <= 21) {
+      await this.verifierAbsenceEtNotifier();
+    }
+
+    const dejVerifie = Utils.storage.get(
+      'ft_verif_pr_' + Utils.aujourd_hui(), false
+    );
+    if (!dejVerifie) {
+      await this.verifierPRsProches();
+      Utils.storage.set('ft_verif_pr_' + Utils.aujourd_hui(), true);
+    }
   },
 
   // ─── PLANIFIER RAPPELS ────────────────────────────────────
@@ -375,23 +443,37 @@ const Notifications = {
     const config = this.getConfig();
     if (!config.active) return;
 
-    // Vérification toutes les heures
     this._intervalVerif = setInterval(async () => {
-      const heure   = Utils.heureActuelle();
-      const minutes = new Date().getMinutes();
+      const heure     = Utils.heureActuelle();
+      const minutes   = new Date().getMinutes();
       const heureConf = parseInt(config.heureRappel.split(':')[0]);
       const minConf   = parseInt(config.heureRappel.split(':')[1]);
 
-      // Rappel quotidien à l'heure configurée
-      if (heure === heureConf && minutes === minConf && config.rappelQuotidien) {
-        const dejEnvoye = Utils.storage.get('ft_rappel_' + Utils.aujourd_hui(), false);
+      // Rappel quotidien
+      if (heure === heureConf && minutes === minConf
+          && config.rappelQuotidien) {
+        const dejEnvoye = Utils.storage.get(
+          'ft_rappel_' + Utils.aujourd_hui(), false
+        );
         if (!dejEnvoye) {
           await this.envoyerRappelQuotidien();
           Utils.storage.set('ft_rappel_' + Utils.aujourd_hui(), true);
         }
       }
 
-      // Vérification absence (toutes les 2h)
+      // Motivation matin (30 min après rappel)
+      if (heure === heureConf && minutes === (minConf + 30) % 60
+          && config.motivationMatin) {
+        const dejEnvoye = Utils.storage.get(
+          'ft_motiv_' + Utils.aujourd_hui(), false
+        );
+        if (!dejEnvoye) {
+          await this.envoyerMotivationMatin();
+          Utils.storage.set('ft_motiv_' + Utils.aujourd_hui(), true);
+        }
+      }
+
+      // Absence (toutes les 2h)
       if (minutes === 0 && heure % 2 === 0) {
         await this.verifierAbsenceEtNotifier();
       }
@@ -401,34 +483,35 @@ const Notifications = {
         await this.verifierStreakDanger();
       }
 
-    }, 60 * 1000); // Vérifier toutes les minutes
+      // PR proches (à midi)
+      if (heure === 12 && minutes === 0) {
+        await this.verifierPRsProches();
+      }
+
+    }, 60 * 1000);
   },
 
   arreterPlanification() {
-    if (this._intervalVerif) {
-      clearInterval(this._intervalVerif);
-    }
+    if (this._intervalVerif) clearInterval(this._intervalVerif);
   },
 
-  // ─── TEST NOTIFICATION ────────────────────────────────────
+  // ─── TEST ─────────────────────────────────────────────────
   async tester() {
     const autorisee = await this.demanderPermission();
     if (!autorisee) {
       Utils.toast('Permission notifications refusée', 'error');
       return false;
     }
-
     await this.envoyer(
       '✅ Notifications actives !',
       'FitTracker Pro te tiendra informé de tes séances.',
       { tag: 'test' }
     );
-
     Utils.toast('Notification de test envoyée !', 'success');
     return true;
   },
 
-  // ─── INITIALISER ──────────────────────────────────────────
+  // ─── INIT ─────────────────────────────────────────────────
   async init() {
     const config = this.getConfig();
     if (!config.active) return;
@@ -436,6 +519,7 @@ const Notifications = {
     const autorisee = await this.demanderPermission();
     if (autorisee) {
       this.planifierRappels();
+      setTimeout(() => this.verifierAuLancement(), 3000);
       console.log('✅ Notifications initialisées');
     }
   }
