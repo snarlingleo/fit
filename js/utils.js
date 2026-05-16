@@ -7,7 +7,7 @@ const Utils = {
 
   // ─── DATES ───────────────────────────────────────────────
   aujourd_hui() {
-    return new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    return new Date().toISOString().split('T')[0];
   },
 
   formatDate(dateStr, options = {}) {
@@ -29,12 +29,12 @@ const Utils = {
   },
 
   jourSemaineComplet(dateStr) {
-    const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+    const jours = ['Dimanche','Lundi','Mardi','Mercredi',
+                   'Jeudi','Vendredi','Samedi'];
     return jours[new Date(dateStr).getDay()];
   },
 
   indexJourSemaine(dateStr) {
-    // 0=LUN, 1=MAR, ... 6=DIM
     const d = new Date(dateStr).getDay();
     return d === 0 ? 6 : d - 1;
   },
@@ -52,7 +52,7 @@ const Utils = {
   },
 
   debutSemaine(dateStr) {
-    const d = new Date(dateStr);
+    const d   = new Date(dateStr);
     const jour = d.getDay();
     const diff = jour === 0 ? -6 : 1 - jour;
     d.setDate(d.getDate() + diff);
@@ -112,13 +112,11 @@ const Utils = {
 
   // ─── CALCULS FITNESS ──────────────────────────────────────
   calculer1RM(poids, reps) {
-    // Formule Epley : 1RM = poids × (1 + reps/30)
     if (reps === 1) return poids;
     return Math.round(poids * (1 + reps / 30));
   },
 
   calculerVolume(series) {
-    // series = [{poids, reps}, ...]
     return series.reduce((total, s) => total + (s.poids * s.reps), 0);
   },
 
@@ -129,12 +127,11 @@ const Utils = {
 
   categorieIMC(imc) {
     if (imc < 18.5) return { label: 'Insuffisance pondérale', color: '#bfa1ff' };
-    if (imc < 25)   return { label: 'Poids normal', color: '#8bf0bb' };
-    if (imc < 30)   return { label: 'Surpoids', color: '#f9ef77' };
-    return                  { label: 'Obésité', color: '#ff8d96' };
+    if (imc < 25)   return { label: 'Poids normal',           color: '#8bf0bb' };
+    if (imc < 30)   return { label: 'Surpoids',               color: '#f9ef77' };
+    return                  { label: 'Obésité',               color: '#ff8d96' };
   },
 
-  // Calories brûlées estimées (MET × poids × heures)
   caloriesBrulees(dureeMin, poidsKg, intensite = 'modere') {
     const MET = { leger: 3.5, modere: 5.5, intense: 8.0 };
     const met = MET[intensite] || MET.modere;
@@ -163,9 +160,7 @@ const Utils = {
       }
     },
 
-    remove(cle) {
-      localStorage.removeItem(cle);
-    },
+    remove(cle) { localStorage.removeItem(cle); },
 
     clear(prefix = 'ft_') {
       Object.keys(localStorage)
@@ -208,17 +203,12 @@ const Utils = {
 
   // ─── DOM ──────────────────────────────────────────────────
   dom: {
-    $(selector, parent = document) {
-      return parent.querySelector(selector);
-    },
-
-    $$(selector, parent = document) {
-      return [...parent.querySelectorAll(selector)];
-    },
+    $(selector, parent = document)   { return parent.querySelector(selector); },
+    $$(selector, parent = document)  { return [...parent.querySelectorAll(selector)]; },
 
     creer(tag, classes = '', innerHTML = '') {
       const el = document.createElement(tag);
-      if (classes) el.className = classes;
+      if (classes)   el.className = classes;
       if (innerHTML) el.innerHTML = innerHTML;
       return el;
     },
@@ -250,11 +240,8 @@ const Utils = {
     if (!container) return;
 
     const icons = {
-      success: '✅',
-      error:   '❌',
-      info:    'ℹ️',
-      pr:      '🏆',
-      warning: '⚠️'
+      success: '✅', error: '❌',
+      info: 'ℹ️', pr: '🏆', warning: '⚠️'
     };
 
     const toast = document.createElement('div');
@@ -267,7 +254,7 @@ const Utils = {
     container.appendChild(toast);
 
     setTimeout(() => {
-      toast.style.opacity = '0';
+      toast.style.opacity   = '0';
       toast.style.transform = 'translateY(-10px)';
       toast.style.transition = '0.3s ease';
       setTimeout(() => toast.remove(), 300);
@@ -277,10 +264,10 @@ const Utils = {
   // ─── MODAL CONFIRM ────────────────────────────────────────
   confirmer(titre, message) {
     return new Promise(resolve => {
-      const modal   = document.getElementById('modal-confirm');
-      const titleEl = document.getElementById('modal-confirm-title');
-      const msgEl   = document.getElementById('modal-confirm-msg');
-      const btnOk   = document.getElementById('modal-confirm-ok');
+      const modal     = document.getElementById('modal-confirm');
+      const titleEl   = document.getElementById('modal-confirm-title');
+      const msgEl     = document.getElementById('modal-confirm-msg');
+      const btnOk     = document.getElementById('modal-confirm-ok');
       const btnCancel = document.getElementById('modal-confirm-cancel');
 
       titleEl.textContent = titre;
@@ -289,11 +276,10 @@ const Utils = {
 
       const cleanup = () => modal.classList.add('hidden');
 
-      btnOk.onclick = () => { cleanup(); resolve(true); };
+      btnOk.onclick     = () => { cleanup(); resolve(true);  };
       btnCancel.onclick = () => { cleanup(); resolve(false); };
-      modal.querySelector('.modal-overlay').onclick = () => {
-        cleanup(); resolve(false);
-      };
+      modal.querySelector('.modal-overlay').onclick =
+        () => { cleanup(); resolve(false); };
     });
   },
 
@@ -302,30 +288,31 @@ const Utils = {
     if (navigator.vibrate) navigator.vibrate(pattern);
   },
 
-  vibrerSuccess()  { this.vibrer([100, 50, 100]); },
-  vibrerPR()       { this.vibrer([200, 100, 200, 100, 400]); },
-  vibrerFin()      { this.vibrer([300, 100, 300, 100, 600]); },
-  vibrerBeep()     { this.vibrer([50]); },
+  vibrerSuccess() { this.vibrer([100, 50, 100]);             },
+  vibrerPR()      { this.vibrer([200, 100, 200, 100, 400]);  },
+  vibrerFin()     { this.vibrer([300, 100, 300, 100, 600]);  },
+  vibrerBeep()    { this.vibrer([50]);                       },
 
   // ─── CONFETTI ─────────────────────────────────────────────
   confetti(duree = 3000) {
     const canvas = document.getElementById('confetti-canvas');
     if (!canvas) return;
 
-    const ctx    = canvas.getContext('2d');
+    const ctx     = canvas.getContext('2d');
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const couleurs = ['#4b4bf9','#f9ef77','#8bf0bb','#ff8d96','#bfa1ff','#ffffff'];
+    const couleurs  = ['#4b4bf9','#f9ef77','#8bf0bb',
+                       '#ff8d96','#bfa1ff','#ffffff'];
     const particules = Array.from({ length: 120 }, () => ({
-      x:  Math.random() * canvas.width,
-      y:  Math.random() * canvas.height - canvas.height,
-      w:  Math.random() * 10 + 5,
-      h:  Math.random() * 6 + 3,
-      color: couleurs[Math.floor(Math.random() * couleurs.length)],
+      x:        Math.random() * canvas.width,
+      y:        Math.random() * canvas.height - canvas.height,
+      w:        Math.random() * 10 + 5,
+      h:        Math.random() * 6 + 3,
+      color:    couleurs[Math.floor(Math.random() * couleurs.length)],
       rotation: Math.random() * 360,
-      vitesse: Math.random() * 3 + 2,
-      drift: Math.random() * 2 - 1
+      vitesse:  Math.random() * 3 + 2,
+      drift:    Math.random() * 2 - 1
     }));
 
     let animId;
@@ -367,7 +354,7 @@ const Utils = {
   exporterJSON() {
     const data = {
       version: '1.0.0',
-      date: this.aujourd_hui(),
+      date:    this.aujourd_hui(),
       donnees: this.storage.exporter()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)],
@@ -382,16 +369,16 @@ const Utils = {
   },
 
   exporterCSV() {
-    const data    = this.storage.exporter();
-    const lignes  = [['Date','Séance','Exercice','Série','Reps','Poids','RPE']];
+    const data   = this.storage.exporter();
+    const lignes = [['Date','Séance','Exercice','Série','Reps','Poids','RPE']];
 
     for (const [cle, val] of Object.entries(data)) {
-      // cle format : ft_YYYY-MM-DD_seanceId_exerciceRef_sX
       if (!cle.startsWith('ft_') || !cle.includes('_s')) continue;
       const parts = cle.split('_');
       if (parts.length < 5) continue;
       const [, date, seance, exercice, serie] = parts;
-      lignes.push([date, seance, exercice, serie, val.reps, val.poids, val.rpe || '']);
+      lignes.push([date, seance, exercice, serie,
+                   val.reps, val.poids, val.rpe || '']);
     }
 
     const csv  = lignes.map(l => l.join(',')).join('\n');
@@ -425,8 +412,6 @@ const Utils = {
 
   // ─── QR CODE ──────────────────────────────────────────────
   async genererQR(texte, canvas) {
-    // Utilise l'API QR simple (pas de lib externe)
-    // Implémentation légère via URL encode
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(texte)}`;
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -442,6 +427,206 @@ const Utils = {
     });
   },
 
+  // ─── BACKUP AUTOMATIQUE ───────────────────────────────────
+  verifierBackupAuto() {
+    const dernierBackup = this.storage.get('ft_dernier_backup', null);
+    const aujourd_hui   = this.aujourd_hui();
+
+    if (!dernierBackup ||
+        this.diffJours(dernierBackup, aujourd_hui) >= 7) {
+      this.storage.set('ft_dernier_backup', aujourd_hui);
+      this.toast(
+        '💾 Backup hebdomadaire disponible — Va dans Outils > Export !',
+        'info', 5000
+      );
+    }
+  },
+
+  // ─── EXPORT PDF ───────────────────────────────────────────
+  exporterPDF() {
+    const profil = window.Tracker?.getProfil()       || {};
+    const prs    = window.Tracker?.getAllPRs()        || {};
+    const streak = window.Tracker?.getStreak()        || {};
+    const total  = window.Tracker?.getTotalSeances()  || 0;
+    const xp     = window.Gamification?.getXP()       || {};
+
+    const contenu = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>FitTracker Pro — Rapport ${this.aujourd_hui()}</title>
+        <style>
+          * { margin:0;padding:0;box-sizing:border-box; }
+          body {
+            font-family: system-ui, sans-serif;
+            background: white;
+            color: #09092d;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+          }
+          .header {
+            background: #4b4bf9;
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .header h1 { font-size: 1.5rem; font-weight: 800; }
+          .header p  { font-size: .85rem; opacity: .8; margin-top: 4px; }
+          .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-weight: 700;
+          }
+          .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+          }
+          .stat-box {
+            background: #f3f3f7;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+          }
+          .stat-val {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #4b4bf9;
+          }
+          .stat-lbl { font-size:.72rem;color:#666;margin-top:4px; }
+          .section {
+            margin-bottom: 24px;
+            border: 1px solid #e5e5f0;
+            border-radius: 12px;
+            overflow: hidden;
+          }
+          .section-title {
+            background: #f3f3f7;
+            padding: 12px 20px;
+            font-weight: 700;
+            font-size: .9rem;
+            color: #4b4bf9;
+            border-bottom: 1px solid #e5e5f0;
+          }
+          .section-body { padding: 20px; }
+          .pr-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f3f7;
+            font-size: .88rem;
+          }
+          .pr-val { font-weight:700;color:#4b4bf9; }
+          .footer {
+            text-align: center;
+            font-size: .72rem;
+            color: #999;
+            margin-top: 32px;
+          }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>🏋️ FitTracker Pro</h1>
+            <p>Rapport de progression — ${this.aujourd_hui()}</p>
+            <p style="margin-top:4px;font-size:.8rem">
+              ${profil.nom || 'Athlète'}
+            </p>
+          </div>
+          <div class="badge">
+            ${xp.niveau?.emoji || '💪'} Niv.${xp.niveau?.numero || 1}
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-val">${total}</div>
+            <div class="stat-lbl">Séances totales</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">${streak.count || 0}🔥</div>
+            <div class="stat-lbl">Streak actuel</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">${streak.max || 0}</div>
+            <div class="stat-lbl">Streak max</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">${xp.total || 0}</div>
+            <div class="stat-lbl">XP Total</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🏆 Records personnels</div>
+          <div class="section-body">
+            ${Object.entries(prs).length === 0
+              ? '<p style="color:#999;font-size:.85rem">Aucun record</p>'
+              : Object.entries(prs)
+                  .sort((a,b) => (b[1].poids||0) - (a[1].poids||0))
+                  .map(([ref, pr]) => {
+                    const ex = window.EXERCICES?.[ref] || {};
+                    return `
+                      <div class="pr-row">
+                        <span>${ex.emoji||'💪'} ${ex.nom||ref}</span>
+                        <span class="pr-val">
+                          ${pr.poids}kg × ${pr.reps}
+                          ${pr.rm1 ? `· ~${pr.rm1}kg 1RM` : ''}
+                        </span>
+                      </div>`;
+                  }).join('')}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">👤 Profil</div>
+          <div class="section-body">
+            <div class="pr-row">
+              <span>Prénom</span>
+              <span class="pr-val">${profil.nom    || '—'}</span>
+            </div>
+            <div class="pr-row">
+              <span>Poids</span>
+              <span class="pr-val">${profil.poids  || '—'} kg</span>
+            </div>
+            <div class="pr-row">
+              <span>Taille</span>
+              <span class="pr-val">${profil.taille || '—'} cm</span>
+            </div>
+            <div class="pr-row">
+              <span>Niveau</span>
+              <span class="pr-val">
+                ${xp.niveau?.emoji||''} ${xp.niveau?.nom||'—'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          Généré par FitTracker Pro ·
+          ${new Date().toLocaleString('fr-FR')} · Powered by EverGPT
+        </div>
+      </body>
+      </html>
+    `;
+
+    const fenetre = window.open('', '_blank');
+    fenetre.document.write(contenu);
+    fenetre.document.close();
+    setTimeout(() => fenetre.print(), 500);
+    this.toast('📄 Rapport PDF généré !', 'success');
+  },
+
   // ─── GRAPHIQUES (Canvas natif) ────────────────────────────
   graphiques: {
 
@@ -453,14 +638,13 @@ const Utils = {
       canvas.width  = W;
       canvas.height = H;
 
-      const pad    = { top: 20, right: 16, bottom: 30, left: 40 };
+      const pad    = { top:20, right:16, bottom:30, left:40 };
       const maxVal = Math.max(...valeurs, 1);
       const barW   = (W - pad.left - pad.right) / valeurs.length * 0.6;
       const gap    = (W - pad.left - pad.right) / valeurs.length;
 
       ctx.clearRect(0, 0, W, H);
 
-      // Grille
       ctx.strokeStyle = 'rgba(255,255,255,0.07)';
       ctx.lineWidth   = 1;
       for (let i = 0; i <= 4; i++) {
@@ -471,23 +655,23 @@ const Utils = {
         ctx.stroke();
       }
 
-      // Labels Y
-      ctx.fillStyle  = 'rgba(255,255,255,0.35)';
-      ctx.font       = '10px system-ui';
-      ctx.textAlign  = 'right';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.font      = '10px system-ui';
+      ctx.textAlign = 'right';
       for (let i = 0; i <= 4; i++) {
         const val = Math.round(maxVal * (1 - i/4));
         const y   = pad.top + (H - pad.top - pad.bottom) * (i / 4);
-        ctx.fillText(val > 1000 ? `${(val/1000).toFixed(1)}k` : val, pad.left - 4, y + 4);
+        ctx.fillText(
+          val > 1000 ? `${(val/1000).toFixed(1)}k` : val,
+          pad.left - 4, y + 4
+        );
       }
 
-      // Barres
       valeurs.forEach((val, i) => {
         const x    = pad.left + i * gap + (gap - barW) / 2;
-        const barH = ((val / maxVal) * (H - pad.top - pad.bottom));
+        const barH = (val / maxVal) * (H - pad.top - pad.bottom);
         const y    = H - pad.bottom - barH;
 
-        // Gradient
         const grad = ctx.createLinearGradient(0, y, 0, H - pad.bottom);
         grad.addColorStop(0, options.color || '#4b4bf9');
         grad.addColorStop(1, 'rgba(75,75,249,0.3)');
@@ -497,7 +681,6 @@ const Utils = {
         ctx.roundRect(x, y, barW, barH, 4);
         ctx.fill();
 
-        // Label X
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.font      = '9px system-ui';
         ctx.textAlign = 'center';
@@ -513,7 +696,7 @@ const Utils = {
       canvas.width  = W;
       canvas.height = H;
 
-      const pad    = { top: 20, right: 16, bottom: 30, left: 44 };
+      const pad     = { top:20, right:16, bottom:30, left:44 };
       const allVals = datasets.flatMap(d => d.valeurs);
       const maxVal  = Math.max(...allVals, 1);
       const minVal  = Math.min(...allVals, 0);
@@ -521,62 +704,54 @@ const Utils = {
 
       ctx.clearRect(0, 0, W, H);
 
-      const getX = (i) => pad.left + i * (W - pad.left - pad.right) / (labels.length - 1 || 1);
-      const getY = (v) => H - pad.bottom - ((v - minVal) / range) * (H - pad.top - pad.bottom);
+      const getX = i =>
+        pad.left + i * (W - pad.left - pad.right) / (labels.length - 1 || 1);
+      const getY = v =>
+        H - pad.bottom - ((v - minVal) / range) * (H - pad.top - pad.bottom);
 
-      // Grille
       ctx.strokeStyle = 'rgba(255,255,255,0.07)';
       ctx.lineWidth   = 1;
       for (let i = 0; i <= 4; i++) {
         const y = pad.top + (H - pad.top - pad.bottom) * (i / 4);
         ctx.beginPath();
-        ctx.moveTo(pad.left, y);
-        ctx.lineTo(W - pad.right, y);
+        ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y);
         ctx.stroke();
-
         const val = Math.round(maxVal - (range * i / 4));
-        ctx.fillStyle  = 'rgba(255,255,255,0.35)';
-        ctx.font       = '10px system-ui';
-        ctx.textAlign  = 'right';
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.font      = '10px system-ui';
+        ctx.textAlign = 'right';
         ctx.fillText(val, pad.left - 4, y + 4);
       }
 
-      // Datasets
       datasets.forEach(dataset => {
-        const vals = dataset.valeurs;
+        const vals  = dataset.valeurs;
         const color = dataset.color || '#4b4bf9';
-
         if (vals.length < 2) return;
 
-        // Zone remplie
         const grad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
         grad.addColorStop(0, color.replace(')', ',0.25)').replace('rgb','rgba'));
         grad.addColorStop(1, color.replace(')', ',0.0)').replace('rgb','rgba'));
 
         ctx.beginPath();
         ctx.moveTo(getX(0), getY(vals[0]));
-        for (let i = 1; i < vals.length; i++) {
+        for (let i = 1; i < vals.length; i++)
           ctx.lineTo(getX(i), getY(vals[i]));
-        }
-        ctx.lineTo(getX(vals.length - 1), H - pad.bottom);
+        ctx.lineTo(getX(vals.length-1), H - pad.bottom);
         ctx.lineTo(getX(0), H - pad.bottom);
         ctx.closePath();
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // Ligne
         ctx.beginPath();
         ctx.strokeStyle = color;
         ctx.lineWidth   = 2.5;
         ctx.lineJoin    = 'round';
         ctx.lineCap     = 'round';
         ctx.moveTo(getX(0), getY(vals[0]));
-        for (let i = 1; i < vals.length; i++) {
+        for (let i = 1; i < vals.length; i++)
           ctx.lineTo(getX(i), getY(vals[i]));
-        }
         ctx.stroke();
 
-        // Points
         vals.forEach((v, i) => {
           ctx.beginPath();
           ctx.arc(getX(i), getY(v), 4, 0, Math.PI * 2);
@@ -588,13 +763,10 @@ const Utils = {
         });
       });
 
-      // Labels X
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.font      = '9px system-ui';
       ctx.textAlign = 'center';
-      labels.forEach((l, i) => {
-        ctx.fillText(l, getX(i), H - pad.bottom + 14);
-      });
+      labels.forEach((l, i) => ctx.fillText(l, getX(i), H - pad.bottom + 14));
     },
 
     anneau(canvas, valeur, max, couleur = '#4b4bf9') {
@@ -611,14 +783,12 @@ const Utils = {
 
       ctx.clearRect(0, 0, size, size);
 
-      // Fond
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.lineWidth   = 8;
       ctx.stroke();
 
-      // Arc valeur
       ctx.beginPath();
       ctx.arc(cx, cy, r, -Math.PI/2, angle);
       ctx.strokeStyle = couleur;
@@ -646,26 +816,22 @@ const Utils = {
   clone(obj) {
     return JSON.parse(JSON.stringify(obj));
   }
-};
+
+}; // ← FIN de Utils
 
 /* ============================================================
-   ExerciseGIF v2 — Wger API (Gratuite + Sans clé)
+   ExerciseGIF v2
    ============================================================ */
-
-// Remplace TOUT le bloc ExerciseGIF dans utils.js par :
-
 const ExerciseGIF = {
 
-  // ─── Charger dans un élément ──────────────────────────────
   async chargerDans(exerciceRef, elementId, options = {}) {
-    // ✅ Délègue à ExerciceVideos
     await ExerciceVideos.chargerDans(exerciceRef, elementId, options);
   },
 
-  // ─── Compatibilité avec le code existant ──────────────────
-  async getGIF(ref)     { return null; },
-  async prechargerTout(){ return;      },
-  viderCache()          { return;      },
+  async getGIF(ref)      { return null; },
+  async prechargerTout() { return;      },
+  viderCache()           { return;      },
+
   statsCache() {
     return {
       total:  Object.keys(ExerciceVideos.VIDEOS).length,
@@ -676,5 +842,4 @@ const ExerciseGIF = {
 };
 
 window.ExerciseGIF = ExerciseGIF;
-window.ExerciseGIF = ExerciseGIF;
-console.log('✅ ExerciseGIF v2 chargé — Source: GitHub Free Exercise DB');
+console.log('✅ Utils + ExerciseGIF chargés');
