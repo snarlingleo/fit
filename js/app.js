@@ -1,6 +1,6 @@
 /* ============================================================
-   FitTracker Pro — App.js v1.1 CORRIGÉ
-   Router SPA + Init + Pages complètes
+   FitTracker Pro — App.js v1.2
+   Router SPA + Init + Pages complètes + Feature 6
    ============================================================ */
 
 // ─── ÉTAT GLOBAL ──────────────────────────────────────────────
@@ -40,15 +40,17 @@ async function initServiceWorker() {
       const nw = reg.installing;
       nw.addEventListener('statechange', () => {
         if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-          document.getElementById('update-banner')?.classList.remove('hidden');
+          document.getElementById('update-banner')
+            ?.classList.remove('hidden');
         }
       });
     });
 
-    document.getElementById('btn-update')?.addEventListener('click', () => {
-      reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
-      window.location.reload();
-    });
+    document.getElementById('btn-update')
+      ?.addEventListener('click', () => {
+        reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
+      });
   } catch(e) {
     console.warn('SW Error:', e);
   }
@@ -62,7 +64,10 @@ function afficherSplash() {
       if (splash) {
         splash.style.opacity    = '0';
         splash.style.transition = 'opacity 0.5s ease';
-        setTimeout(() => { splash.classList.add('hidden'); resolve(); }, 500);
+        setTimeout(() => {
+          splash.classList.add('hidden');
+          resolve();
+        }, 500);
       } else resolve();
     }, 2000);
   });
@@ -143,7 +148,10 @@ async function avancerOnboarding(step, alt = false) {
   if (step === 2) {
     const poids  = parseFloat(document.getElementById('ob-poids')?.value);
     const taille = parseFloat(document.getElementById('ob-taille')?.value);
-    if (!poids || !taille) { Utils.toast('Remplis tes mesures !', 'error'); return; }
+    if (!poids || !taille) {
+      Utils.toast('Remplis tes mesures !', 'error');
+      return;
+    }
     Tracker.sauvegarderProfil({ poids, taille });
     Tracker.ajouterMesure({ poids, taille });
   }
@@ -168,10 +176,10 @@ function lancerApp() {
   initNav();
   initInstallPrompt();
   initTheme();
+  initExercicesCustom();
   Notifications.init();
-  Utils.verifierBackupAuto(); 
+  Utils.verifierBackupAuto();
 
-  // Préchargement GIFs en arrière-plan
   const stats = ExerciseGIF.statsCache();
   console.log(`[GIF] Cache: ${stats.cached}/${stats.total}`);
   if (stats.cached < stats.total) {
@@ -184,7 +192,6 @@ function lancerApp() {
     }, 3000);
   }
 
-  // URL params
   const params = new URLSearchParams(window.location.search);
   const page   = params.get('page')   || 'home';
   const action = params.get('action');
@@ -232,28 +239,40 @@ function naviguer(page) {
     case 'home':     renderAccueil();  break;
     case 'training': renderTraining(); break;
     case 'live':     renderLive();     break;
-    case 'stats':    Charts.renderStatsTab(document.getElementById('page-content')); break;
+    case 'stats':
+      Charts.renderStatsTab(
+        document.getElementById('page-content')
+      );
+      break;
     case 'profile':  renderProfil();   break;
     default:         renderAccueil();
   }
 }
 
-// ─── THÈME ────────────────────────────────────────────────────
+// ─── THÈME ÉTENDU ─────────────────────────────────────────────
 function initTheme() {
   appliquerTheme(Utils.storage.get('ft_theme', 'dark'));
 }
 
 function toggleTheme() {
+  const themes  = ['dark', 'light', 'indigo', 'midnight'];
   const actuel  = document.documentElement.getAttribute('data-theme');
-  const nouveau = actuel === 'dark' ? 'light' : 'dark';
+  const idx     = themes.indexOf(actuel);
+  const nouveau = themes[(idx + 1) % themes.length];
   appliquerTheme(nouveau);
   Utils.storage.set('ft_theme', nouveau);
 }
 
 function appliquerTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
+  const icones = {
+    dark:     '☀️',
+    light:    '🌙',
+    indigo:   '💜',
+    midnight: '⭐'
+  };
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  if (btn) btn.textContent = icones[theme] || '☀️';
   AppState.thème = theme;
 }
 
@@ -262,20 +281,26 @@ function initInstallPrompt() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     AppState.installPrompt = e;
-    document.getElementById('install-prompt')?.classList.remove('hidden');
+    document.getElementById('install-prompt')
+      ?.classList.remove('hidden');
   });
 
-  document.getElementById('btn-install')?.addEventListener('click', async () => {
-    if (!AppState.installPrompt) return;
-    AppState.installPrompt.prompt();
-    const result = await AppState.installPrompt.userChoice;
-    if (result.outcome === 'accepted') Utils.toast('App installée ! 🎉', 'success');
-    document.getElementById('install-prompt')?.classList.add('hidden');
-  });
+  document.getElementById('btn-install')
+    ?.addEventListener('click', async () => {
+      if (!AppState.installPrompt) return;
+      AppState.installPrompt.prompt();
+      const result = await AppState.installPrompt.userChoice;
+      if (result.outcome === 'accepted')
+        Utils.toast('App installée ! 🎉', 'success');
+      document.getElementById('install-prompt')
+        ?.classList.add('hidden');
+    });
 
-  document.getElementById('btn-install-dismiss')?.addEventListener('click', () => {
-    document.getElementById('install-prompt')?.classList.add('hidden');
-  });
+  document.getElementById('btn-install-dismiss')
+    ?.addEventListener('click', () => {
+      document.getElementById('install-prompt')
+        ?.classList.add('hidden');
+    });
 }
 
 // ════════════════════════════════════════════════════════════
@@ -296,21 +321,27 @@ function renderAccueil() {
 
   container.innerHTML = `
     <!-- Hero -->
-    <div class="card card-indigo mb-md" style="position:relative;overflow:hidden">
-      <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;
-                  background:rgba(255,255,255,0.05);border-radius:50%"></div>
+    <div class="card card-indigo mb-md"
+         style="position:relative;overflow:hidden">
+      <div style="position:absolute;top:-30px;right:-30px;
+                  width:120px;height:120px;
+                  background:rgba(255,255,255,0.05);
+                  border-radius:50%"></div>
       <div style="font-size:.8rem;opacity:.8;margin-bottom:4px">
         ${Utils.salutation()} 👋
       </div>
-      <div style="font-size:1.8rem;font-weight:800;margin-bottom:var(--space-md)">
+      <div style="font-size:1.8rem;font-weight:800;
+                  margin-bottom:var(--space-md)">
         ${profil.nom || 'Athlète'}
       </div>
       ${seance ? `
-        <div style="background:rgba(255,255,255,0.12);border-radius:var(--radius-md);
+        <div style="background:rgba(255,255,255,0.12);
+                    border-radius:var(--radius-md);
                     padding:var(--space-md);cursor:pointer"
              onclick="naviguer('training')">
-          <div style="font-size:.65rem;font-weight:700;letter-spacing:.08em;
-                      text-transform:uppercase;opacity:.7;margin-bottom:4px">
+          <div style="font-size:.65rem;font-weight:700;
+                      letter-spacing:.08em;text-transform:uppercase;
+                      opacity:.7;margin-bottom:4px">
             ${seance.dansJours === 0
               ? 'Séance du jour'
               : `Dans ${seance.dansJours} jour${seance.dansJours>1?'s':''}`}
@@ -329,7 +360,8 @@ function renderAccueil() {
             <span>${infos.progression}%</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" style="width:${infos.progression}%"></div>
+            <div class="progress-fill"
+                 style="width:${infos.progression}%"></div>
           </div>
         </div>
       ` : `
@@ -343,9 +375,11 @@ function renderAccueil() {
       <div class="card-label">😊 Humeur du jour</div>
       <div class="humeur-grid mt-md">
         ${['🔥','😊','😐','😒','😤'].map(h => `
-          <button class="humeur-btn ${humeur?.humeur===h?'selected':''}"
-                  onclick="selectionnerHumeur('${h}')">${h}</button>
-        `).join('')}
+          <button class="humeur-btn
+                  ${humeur?.humeur===h?'selected':''}"
+                  onclick="selectionnerHumeur('${h}')">
+            ${h}
+          </button>`).join('')}
       </div>
     </div>
 
@@ -386,8 +420,9 @@ function renderAccueil() {
         </div>
         <div style="position:relative;width:80px;height:80px">
           <canvas id="anneau-semaine" width="80" height="80"></canvas>
-          <div style="position:absolute;inset:0;display:flex;align-items:center;
-                      justify-content:center;font-size:1.1rem;font-weight:800;
+          <div style="position:absolute;inset:0;display:flex;
+                      align-items:center;justify-content:center;
+                      font-size:1.1rem;font-weight:800;
                       color:var(--fd-indigo)">
             ${Math.round((seanceDJ/Math.max(objectif,1))*100)}%
           </div>
@@ -400,7 +435,8 @@ function renderAccueil() {
       <div class="flex justify-between items-center mb-md">
         <div class="card-label">⚡ Score Forme</div>
         <span class="chip chip-${
-          score.score>=80?'mint':score.score>=60?'lemon':'coral'
+          score.score>=80 ? 'mint' :
+          score.score>=60 ? 'lemon' : 'coral'
         }">${score.niveau}</span>
       </div>
       <div class="score-forme-content">
@@ -411,7 +447,8 @@ function renderAccueil() {
               stroke-dasharray="${2*Math.PI*34}"
               stroke-dashoffset="${2*Math.PI*34*(1-score.score/100)}"
               style="transition:stroke-dashoffset 1s ease;
-                     transform:rotate(-90deg);transform-origin:center"/>
+                     transform:rotate(-90deg);
+                     transform-origin:center"/>
           </svg>
           <div class="score-number">
             ${score.score}<span class="score-sub">/100</span>
@@ -428,7 +465,8 @@ function renderAccueil() {
               <span class="score-row-value">${r.val}%</span>
             </div>`).join('')}
           <div class="progress-bar mt-md">
-            <div class="progress-fill" style="width:${score.score}%"></div>
+            <div class="progress-fill"
+                 style="width:${score.score}%"></div>
           </div>
         </div>
       </div>
@@ -449,14 +487,16 @@ function renderAccueil() {
         <div class="card-label">🎯 Défi semaine</div>
         <span class="chip chip-indigo">${seanceDJ}/${objectif}</span>
       </div>
-      <p style="font-size:.9rem;color:var(--text-primary);margin:var(--space-sm) 0">
+      <p style="font-size:.9rem;color:var(--text-primary);
+                margin:var(--space-sm) 0">
         Réalise ${objectif} séances cette semaine !
       </p>
       <div class="progress-bar">
         <div class="progress-fill"
-             style="width:${Math.min(100,(seanceDJ/Math.max(objectif,1))*100)}%;
+             style="width:${Math.min(100,
+               (seanceDJ/Math.max(objectif,1))*100)}%;
                     background:${seanceDJ>=objectif
-                      ?'var(--fd-mint)':'var(--fd-indigo)'}">
+                      ? 'var(--fd-mint)' : 'var(--fd-indigo)'}">
         </div>
       </div>
     </div>
@@ -466,33 +506,36 @@ function renderAccueil() {
       <div class="card-label">🌡️ Niveau de fatigue</div>
       <div class="flex gap-sm mt-md">
         ${[
-          { val:0, label:'Frais',  color:'var(--fd-mint)'   },
-          { val:1, label:'OK',     color:'var(--fd-lemon)'  },
-          { val:2, label:'Modéré', color:'var(--fd-coral)'  },
-          { val:3, label:'Épuisé', color:'rgba(255,141,150,.6)'}
+          { val:0, label:'Frais',  color:'var(--fd-mint)'          },
+          { val:1, label:'OK',     color:'var(--fd-lemon)'         },
+          { val:2, label:'Modéré', color:'var(--fd-coral)'         },
+          { val:3, label:'Épuisé', color:'rgba(255,141,150,.6)'    }
         ].map(f => `
           <button onclick="selectionnerFatigue(${f.val})"
                   style="flex:1;padding:var(--space-sm) 4px;
                          border-radius:var(--radius-md);
                          border:2px solid ${fatigue?.niveau===f.val
-                           ?f.color:'var(--border-color)'};
+                           ? f.color : 'var(--border-color)'};
                          background:${fatigue?.niveau===f.val
-                           ?f.color+'22':'var(--bg-card)'};
+                           ? f.color+'22' : 'var(--bg-card)'};
                          color:${fatigue?.niveau===f.val
-                           ?f.color:'var(--text-muted)'};
-                         font-size:.72rem;font-weight:600;transition:all .2s">
+                           ? f.color : 'var(--text-muted)'};
+                         font-size:.72rem;font-weight:600;
+                         transition:all .2s">
             ${f.label}
           </button>`).join('')}
       </div>
     </div>
 
     <!-- Warm-up -->
-    <div class="card mb-md" onclick="naviguer('training')"
+    <div class="card mb-md"
+         onclick="naviguer('training')"
          style="cursor:pointer">
       <div class="flex justify-between items-center">
         <div>
           <div class="card-label">🌡️ Warm-up suggéré</div>
-          <div style="font-size:.88rem;color:var(--text-primary);margin-top:4px">
+          <div style="font-size:.88rem;color:var(--text-primary);
+                      margin-top:4px">
             ${Coach.getWarmupDuJour()?.[0]?.nom || '5 min · Cardio léger'}
           </div>
           <div style="font-size:.72rem;color:var(--text-muted)">
@@ -506,7 +549,9 @@ function renderAccueil() {
 
   requestAnimationFrame(() => {
     const canvas = document.getElementById('anneau-semaine');
-    if (canvas) Utils.graphiques.anneau(canvas, seanceDJ, objectif, '#4b4bf9');
+    if (canvas) {
+      Utils.graphiques.anneau(canvas, seanceDJ, objectif, '#4b4bf9');
+    }
   });
 }
 
@@ -535,9 +580,13 @@ function renderTraining(tab = 'planning', offset = 0) {
       ${tabs.map(t => `
         <button class="tab-btn ${tab===t?'active':''}"
                 onclick="renderTraining('${t}')">
-          ${{planning:'📅 Planning', exercices:'🏋️ Exercices',
-             timer:'⏱️ Timer', phases:'📈 Phases',
-             recup:'🧘 Récup'}[t]}
+          ${{
+            planning:  '📅 Planning',
+            exercices: '🏋️ Exercices',
+            timer:     '⏱️ Timer',
+            phases:    '📈 Phases',
+            recup:     '🧘 Récup'
+          }[t]}
         </button>`).join('')}
     </div>
     <div id="training-content"></div>
@@ -548,8 +597,8 @@ function renderTraining(tab = 'planning', offset = 0) {
     case 'planning':  renderPlanning(content, offset); break;
     case 'exercices': renderListeExercices(content);   break;
     case 'timer':     renderTimerStandalone(content);  break;
-    case 'phases':    renderPhases(content);            break;
-    case 'recup':     renderRecup(content);             break;
+    case 'phases':    renderPhases(content);           break;
+    case 'recup':     renderRecup(content);            break;
   }
 }
 
@@ -562,22 +611,28 @@ function renderPlanning(el, offset = 0) {
   el.innerHTML = `
     <div class="flex items-center justify-between mb-md">
       <button class="btn-icon"
-              onclick="renderTraining('planning',${offset-1})">◄</button>
+              onclick="renderTraining('planning',${offset-1})">
+        ◄
+      </button>
       <div style="text-align:center">
-        <div style="font-weight:700;font-size:1rem">SEMAINE ${semNum}</div>
+        <div style="font-weight:700;font-size:1rem">
+          SEMAINE ${semNum}
+        </div>
         <div style="font-size:.72rem;color:var(--text-muted)">
           ${infos.phase.emoji} ${infos.phase.nom}
         </div>
       </div>
       <button class="btn-icon"
-              onclick="renderTraining('planning',${offset+1})">►</button>
+              onclick="renderTraining('planning',${offset+1})">
+        ►
+      </button>
     </div>
     <div class="card">
       ${semaines.map(jour => `
         <div class="seance-card">
           <span class="seance-day"
                 style="${jour.estAujourdhui
-                  ?'color:var(--fd-indigo);font-weight:800':''}">
+                  ? 'color:var(--fd-indigo);font-weight:800' : ''}">
             ${jour.label}
           </span>
           <div class="seance-info">
@@ -590,14 +645,15 @@ function renderPlanning(el, offset = 0) {
                 · ~${jour.seance.duree_estimee}min
               </div>
             ` : `
-              <div class="seance-name" style="color:var(--text-muted)">
+              <div class="seance-name"
+                   style="color:var(--text-muted)">
                 ✨ Récupération
               </div>`}
           </div>
           ${jour.seance ? `
             <button class="badge-seance"
                     onclick="ouvrirSeance('${jour.seance.id}')">
-              ${jour.estPasse&&!jour.estAujourdhui?'📋':'▶'} Séance
+              ${jour.estPasse&&!jour.estAujourdhui ? '📋' : '▶'} Séance
             </button>
           ` : `<span class="badge-repos">Repos</span>`}
         </div>`).join('')}
@@ -620,7 +676,9 @@ function renderListeExercices(el) {
     </div>
     <div id="ex-list">
       ${Object.entries(groupes).map(([muscle, exos]) => `
-        <div class="section-title">${exos[0]?.emoji||'💪'} ${muscle}</div>
+        <div class="section-title">
+          ${exos[0]?.emoji||'💪'} ${muscle}
+        </div>
         ${exos.map(ex => {
           const uid = `list_gif_${ex.ref}`;
           return `
@@ -628,10 +686,12 @@ function renderListeExercices(el) {
                  onclick="afficherDetailExercice('${ex.ref}')">
               <div class="exercice-header">
                 <div id="${uid}"
-                     style="width:70px;height:70px;border-radius:var(--radius-md);
-                            background:var(--fd-indigo-dim);display:flex;
-                            align-items:center;justify-content:center;
-                            font-size:1.8rem;flex-shrink:0;overflow:hidden">
+                     style="width:70px;height:70px;
+                            border-radius:var(--radius-md);
+                            background:var(--fd-indigo-dim);
+                            display:flex;align-items:center;
+                            justify-content:center;font-size:1.8rem;
+                            flex-shrink:0;overflow:hidden">
                   ${ex.emoji}
                 </div>
                 <div class="exercice-details">
@@ -639,7 +699,8 @@ function renderListeExercices(el) {
                   <div class="exercice-muscle">${ex.muscle}</div>
                   <div class="exercice-volume">${ex.equipement}</div>
                   <div style="font-size:.75rem;margin-top:4px">
-                    ${'⭐'.repeat(ex.difficulte)}${'☆'.repeat(4-ex.difficulte)}
+                    ${'⭐'.repeat(ex.difficulte)}
+                    ${'☆'.repeat(4-ex.difficulte)}
                   </div>
                 </div>
               </div>
@@ -674,13 +735,14 @@ function _observerGIFs() {
 function filtrerExercices(query) {
   const q = query.toLowerCase();
   document.querySelectorAll('.exercice-card').forEach(card => {
-    card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
+    card.style.display =
+      card.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 }
 
 function afficherDetailExercice(ref) {
-  const ex     = EXERCICES[ref];
-  const pr     = Tracker.getPR(ref);
+  const ex    = EXERCICES[ref];
+  const pr    = Tracker.getPR(ref);
   if (!ex) return;
 
   const gifUID  = `modal_gif_${ref}_${Date.now()}`;
@@ -689,9 +751,11 @@ function afficherDetailExercice(ref) {
 
   content.innerHTML = `
     <div id="${gifUID}"
-         style="width:100%;height:200px;display:flex;align-items:center;
-                justify-content:center;background:var(--fd-indigo-dim);
-                border-radius:var(--radius-lg);margin-bottom:var(--space-md);
+         style="width:100%;height:200px;display:flex;
+                align-items:center;justify-content:center;
+                background:var(--fd-indigo-dim);
+                border-radius:var(--radius-lg);
+                margin-bottom:var(--space-md);
                 font-size:4rem;overflow:hidden">
       ${ex.emoji}
     </div>
@@ -701,21 +765,30 @@ function afficherDetailExercice(ref) {
       <span style="margin-left:var(--space-sm)">
         ${'⭐'.repeat(ex.difficulte)}${'☆'.repeat(4-ex.difficulte)}
       </span>
+      ${ex.custom ? `
+        <span class="chip chip-lemon"
+              style="margin-left:var(--space-sm)">
+          ✏️ Custom
+        </span>` : ''}
     </div>
     <div class="card mb-md">
-      <div class="card-label">📍 Équipement Basic-Fit</div>
-      <p style="font-size:.9rem;margin-top:var(--space-xs)">${ex.equipement}</p>
+      <div class="card-label">📍 Équipement</div>
+      <p style="font-size:.9rem;margin-top:var(--space-xs)">
+        ${ex.equipement}
+      </p>
     </div>
     <div class="card mb-md">
       <div class="card-label">📖 Description</div>
-      <p style="font-size:.88rem;line-height:1.6;margin-top:var(--space-xs)">
+      <p style="font-size:.88rem;line-height:1.6;
+                margin-top:var(--space-xs)">
         ${ex.description}
       </p>
     </div>
     <div class="card mb-md">
       <div class="card-label">💡 Conseils</div>
-      ${ex.conseils.map(c => `
-        <div style="display:flex;gap:var(--space-sm);padding:4px 0;font-size:.85rem">
+      ${(ex.conseils||[]).map(c => `
+        <div style="display:flex;gap:var(--space-sm);
+                    padding:4px 0;font-size:.85rem">
           <span style="color:var(--fd-mint)">✓</span>
           <span>${c}</span>
         </div>`).join('')}
@@ -725,22 +798,31 @@ function afficherDetailExercice(ref) {
         <div class="card-label">🏆 Record personnel</div>
         <div class="flex justify-between mt-md">
           <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-lemon)">
+            <div style="font-size:1.3rem;font-weight:800;
+                        color:var(--fd-lemon)">
               ${pr.rm1}kg
             </div>
-            <div style="font-size:.7rem;color:var(--text-muted)">1RM estimé</div>
+            <div style="font-size:.7rem;color:var(--text-muted)">
+              1RM estimé
+            </div>
           </div>
           <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-indigo)">
+            <div style="font-size:1.3rem;font-weight:800;
+                        color:var(--fd-indigo)">
               ${pr.poids}kg
             </div>
-            <div style="font-size:.7rem;color:var(--text-muted)">Meilleur poids</div>
+            <div style="font-size:.7rem;color:var(--text-muted)">
+              Meilleur poids
+            </div>
           </div>
           <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-mint)">
+            <div style="font-size:1.3rem;font-weight:800;
+                        color:var(--fd-mint)">
               ${pr.reps}
             </div>
-            <div style="font-size:.7rem;color:var(--text-muted)">Meilleur reps</div>
+            <div style="font-size:.7rem;color:var(--text-muted)">
+              Meilleur reps
+            </div>
           </div>
         </div>
       </div>` : ''}
@@ -765,33 +847,44 @@ function renderTimerStandalone(el) {
       <div class="timer-presets">
         ${[60,90,120,180].map(s => `
           <button class="preset-btn ${s===90?'active':''}"
-                  onclick="selectionnerPreset(${s},this)">${s}s</button>
-        `).join('')}
-        <button class="preset-btn" onclick="demanderCustomTimer()">⚙️</button>
+                  onclick="selectionnerPreset(${s},this)">
+            ${s}s
+          </button>`).join('')}
+        <button class="preset-btn"
+                onclick="demanderCustomTimer()">⚙️</button>
       </div>
       <div class="countdown-ring">
         <svg width="200" height="200" viewBox="0 0 200 200">
           <circle class="ring-bg" cx="100" cy="100" r="88"
                   stroke-dasharray="${2*Math.PI*88}"/>
-          <circle class="ring-fill" id="ring-fill" cx="100" cy="100" r="88"
-                  stroke-dasharray="${2*Math.PI*88}" stroke-dashoffset="0"/>
+          <circle class="ring-fill" id="ring-fill"
+                  cx="100" cy="100" r="88"
+                  stroke-dasharray="${2*Math.PI*88}"
+                  stroke-dashoffset="0"/>
         </svg>
         <div class="countdown-text">
-          <div class="countdown-number" id="countdown-display">01:30</div>
-          <div class="countdown-label" id="countdown-label">Prêt</div>
+          <div class="countdown-number"
+               id="countdown-display">01:30</div>
+          <div class="countdown-label"
+               id="countdown-label">Prêt</div>
         </div>
       </div>
       <div class="timer-controls mb-md">
         <button class="timer-adjust-btn"
-                onclick="timerRepos.ajuster(-30);updateTimerUI()">-30s</button>
+                onclick="timerRepos.ajuster(-30);
+                         updateTimerUI()">-30s</button>
         <button class="btn-primary" id="btn-timer-start"
                 onclick="toggleTimer()"
-                style="flex:1;max-width:160px">▶ Démarrer</button>
+                style="flex:1;max-width:160px">
+          ▶ Démarrer
+        </button>
         <button class="timer-adjust-btn"
-                onclick="timerRepos.ajuster(30);updateTimerUI()">+30s</button>
+                onclick="timerRepos.ajuster(30);
+                         updateTimerUI()">+30s</button>
       </div>
       <div class="flex gap-md justify-center">
-        <label class="toggle-row" style="border:none;gap:var(--space-sm)">
+        <label class="toggle-row"
+               style="border:none;gap:var(--space-sm)">
           <span style="font-size:.85rem">🔔 Son</span>
           <label class="toggle">
             <input type="checkbox"
@@ -800,7 +893,8 @@ function renderTimerStandalone(el) {
             <span class="toggle-slider"></span>
           </label>
         </label>
-        <label class="toggle-row" style="border:none;gap:var(--space-sm)">
+        <label class="toggle-row"
+               style="border:none;gap:var(--space-sm)">
           <span style="font-size:.85rem">📳 Vibration</span>
           <label class="toggle">
             <input type="checkbox"
@@ -818,7 +912,8 @@ function renderTimerStandalone(el) {
 function selectionnerPreset(s, btn) {
   timerDureeBase = s;
   timerRepos.reset(s);
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.preset-btn')
+    .forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   updateTimerUI(s);
   const startBtn = document.getElementById('btn-timer-start');
@@ -830,18 +925,23 @@ function toggleTimer() {
   if (!timerRepos.isActif()) {
     timerRepos.demarrer(timerDureeBase,
       (r,t) => updateTimerUI(r,t),
-      () => { updateTimerUI(0,timerDureeBase); if(btn) btn.textContent='▶ Démarrer'; }
+      () => {
+        updateTimerUI(0, timerDureeBase);
+        if (btn) btn.textContent = '▶ Démarrer';
+      }
     );
     if (btn) btn.textContent = '⏸ Pause';
   } else {
     timerRepos.pauseReprendre();
-    if (btn) btn.textContent = timerRepos.enPause ? '▶ Reprendre' : '⏸ Pause';
+    if (btn) btn.textContent =
+      timerRepos.enPause ? '▶ Reprendre' : '⏸ Pause';
   }
 }
 
 function updateTimerUI(restant = null, total = null) {
   const r   = restant !== null ? restant : timerRepos.restant;
-  const t   = total   !== null ? total   : (timerRepos.total || timerDureeBase);
+  const t   = total   !== null ? total   :
+              (timerRepos.total || timerDureeBase);
   const pct = t > 0 ? r / t : 1;
 
   const display = document.getElementById('countdown-display');
@@ -850,12 +950,14 @@ function updateTimerUI(restant = null, total = null) {
 
   if (display) display.textContent = Utils.formatDureeMin(r);
   if (label)   label.textContent   =
-    r===0 ? '✅ C\'est parti !' : timerRepos.actif ? 'Repos...' : 'Prêt';
+    r === 0 ? '✅ C\'est parti !' :
+    timerRepos.actif ? 'Repos...' : 'Prêt';
   if (ring) {
     const circ = 2 * Math.PI * 88;
     ring.style.strokeDashoffset = circ * (1 - pct);
-    ring.style.stroke = r<=3 ? 'var(--fd-coral)' :
-                        r<=10 ? 'var(--fd-lemon)' : 'var(--fd-indigo)';
+    ring.style.stroke =
+      r <= 3  ? 'var(--fd-coral)' :
+      r <= 10 ? 'var(--fd-lemon)' : 'var(--fd-indigo)';
   }
 }
 
@@ -870,16 +972,16 @@ function demanderCustomTimer() {
 
 // ── Phases ────────────────────────────────────────────────────
 function renderPhases(el) {
-  const infos = Programme.getInfosProgramme();
+  const infos  = Programme.getInfosProgramme();
   const phases = [
     { num:1, nom:'Reprise',      emoji:'🌱', desc:'Technique & Adaptation',
-      s:'S1-S4',  intensite:'65-70%', color:'var(--fd-mint)'     },
+      s:'S1-S4',   intensite:'65-70%', color:'var(--fd-mint)'     },
     { num:2, nom:'Construction', emoji:'🏗️', desc:'Volume & Hypertrophie',
-      s:'S5-S8',  intensite:'75-80%', color:'var(--fd-indigo)'   },
+      s:'S5-S8',   intensite:'75-80%', color:'var(--fd-indigo)'   },
     { num:3, nom:'Intensité',    emoji:'💥', desc:'Force & Records',
-      s:'S9-S12', intensite:'85-90%', color:'var(--fd-lavender)' },
+      s:'S9-S12',  intensite:'85-90%', color:'var(--fd-lavender)' },
     { num:4, nom:'Peak',         emoji:'🏆', desc:'Records & Décharge',
-      s:'S13-S16',intensite:'95%+',   color:'var(--fd-lemon)'    }
+      s:'S13-S16', intensite:'95%+',   color:'var(--fd-lemon)'    }
   ];
 
   el.innerHTML = `
@@ -889,35 +991,44 @@ function renderPhases(el) {
       </div>
       <div style="margin:var(--space-md) 0">
         <div class="progress-bar">
-          <div class="progress-fill" style="width:${infos.progression}%"></div>
+          <div class="progress-fill"
+               style="width:${infos.progression}%"></div>
         </div>
-        <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
+        <div style="font-size:.72rem;color:var(--text-muted);
+                    margin-top:4px">
           ${infos.progression}% du cycle complété
         </div>
       </div>
     </div>
     ${phases.map(p => `
-      <div class="card mb-md" style="${p.num===infos.phase.numero
-        ?`border-color:${p.color};background:${p.color}15`:''}">
+      <div class="card mb-md" style="${p.num === infos.phase.numero
+        ? `border-color:${p.color};background:${p.color}15` : ''}">
         <div class="flex items-center gap-md">
           <div style="width:44px;height:44px;border-radius:50%;
-                      background:${p.color}22;border:2px solid ${p.color};
-                      display:flex;align-items:center;justify-content:center;
-                      font-size:1.2rem;flex-shrink:0">
+                      background:${p.color}22;
+                      border:2px solid ${p.color};
+                      display:flex;align-items:center;
+                      justify-content:center;font-size:1.2rem;
+                      flex-shrink:0">
             ${p.num < infos.phase.numero ? '✅' :
-              p.num===infos.phase.numero ? p.emoji : '🔒'}
+              p.num === infos.phase.numero ? p.emoji : '🔒'}
           </div>
           <div style="flex:1">
-            <div style="font-weight:700;font-size:.95rem;color:${
-              p.num===infos.phase.numero?p.color:'var(--text-primary)'}">
+            <div style="font-weight:700;font-size:.95rem;
+                        color:${p.num === infos.phase.numero
+                          ? p.color : 'var(--text-primary)'}">
               Phase ${p.num} — ${p.nom}
-              ${p.num===infos.phase.numero
-                ?'<span style="font-size:.7rem;margin-left:4px">← Actuelle</span>':''}
+              ${p.num === infos.phase.numero
+                ? '<span style="font-size:.7rem;margin-left:4px">← Actuelle</span>'
+                : ''}
             </div>
-            <div style="font-size:.75rem;color:var(--text-muted)">${p.desc}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">
+              ${p.desc}
+            </div>
             <div style="font-size:.72rem;margin-top:2px">
               <span class="chip chip-indigo">${p.s}</span>
-              <span style="color:${p.color};font-weight:600;margin-left:var(--space-sm)">
+              <span style="color:${p.color};font-weight:600;
+                           margin-left:var(--space-sm)">
                 ${p.intensite} du max
               </span>
             </div>
@@ -929,7 +1040,6 @@ function renderPhases(el) {
 
 // ── Récup ─────────────────────────────────────────────────────
 function renderRecup(el) {
-  // ✅ FIX : on cherche la séance via le planning du jour
   const indexJour  = Utils.indexJourSemaine(Utils.aujourd_hui());
   const planning   = PLANNING_SEMAINE[indexJour];
   const seanceId   = planning?.seanceId;
@@ -939,7 +1049,8 @@ function renderRecup(el) {
     <div class="card mb-md">
       <div class="card-label">🧘 Étirements du jour</div>
       ${etirements.length === 0 ? `
-        <p style="color:var(--text-muted);padding:var(--space-md);text-align:center">
+        <p style="color:var(--text-muted);padding:var(--space-md);
+                  text-align:center">
           Lance une séance pour voir les étirements adaptés.
         </p>` :
         etirements.map(e => `
@@ -948,36 +1059,39 @@ function renderRecup(el) {
                       border-bottom:1px solid var(--border-color)">
             <span style="font-size:1.5rem">${e.gif}</span>
             <div style="flex:1">
-              <div style="font-size:.9rem;font-weight:600">${e.nom}</div>
+              <div style="font-size:.9rem;font-weight:600">
+                ${e.nom}
+              </div>
             </div>
-            <div style="color:var(--fd-mint);font-size:.82rem;font-weight:600">
-              ${e.duree}s
-            </div>
+            <div style="color:var(--fd-mint);font-size:.82rem;
+                        font-weight:600">${e.duree}s</div>
           </div>`).join('')}
     </div>
     <div class="card">
       <div class="card-label">💡 Conseils récupération</div>
       ${[
-        { emoji:'💧', titre:'Hydratation', desc:'2.5 à 3L d\'eau par jour.' },
-        { emoji:'😴', titre:'Sommeil',     desc:'7 à 9 heures par nuit.'    },
-        { emoji:'🍗', titre:'Protéines',   desc:'~2g/kg de poids corporel.' },
+        { emoji:'💧', titre:'Hydratation', desc:'2.5 à 3L d\'eau par jour.'      },
+        { emoji:'😴', titre:'Sommeil',     desc:'7 à 9 heures par nuit.'         },
+        { emoji:'🍗', titre:'Protéines',   desc:'~2g/kg de poids corporel.'      },
         { emoji:'🧊', titre:'Bain froid',  desc:'2-3 min à 10-15°C post séance.' },
-        { emoji:'📱', titre:'Repos actif', desc:'Marche légère les jours off.' }
+        { emoji:'📱', titre:'Repos actif', desc:'Marche légère les jours off.'   }
       ].map(c => `
-        <div style="display:flex;gap:var(--space-md);padding:var(--space-sm) 0;
+        <div style="display:flex;gap:var(--space-md);
+                    padding:var(--space-sm) 0;
                     border-bottom:1px solid var(--border-color)">
           <span style="font-size:1.3rem">${c.emoji}</span>
           <div>
-            <div style="font-weight:600;font-size:.88rem">${c.titre}</div>
-            <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px">
-              ${c.desc}
+            <div style="font-weight:600;font-size:.88rem">
+              ${c.titre}
             </div>
+            <div style="font-size:.78rem;color:var(--text-muted);
+                        margin-top:2px">${c.desc}</div>
           </div>
         </div>`).join('')}
     </div>`;
 }
 
-// ── Ouvrir séance (aperçu) ────────────────────────────────────
+// ── Ouvrir séance ─────────────────────────────────────────────
 function ouvrirSeance(seanceId) {
   const seance = Programme.getSeanceComplete(seanceId);
   if (!seance) return;
@@ -993,7 +1107,8 @@ function ouvrirSeance(seanceId) {
           ${seance.emoji} ${seance.nom}
         </div>
         <div style="font-size:.75rem;color:var(--text-muted)">
-          ${seance.exercices.length} exercices · ~${seance.duree_estimee}min
+          ${seance.exercices.length} exercices
+          · ~${seance.duree_estimee}min
         </div>
       </div>
     </div>
@@ -1007,7 +1122,9 @@ function ouvrirSeance(seanceId) {
                     padding:var(--space-xs) 0;font-size:.85rem;
                     border-bottom:1px solid var(--border-color)">
           <span>${w.nom}</span>
-          <span style="color:var(--fd-mint)">${Utils.formatDuree(w.duree)}</span>
+          <span style="color:var(--fd-mint)">
+            ${Utils.formatDuree(w.duree)}
+          </span>
         </div>`).join('')}
     </div>
 
@@ -1023,10 +1140,12 @@ function ouvrirSeance(seanceId) {
                       border-bottom:1px solid var(--border-color);
                       align-items:center">
             <div id="${uid}"
-                 style="width:60px;height:60px;border-radius:var(--radius-md);
-                        background:var(--fd-indigo-dim);display:flex;
-                        align-items:center;justify-content:center;
-                        font-size:1.5rem;flex-shrink:0;overflow:hidden">
+                 style="width:60px;height:60px;
+                        border-radius:var(--radius-md);
+                        background:var(--fd-indigo-dim);
+                        display:flex;align-items:center;
+                        justify-content:center;font-size:1.5rem;
+                        flex-shrink:0;overflow:hidden">
               ${ex?.emoji||'💪'}
             </div>
             <div style="flex:1">
@@ -1037,10 +1156,12 @@ function ouvrirSeance(seanceId) {
                 ${ex?.muscle||''}
               </div>
               <div style="font-size:.75rem;color:var(--text-muted)">
-                ${item.series} × ${item.reps} · Repos ${item.repos}s
+                ${item.series} × ${item.reps}
+                · Repos ${item.repos}s
               </div>
               ${pr ? `
-                <div style="font-size:.7rem;color:var(--fd-lemon);margin-top:2px">
+                <div style="font-size:.7rem;color:var(--fd-lemon);
+                            margin-top:2px">
                   🏆 Record: ${pr.poids}kg × ${pr.reps}
                 </div>` : ''}
             </div>
@@ -1058,7 +1179,9 @@ function ouvrirSeance(seanceId) {
 
   seance.exercicesDetails.forEach((item, i) => {
     setTimeout(() => {
-      ExerciseGIF.chargerDans(item.ref, `preview_gif_${item.ref}_${i}`);
+      ExerciseGIF.chargerDans(
+        item.ref, `preview_gif_${item.ref}_${i}`
+      );
     }, i * 100);
   });
 }
@@ -1071,7 +1194,7 @@ function renderLive() {
   const seance    = AppState.seanceEnCours;
 
   if (!seance && !AppState.seanceChoisie) {
-    renderSelecteurSeance(container); // ✅ Maintenant définie juste en dessous
+    renderSelecteurSeance(container);
     return;
   }
   if (!seance) {
@@ -1081,7 +1204,6 @@ function renderLive() {
   renderExerciceActuel(container);
 }
 
-// ✅ FIX — Fonction manquante ajoutée
 function renderSelecteurSeance(container) {
   const seances   = Programme.getAllSeances();
   const prochaine = Programme.getProchaineSeance();
@@ -1106,19 +1228,22 @@ function renderSelecteurSeance(container) {
           ${prochaine.emoji} ${prochaine.nom}
         </div>
         <div style="font-size:.78rem;opacity:.8;margin-top:4px">
-          ${prochaine.exercices.length} exercices · ~${prochaine.duree_estimee}min
+          ${prochaine.exercices.length} exercices
+          · ~${prochaine.duree_estimee}min
         </div>
       </div>` : ''}
 
     ${seances.map(s => `
-      <div class="seance-card" onclick="ouvrirSeance('${s.id}')">
+      <div class="seance-card"
+           onclick="ouvrirSeance('${s.id}')">
         <span style="font-size:1.5rem;margin-right:var(--space-md)">
           ${s.emoji}
         </span>
         <div class="seance-info">
           <div class="seance-name">${s.nom}</div>
           <div class="seance-meta">
-            ${s.exercices.length} exercices · ~${s.duree_estimee}min
+            ${s.exercices.length} exercices
+            · ~${s.duree_estimee}min
           </div>
         </div>
         <span style="color:var(--fd-indigo)">▶</span>
@@ -1143,15 +1268,14 @@ function demarrerNouvelleSeance(seance) {
   renderExerciceActuel(document.getElementById('page-content'));
 }
 
-// ✅ VERSION UNIQUE et correcte de renderExerciceActuel
 function renderExerciceActuel(container) {
-  const seance  = AppState.seanceEnCours;
+  const seance   = AppState.seanceEnCours;
   if (!seance) return;
 
-  const item    = seance.exercicesDetails[AppState.exerciceIndex];
-  const ex      = item?.details;
+  const item     = seance.exercicesDetails[AppState.exerciceIndex];
+  const ex       = item?.details;
   const derniere = Tracker.getDernierePerf(seance.id, item?.ref);
-  const gifUID  = `live_gif_${item?.ref}_${Date.now()}`;
+  const gifUID   = `live_gif_${item?.ref}_${Date.now()}`;
 
   container.innerHTML = `
     <!-- Header -->
@@ -1174,10 +1298,10 @@ function renderExerciceActuel(container) {
     <!-- Exercice card -->
     <div class="exercice-card mb-md">
 
-      <!-- GIF grand format -->
       <div id="${gifUID}"
-           style="width:100%;height:220px;display:flex;align-items:center;
-                  justify-content:center;background:var(--fd-indigo-dim);
+           style="width:100%;height:220px;display:flex;
+                  align-items:center;justify-content:center;
+                  background:var(--fd-indigo-dim);
                   border-radius:var(--radius-md) var(--radius-md) 0 0;
                   font-size:4rem;overflow:hidden">
         ${ex?.emoji || '💪'}
@@ -1185,53 +1309,59 @@ function renderExerciceActuel(container) {
 
       <div style="padding:var(--space-md);text-align:center;
                   border-bottom:1px solid var(--border-color)">
-        <div style="font-size:1.2rem;font-weight:700">${ex?.nom||item?.ref}</div>
+        <div style="font-size:1.2rem;font-weight:700">
+          ${ex?.nom||item?.ref}
+        </div>
         <div style="font-size:.8rem;color:var(--fd-mint);margin-top:4px">
           ${ex?.muscle||''}
         </div>
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
-          ${item?.series} séries × ${item?.reps} reps · Repos ${item?.repos}s
+          ${item?.series} séries × ${item?.reps} reps
+          · Repos ${item?.repos}s
         </div>
         ${derniere ? `
-          <div style="font-size:.72rem;color:var(--fd-lemon);margin-top:4px">
+          <div style="font-size:.72rem;color:var(--fd-lemon);
+                      margin-top:4px">
             📊 Dernière fois: ${derniere.poids}kg × ${derniere.reps} reps
           </div>` : ''}
       </div>
 
-      <!-- Indicateurs séries -->
       <div style="padding:var(--space-sm) var(--space-md)">
         <div class="series-indicators">
           ${Array.from({length:item?.series||4},(_,i) => `
             <div class="serie-dot ${
-              i+1 < AppState.serieActuelle  ? 'done'    :
+              i+1 <  AppState.serieActuelle ? 'done'    :
               i+1 === AppState.serieActuelle ? 'current' : ''}">
               ${i+1 < AppState.serieActuelle ? '✓' : i+1}
             </div>`).join('')}
         </div>
       </div>
 
-      <!-- Inputs -->
       <div style="padding:var(--space-md)">
         <div style="font-size:.85rem;font-weight:600;text-align:center;
-                    color:var(--text-secondary);margin-bottom:var(--space-sm)">
+                    color:var(--text-secondary);
+                    margin-bottom:var(--space-sm)">
           Série ${AppState.serieActuelle} / ${item?.series}
         </div>
         <div class="input-group mb-md">
           <div style="flex:1">
-            <div class="input-label" style="text-align:center">Poids (kg)</div>
+            <div class="input-label" style="text-align:center">
+              Poids (kg)
+            </div>
             <input class="input" id="inp-poids" type="number"
                    placeholder="${derniere?.poids||'0'}"
                    value="${derniere?.poids||''}" step="2.5" />
           </div>
           <div style="flex:1">
-            <div class="input-label" style="text-align:center">Reps</div>
+            <div class="input-label" style="text-align:center">
+              Reps
+            </div>
             <input class="input" id="inp-reps" type="number"
                    placeholder="${derniere?.reps||'0'}"
                    value="${derniere?.reps||''}" />
           </div>
         </div>
 
-        <!-- RPE -->
         <div class="rpe-selector">
           <div class="rpe-label">Effort ressenti (RPE)</div>
           <div class="rpe-grid">
@@ -1243,7 +1373,8 @@ function renderExerciceActuel(container) {
           </div>
         </div>
 
-        <button class="btn-primary mt-md" onclick="validerSerie()">
+        <button class="btn-primary mt-md"
+                onclick="validerSerie()">
           ✅ Valider série ${AppState.serieActuelle}
         </button>
       </div>
@@ -1251,14 +1382,17 @@ function renderExerciceActuel(container) {
 
     <!-- Zone repos -->
     <div id="zone-repos" class="hidden">
-      <div class="card" style="text-align:center;padding:var(--space-xl)">
+      <div class="card" style="text-align:center;
+                                padding:var(--space-xl)">
         <div class="timer-title">💤 Repos</div>
         <div class="countdown-ring"
-             style="width:160px;height:160px;margin:var(--space-md) auto">
+             style="width:160px;height:160px;
+                    margin:var(--space-md) auto">
           <svg width="160" height="160" viewBox="0 0 160 160">
             <circle class="ring-bg" cx="80" cy="80" r="70"
                     stroke-dasharray="${2*Math.PI*70}"/>
-            <circle class="ring-fill" id="live-ring" cx="80" cy="80" r="70"
+            <circle class="ring-fill" id="live-ring"
+                    cx="80" cy="80" r="70"
                     stroke-dasharray="${2*Math.PI*70}"
                     stroke-dashoffset="0"/>
           </svg>
@@ -1272,18 +1406,19 @@ function renderExerciceActuel(container) {
         </div>
         <div class="timer-controls">
           <button class="timer-adjust-btn"
-                  onclick="timerRepos.ajuster(-15);updateLiveTimer()">-15s</button>
+                  onclick="timerRepos.ajuster(-15);
+                           updateLiveTimer()">-15s</button>
           <button class="timer-adjust-btn"
                   onclick="passerRepos()"
                   style="color:var(--fd-mint)">⏭ Passer</button>
           <button class="timer-adjust-btn"
-                  onclick="timerRepos.ajuster(15);updateLiveTimer()">+15s</button>
+                  onclick="timerRepos.ajuster(15);
+                           updateLiveTimer()">+15s</button>
         </div>
       </div>
     </div>
   `;
 
-  // ✅ Charger GIF async
   ExerciseGIF.chargerDans(item?.ref, gifUID);
 }
 
@@ -1291,7 +1426,8 @@ let rpeActuel = null;
 
 function selectionnerRPE(val, btn) {
   rpeActuel = val;
-  document.querySelectorAll('.rpe-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.rpe-btn')
+    .forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
 }
 
@@ -1307,7 +1443,8 @@ function validerSerie() {
   const seance = AppState.seanceEnCours;
   const item   = seance.exercicesDetails[AppState.exerciceIndex];
   const result = Tracker.sauvegarderSerie(
-    seance.id, item.ref, AppState.serieActuelle, reps, poids, rpeActuel
+    seance.id, item.ref, AppState.serieActuelle,
+    reps, poids, rpeActuel
   );
 
   rpeActuel = null;
@@ -1324,13 +1461,19 @@ function validerSerie() {
   if (AppState.serieActuelle < item.series) {
     AppState.serieActuelle++;
     lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(document.getElementById('page-content'));
+      renderExerciceActuel(
+        document.getElementById('page-content')
+      );
     });
-  } else if (AppState.exerciceIndex + 1 < seance.exercicesDetails.length) {
+  } else if (
+    AppState.exerciceIndex + 1 < seance.exercicesDetails.length
+  ) {
     AppState.exerciceIndex++;
     AppState.serieActuelle = 1;
     lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(document.getElementById('page-content'));
+      renderExerciceActuel(
+        document.getElementById('page-content')
+      );
     });
   } else {
     terminerSeance();
@@ -1363,8 +1506,9 @@ function updateLiveTimerValues(restant, total) {
     const circ = 2 * Math.PI * 70;
     const pct  = total > 0 ? restant / total : 1;
     ring.style.strokeDashoffset = circ * (1 - pct);
-    ring.style.stroke = restant<=3 ? 'var(--fd-coral)' :
-                        restant<=10 ? 'var(--fd-lemon)' : 'var(--fd-indigo)';
+    ring.style.stroke =
+      restant <= 3  ? 'var(--fd-coral)' :
+      restant <= 10 ? 'var(--fd-lemon)' : 'var(--fd-indigo)';
     ring.style.transition = 'stroke-dashoffset 1s linear';
   }
 }
@@ -1409,16 +1553,21 @@ function terminerSeance() {
     <div class="fin-screen">
       <div class="fin-emoji">🎉</div>
       <div class="fin-title">Séance terminée !</div>
-      <p style="color:var(--text-secondary);margin-bottom:var(--space-lg)">
+      <p style="color:var(--text-secondary);
+                margin-bottom:var(--space-lg)">
         Bravo ${Tracker.getProfil().nom||''} ! Incroyable effort.
       </p>
       <div class="fin-stats-grid mb-md">
         <div class="fin-stat">
-          <div class="fin-stat-value">${Utils.formatDuree(duree)}</div>
+          <div class="fin-stat-value">
+            ${Utils.formatDuree(duree)}
+          </div>
           <div class="fin-stat-label">Durée</div>
         </div>
         <div class="fin-stat">
-          <div class="fin-stat-value">${Utils.formatVolume(volume)}</div>
+          <div class="fin-stat-value">
+            ${Utils.formatVolume(volume)}
+          </div>
           <div class="fin-stat-label">Volume</div>
         </div>
         <div class="fin-stat">
@@ -1429,19 +1578,24 @@ function terminerSeance() {
       ${prs.length > 0 ? `
         <div class="pr-alert mb-md">
           <div class="pr-alert-title">
-            🏆 ${prs.length} nouveau${prs.length>1?'x':''} record${prs.length>1?'s':''} !
+            🏆 ${prs.length} nouveau${prs.length>1?'x':''}
+            record${prs.length>1?'s':''} !
           </div>
           ${prs.map(p => `
             <div class="pr-alert-item">
               <span>🎯</span>
-              <span>${EXERCICES[p.ref]?.nom||p.ref}: ${p.poids}kg × ${p.reps}</span>
+              <span>
+                ${EXERCICES[p.ref]?.nom||p.ref}:
+                ${p.poids}kg × ${p.reps}
+              </span>
             </div>`).join('')}
         </div>` : ''}
       <button class="btn-primary mb-md"
               onclick="ajouterJournalPostSeance('${seance.id}')">
         📔 Ajouter une note
       </button>
-      <button class="btn-secondary" onclick="naviguer('home')">
+      <button class="btn-secondary"
+              onclick="naviguer('home')">
         🏠 Retour accueil
       </button>
     </div>`;
@@ -1469,7 +1623,8 @@ function ajouterJournalPostSeance(seanceId) {
 }
 
 function sauvegarderNoteJournal(seanceId) {
-  const texte = document.getElementById('journal-texte')?.value?.trim();
+  const texte =
+    document.getElementById('journal-texte')?.value?.trim();
   if (!texte) return;
   Tracker.ajouterEntreeJournal(texte, seanceId);
   Gamification.ajouterXP(25, 'journal');
@@ -1482,27 +1637,38 @@ function sauvegarderNoteJournal(seanceId) {
 // ════════════════════════════════════════════════════════════
 function renderProfil(tab = 'moi') {
   const container = document.getElementById('page-content');
-  const tabs = ['moi','journal','objectifs','blessure','coach','outils'];
+  const tabs = [
+    'moi','journal','objectifs','blessure',
+    'coach','custom','outils'
+  ];
 
   container.innerHTML = `
     <div class="tabs-container">
       ${tabs.map(t => `
         <button class="tab-btn ${tab===t?'active':''}"
                 onclick="renderProfil('${t}')">
-          ${{moi:'👤 Moi', journal:'📔 Journal', objectifs:'🎯 Objectifs',
-             blessure:'🩹 Blessure', coach:'🤖 Coach', outils:'🔧 Outils'}[t]}
+          ${{
+            moi:       '👤 Moi',
+            journal:   '📔 Journal',
+            objectifs: '🎯 Objectifs',
+            blessure:  '🩹 Blessure',
+            coach:     '🤖 Coach',
+            custom:    '🏋️ Mes Exos',
+            outils:    '🔧 Outils'
+          }[t]}
         </button>`).join('')}
     </div>
     <div id="profil-content"></div>`;
 
   const content = document.getElementById('profil-content');
   switch(tab) {
-    case 'moi':       renderProfilMoi(content);      break;
-    case 'journal':   renderJournal(content);        break;
-    case 'objectifs': renderObjectifs(content);      break;
-    case 'blessure':  renderBlessure(content);       break;
-    case 'coach':     Coach.renderCoachTab(content); break;
-    case 'outils':    renderOutils(content);         break;
+    case 'moi':       renderProfilMoi(content);           break;
+    case 'journal':   renderJournal(content);             break;
+    case 'objectifs': renderObjectifs(content);           break;
+    case 'blessure':  renderBlessure(content);            break;
+    case 'coach':     Coach.renderCoachTab(content);      break;
+    case 'custom':    renderExercicesCustom(content);     break;
+    case 'outils':    renderOutils(content);              break;
   }
 }
 
@@ -1512,12 +1678,40 @@ function renderProfilMoi(el) {
   const xp      = Gamification.getXP();
   const streak  = Tracker.getStreak();
 
+  const avatars = ['💪','🏋️','🔥','⚡','🦁','🐺','🦅','👑','🚀','💎'];
+
   el.innerHTML = `
     <div class="profil-card mb-md">
-      <div class="profil-avatar">${profil.avatar||'💪'}</div>
+      <!-- Sélecteur avatar -->
+      <div style="margin-bottom:var(--space-md)">
+        <div style="font-size:3rem;text-align:center;
+                    margin-bottom:var(--space-sm)">
+          ${profil.avatar||'💪'}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;
+                    justify-content:center">
+          ${avatars.map(a => `
+            <button onclick="changerAvatar('${a}')"
+                    style="font-size:1.4rem;padding:4px 8px;
+                           border-radius:var(--radius-sm);
+                           border:2px solid ${
+                             (profil.avatar||'💪') === a
+                               ? 'var(--fd-lemon)'
+                               : 'transparent'};
+                           background:${
+                             (profil.avatar||'💪') === a
+                               ? 'rgba(249,239,119,0.1)'
+                               : 'transparent'};
+                           cursor:pointer;transition:all .2s">
+              ${a}
+            </button>`).join('')}
+        </div>
+      </div>
+
       <div class="profil-name">${profil.nom||'Athlète'}</div>
       <div class="profil-level">
-        ${xp.niveau.emoji} Niveau ${xp.niveau.numero} — ${xp.niveau.nom}
+        ${xp.niveau.emoji} Niveau ${xp.niveau.numero}
+        — ${xp.niveau.nom}
       </div>
       <div style="margin-top:var(--space-md)">
         <div class="flex justify-between"
@@ -1527,8 +1721,9 @@ function renderProfilMoi(el) {
         </div>
         <div style="height:6px;background:rgba(255,255,255,0.2);
                     border-radius:99px;overflow:hidden">
-          <div style="height:100%;width:${xp.pourcentage}%;background:white;
-                      border-radius:99px;transition:width 1s"></div>
+          <div style="height:100%;width:${xp.pourcentage}%;
+                      background:white;border-radius:99px;
+                      transition:width 1s"></div>
         </div>
       </div>
     </div>
@@ -1547,7 +1742,9 @@ function renderProfilMoi(el) {
         <span class="stat-label">Max Streak</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value">${Object.keys(Tracker.getAllPRs()).length}</span>
+        <span class="stat-value">
+          ${Object.keys(Tracker.getAllPRs()).length}
+        </span>
         <span class="stat-label">PRs</span>
       </div>
     </div>
@@ -1557,20 +1754,28 @@ function renderProfilMoi(el) {
       <div style="display:grid;grid-template-columns:1fr 1fr;
                   gap:var(--space-sm);margin-top:var(--space-md)">
         ${[
-          { id:'m-poids',    label:'Poids (kg)',   val:mesures.poids   ||profil.poids   ||'' },
-          { id:'m-taille',   label:'Taille (cm)',  val:mesures.taille  ||profil.taille  ||'' },
-          { id:'m-bras',     label:'Bras (cm)',    val:mesures.bras    ||''                   },
-          { id:'m-poitrine', label:'Poitrine (cm)',val:mesures.poitrine||''                   },
-          { id:'m-taille2',  label:'Taille (cm)',  val:mesures.taille2 ||''                   },
-          { id:'m-hanches',  label:'Hanches (cm)', val:mesures.hanches ||''                   }
+          { id:'m-poids',    label:'Poids (kg)',
+            val: mesures.poids   ||profil.poids   ||'' },
+          { id:'m-taille',   label:'Taille (cm)',
+            val: mesures.taille  ||profil.taille  ||'' },
+          { id:'m-bras',     label:'Bras (cm)',
+            val: mesures.bras    ||''                   },
+          { id:'m-poitrine', label:'Poitrine (cm)',
+            val: mesures.poitrine||''                   },
+          { id:'m-taille2',  label:'Tour taille (cm)',
+            val: mesures.taille2 ||''                   },
+          { id:'m-hanches',  label:'Hanches (cm)',
+            val: mesures.hanches ||''                   }
         ].map(m => `
           <div>
             <div class="input-label">${m.label}</div>
             <input class="input" id="${m.id}" type="number"
-                   placeholder="${m.label}" value="${m.val}" />
+                   placeholder="${m.label}"
+                   value="${m.val}" />
           </div>`).join('')}
       </div>
-      <button class="btn-primary mt-md" onclick="sauvegarderMesures()">
+      <button class="btn-primary mt-md"
+              onclick="sauvegarderMesures()">
         💾 Sauvegarder
       </button>
     </div>
@@ -1579,11 +1784,19 @@ function renderProfilMoi(el) {
       <div class="card-label">✏️ Modifier profil</div>
       <div class="input-label mt-md">Prénom</div>
       <input class="input" id="edit-nom"
-             value="${profil.nom||''}" placeholder="Ton prénom" />
-      <button class="btn-primary mt-md" onclick="sauvegarderProfil()">
+             value="${profil.nom||''}"
+             placeholder="Ton prénom" />
+      <button class="btn-primary mt-md"
+              onclick="sauvegarderProfil()">
         💾 Sauvegarder
       </button>
     </div>`;
+}
+
+function changerAvatar(avatar) {
+  Tracker.sauvegarderProfil({ avatar });
+  Utils.vibrerBeep();
+  renderProfilMoi(document.getElementById('profil-content'));
 }
 
 function sauvegarderMesures() {
@@ -1596,7 +1809,7 @@ function sauvegarderMesures() {
     hanches:  parseFloat(document.getElementById('m-hanches')?.value)  ||undefined
   };
   Tracker.ajouterMesure(data);
-  if (data.poids)  Tracker.sauvegarderProfil({ poids:data.poids });
+  if (data.poids)  Tracker.sauvegarderProfil({ poids:data.poids   });
   if (data.taille) Tracker.sauvegarderProfil({ taille:data.taille });
   Utils.toast('Mesures sauvegardées !', 'success');
 }
@@ -1611,19 +1824,26 @@ function sauvegarderProfil() {
 function renderJournal(el) {
   const journal = Tracker.getJournal();
   el.innerHTML = `
-    <button class="btn-primary mb-md" onclick="ajouterEntreeJournal()">
+    <button class="btn-primary mb-md"
+            onclick="ajouterEntreeJournal()">
       + Nouvelle note
     </button>
     ${journal.length === 0 ? `
-      <div class="card" style="text-align:center;padding:var(--space-xl)">
-        <div style="font-size:2rem;margin-bottom:var(--space-sm)">📔</div>
+      <div class="card"
+           style="text-align:center;padding:var(--space-xl)">
+        <div style="font-size:2rem;margin-bottom:var(--space-sm)">
+          📔
+        </div>
         <p style="color:var(--text-muted)">
-          Ton journal est vide.<br>Commence à noter tes séances !
+          Ton journal est vide.<br>
+          Commence à noter tes séances !
         </p>
       </div>` :
       journal.map(e => `
         <div class="journal-entry">
-          <div class="journal-date">${Utils.formatDateCourt(e.date)}</div>
+          <div class="journal-date">
+            ${Utils.formatDateCourt(e.date)}
+          </div>
           ${e.seanceId ? `
             <div class="journal-seance">
               ${SEANCES_BASE[e.seanceId]?.emoji||''}
@@ -1631,8 +1851,10 @@ function renderJournal(el) {
             </div>` : ''}
           <div class="journal-text">${e.texte}</div>
           <button onclick="supprimerJournal('${e.id}')"
-                  style="margin-top:var(--space-sm);background:none;border:none;
-                         color:var(--text-muted);font-size:.75rem;cursor:pointer">
+                  style="margin-top:var(--space-sm);
+                         background:none;border:none;
+                         color:var(--text-muted);
+                         font-size:.75rem;cursor:pointer">
             🗑️ Supprimer
           </button>
         </div>`).join('')}`;
@@ -1642,11 +1864,14 @@ function ajouterEntreeJournal() {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">📔 Nouvelle note</h3>
+    <h3 style="margin-bottom:var(--space-md)">
+      📔 Nouvelle note
+    </h3>
     <textarea class="input" id="new-journal" rows="5"
               placeholder="Tes pensées, sensations, objectifs..."
               style="resize:vertical;min-height:140px"></textarea>
-    <button class="btn-primary mt-md" onclick="sauvegarderJournal()">
+    <button class="btn-primary mt-md"
+            onclick="sauvegarderJournal()">
       💾 Sauvegarder
     </button>`;
   modal.classList.remove('hidden');
@@ -1655,7 +1880,8 @@ function ajouterEntreeJournal() {
 }
 
 function sauvegarderJournal() {
-  const texte = document.getElementById('new-journal')?.value?.trim();
+  const texte =
+    document.getElementById('new-journal')?.value?.trim();
   if (!texte) return;
   Tracker.ajouterEntreeJournal(texte);
   Gamification.ajouterXP(25, 'journal');
@@ -1665,18 +1891,26 @@ function sauvegarderJournal() {
 }
 
 async function supprimerJournal(id) {
-  const ok = await Utils.confirmer('Supprimer cette note ?','Cette action est irréversible.');
-  if (ok) { Tracker.supprimerEntreeJournal(id); renderProfil('journal'); }
+  const ok = await Utils.confirmer(
+    'Supprimer cette note ?',
+    'Cette action est irréversible.'
+  );
+  if (ok) {
+    Tracker.supprimerEntreeJournal(id);
+    renderProfil('journal');
+  }
 }
 
 function renderObjectifs(el) {
   const objectifs = Tracker.getObjectifs();
   el.innerHTML = `
-    <button class="btn-primary mb-md" onclick="ajouterObjectif()">
+    <button class="btn-primary mb-md"
+            onclick="ajouterObjectif()">
       + Nouvel objectif
     </button>
     ${objectifs.length === 0 ? `
-      <div class="card" style="text-align:center;padding:var(--space-xl)">
+      <div class="card"
+           style="text-align:center;padding:var(--space-xl)">
         <div style="font-size:2rem">🎯</div>
         <p style="color:var(--text-muted);margin-top:var(--space-sm)">
           Définis tes objectifs pour rester motivé !
@@ -1687,18 +1921,25 @@ function renderObjectifs(el) {
         return `
           <div class="objectif-card">
             <div class="objectif-header">
-              <span class="objectif-name">${o.emoji||'🎯'} ${o.nom}</span>
+              <span class="objectif-name">
+                ${o.emoji||'🎯'} ${o.nom}
+              </span>
               <span class="objectif-pct">${pct}%</span>
             </div>
             <div class="progress-bar mb-md">
               <div class="progress-fill"
                    style="width:${pct}%;background:${
-                     pct>=100?'var(--fd-mint)':'var(--fd-indigo)'}"></div>
+                     pct>=100 ? 'var(--fd-mint)' : 'var(--fd-indigo)'}">
+              </div>
             </div>
             <div class="objectif-progress">
-              <span>Actuel: <strong>${o.valeurActuelle||'?'} ${o.unite||''}</strong></span>
+              <span>
+                Actuel:
+                <strong>${o.valeurActuelle||'?'} ${o.unite||''}</strong>
+              </span>
               <span>→ ${o.valeurCible} ${o.unite||''}</span>
-              ${o.echeance?`<span>📅 ${o.echeance}</span>`:''}
+              ${o.echeance
+                ? `<span>📅 ${o.echeance}</span>` : ''}
             </div>
             <div style="margin-top:var(--space-sm)">
               <button class="btn-secondary btn-sm"
@@ -1714,17 +1955,22 @@ function ajouterObjectif() {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">🎯 Nouvel objectif</h3>
+    <h3 style="margin-bottom:var(--space-md)">
+      🎯 Nouvel objectif
+    </h3>
     <div class="input-label">Objectif</div>
-    <input class="input mb-md" id="obj-nom" placeholder="ex: Bench Press 100kg"/>
+    <input class="input mb-md" id="obj-nom"
+           placeholder="ex: Bench Press 100kg"/>
     <div class="flex gap-sm mb-md">
       <div style="flex:1">
         <div class="input-label">Valeur actuelle</div>
-        <input class="input" id="obj-actuel" type="number" placeholder="85"/>
+        <input class="input" id="obj-actuel"
+               type="number" placeholder="85"/>
       </div>
       <div style="flex:1">
         <div class="input-label">Valeur cible</div>
-        <input class="input" id="obj-cible" type="number" placeholder="100"/>
+        <input class="input" id="obj-cible"
+               type="number" placeholder="100"/>
       </div>
     </div>
     <div class="flex gap-sm mb-md">
@@ -1734,7 +1980,8 @@ function ajouterObjectif() {
       </div>
       <div style="flex:1">
         <div class="input-label">Émoji</div>
-        <input class="input" id="obj-emoji" placeholder="🏋️" maxlength="2"/>
+        <input class="input" id="obj-emoji"
+               placeholder="🏋️" maxlength="2"/>
       </div>
     </div>
     <div class="input-label">Échéance (optionnel)</div>
@@ -1750,14 +1997,19 @@ function ajouterObjectif() {
 function sauvegarderObjectif() {
   const nom   = document.getElementById('obj-nom')?.value?.trim();
   const cible = parseFloat(document.getElementById('obj-cible')?.value);
-  if (!nom||!cible) { Utils.toast('Remplis le nom et la cible !','error'); return; }
+  if (!nom||!cible) {
+    Utils.toast('Remplis le nom et la cible !','error');
+    return;
+  }
   Tracker.ajouterObjectif({
     nom,
-    valeurActuelle: parseFloat(document.getElementById('obj-actuel')?.value)||0,
-    valeurCible:    cible,
-    unite:    document.getElementById('obj-unite')?.value||'',
-    emoji:    document.getElementById('obj-emoji')?.value||'🎯',
-    echeance: document.getElementById('obj-date')?.value||null
+    valeurActuelle: parseFloat(
+      document.getElementById('obj-actuel')?.value
+    ) || 0,
+    valeurCible: cible,
+    unite:    document.getElementById('obj-unite')?.value || '',
+    emoji:    document.getElementById('obj-emoji')?.value || '🎯',
+    echeance: document.getElementById('obj-date')?.value  || null
   });
   Utils.toast('Objectif ajouté !','success');
   document.getElementById('modal-info')?.classList.add('hidden');
@@ -1765,23 +2017,32 @@ function sauvegarderObjectif() {
 }
 
 function mettreAJourObjectif(id) {
-  const obj = Tracker.getObjectifs().find(o => o.id===id);
+  const obj = Tracker.getObjectifs().find(o => o.id === id);
   if (!obj) return;
-  const val = prompt(`Valeur actuelle pour "${obj.nom}":`, obj.valeurActuelle);
+  const val = prompt(
+    `Valeur actuelle pour "${obj.nom}":`,
+    obj.valeurActuelle
+  );
   if (!val) return;
-  Tracker.mettreAJourObjectif(id,{valeurActuelle:parseFloat(val)});
+  Tracker.mettreAJourObjectif(id, {
+    valeurActuelle: parseFloat(val)
+  });
   if (parseFloat(val) >= obj.valeurCible) {
-    Tracker.mettreAJourObjectif(id,{complete:true});
+    Tracker.mettreAJourObjectif(id, { complete: true });
     Utils.confetti(2000);
-    Utils.toast('🎉 Objectif atteint !','success',4000);
+    Utils.toast('🎉 Objectif atteint !', 'success', 4000);
   }
   renderProfil('objectifs');
 }
 
 function renderBlessure(el) {
   const blessures = Tracker.getBlessures().filter(b => b.active);
-  const zones = ['Épaule gauche','Épaule droite','Dos haut','Dos bas',
-                 'Genou gauche','Genou droit','Coude','Poignet','Cheville','Cou'];
+  const zones = [
+    'Épaule gauche','Épaule droite','Dos haut','Dos bas',
+    'Genou gauche','Genou droit','Coude','Poignet',
+    'Cheville','Cou'
+  ];
+
   el.innerHTML = `
     <div class="card mb-md">
       <div class="card-label">🩹 Signaler une douleur</div>
@@ -1790,7 +2051,7 @@ function renderBlessure(el) {
         <div>
           <div class="input-label">Zone</div>
           <select class="input" id="b-zone">
-            ${zones.map(z=>`<option>${z}</option>`).join('')}
+            ${zones.map(z => `<option>${z}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -1803,7 +2064,8 @@ function renderBlessure(el) {
         </div>
       </div>
       <textarea class="input mb-md" id="b-notes" rows="2"
-                placeholder="Notes..." style="resize:none"></textarea>
+                placeholder="Notes..."
+                style="resize:none"></textarea>
       <button class="btn-primary" onclick="ajouterBlessure()">
         🩹 Signaler
       </button>
@@ -1811,22 +2073,32 @@ function renderBlessure(el) {
     ${blessures.length > 0 ? `
       <div class="section-title">⚠️ Blessures actives</div>
       ${blessures.map(b => `
-        <div class="card mb-md" style="border-color:var(--fd-coral)">
+        <div class="card mb-md"
+             style="border-color:var(--fd-coral)">
           <div class="flex justify-between items-center">
             <div>
               <div style="font-weight:600">${b.zone}</div>
               <div style="font-size:.78rem;color:var(--fd-coral)">
-                ${b.severite==='severe'?'🔴':b.severite==='moderee'?'🟠':'🟡'}
-                ${b.severite} · depuis ${Utils.formatDateCourt(b.date)}
+                ${b.severite==='severe' ? '🔴' :
+                  b.severite==='moderee' ? '🟠' : '🟡'}
+                ${b.severite}
+                · depuis ${Utils.formatDateCourt(b.date)}
               </div>
-              ${b.notes?`<div style="font-size:.78rem;color:var(--text-muted);
-                              margin-top:4px">${b.notes}</div>`:''}
+              ${b.notes ? `
+                <div style="font-size:.78rem;
+                            color:var(--text-muted);
+                            margin-top:4px">
+                  ${b.notes}
+                </div>` : ''}
             </div>
             <button class="btn-secondary btn-sm"
-                    onclick="guerirBlessure('${b.id}')">✅ Guéri</button>
+                    onclick="guerirBlessure('${b.id}')">
+              ✅ Guéri
+            </button>
           </div>
         </div>`).join('')}` : `
-      <div class="card" style="text-align:center;padding:var(--space-xl)">
+      <div class="card"
+           style="text-align:center;padding:var(--space-xl)">
         <div style="font-size:2rem">💪</div>
         <p style="color:var(--fd-mint);margin-top:var(--space-sm)">
           Aucune blessure active !
@@ -1840,71 +2112,335 @@ function ajouterBlessure() {
   const notes    = document.getElementById('b-notes')?.value?.trim();
   if (!zone) return;
   Tracker.ajouterBlessure(zone, severite, notes);
-  Utils.toast('Blessure signalée. Sois prudent !','info');
+  Utils.toast('Blessure signalée. Sois prudent !', 'info');
   renderProfil('blessure');
 }
 
 async function guerirBlessure(id) {
-  const ok = await Utils.confirmer('Marquer comme guéri ?','');
+  const ok = await Utils.confirmer('Marquer comme guéri ?', '');
   if (ok) {
     Tracker.guerirBlessure(id);
-    Utils.toast('Bien récupéré ! 💪','success');
+    Utils.toast('Bien récupéré ! 💪', 'success');
     renderProfil('blessure');
   }
 }
 
-// ✅ FIX — renderOutils avec input file-import inclus
+// ════════════════════════════════════════════════════════════
+// EXERCICES PERSONNALISÉS (Feature 6)
+// ════════════════════════════════════════════════════════════
+function getExercicesCustom() {
+  return Utils.storage.get('ft_exercices_custom', []);
+}
+
+function sauvegarderExercicesCustom(liste) {
+  Utils.storage.set('ft_exercices_custom', liste);
+  _fusionnerExercicesCustom();
+}
+
+function _fusionnerExercicesCustom() {
+  const custom = getExercicesCustom();
+  custom.forEach(ex => {
+    window.EXERCICES[ex.ref] = {
+      nom:         ex.nom,
+      emoji:       ex.emoji       || '💪',
+      muscle:      ex.muscle      || 'Autre',
+      equipement:  ex.equipement  || 'Libre',
+      description: ex.description || '',
+      conseils:    ex.conseils    || [],
+      difficulte:  ex.difficulte  || 2,
+      custom:      true
+    };
+  });
+}
+
+function initExercicesCustom() {
+  _fusionnerExercicesCustom();
+}
+
+function renderExercicesCustom(el) {
+  const custom = getExercicesCustom();
+
+  el.innerHTML = `
+    <button class="btn-primary mb-md w-full"
+            onclick="ouvrirFormExercice()">
+      ➕ Créer un exercice
+    </button>
+
+    ${custom.length === 0 ? `
+      <div class="card"
+           style="text-align:center;padding:var(--space-xl)">
+        <div style="font-size:2rem;margin-bottom:var(--space-sm)">
+          🏋️
+        </div>
+        <p style="color:var(--text-muted);font-size:.88rem">
+          Aucun exercice personnalisé.<br>
+          Crée tes propres mouvements !
+        </p>
+      </div>` :
+
+      custom.map(ex => `
+        <div class="card mb-md">
+          <div class="flex items-center gap-md">
+            <div style="font-size:2rem;width:48px;
+                        text-align:center">
+              ${ex.emoji || '💪'}
+            </div>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:.95rem">
+                ${ex.nom}
+              </div>
+              <div style="font-size:.75rem;color:var(--fd-mint)">
+                ${ex.muscle}
+              </div>
+              <div style="font-size:.72rem;color:var(--text-muted)">
+                ${ex.equipement}
+                · ${'⭐'.repeat(ex.difficulte||2)}
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <button class="btn-secondary btn-sm"
+                      onclick="ouvrirFormExercice('${ex.ref}')">
+                ✏️
+              </button>
+              <button class="btn-secondary btn-sm"
+                      onclick="supprimerExerciceCustom('${ex.ref}')"
+                      style="color:var(--fd-coral)">
+                🗑️
+              </button>
+            </div>
+          </div>
+          ${ex.description ? `
+            <p style="font-size:.78rem;color:var(--text-muted);
+                      margin-top:var(--space-sm);
+                      border-top:1px solid var(--border-color);
+                      padding-top:var(--space-sm)">
+              ${ex.description}
+            </p>` : ''}
+        </div>`).join('')}
+  `;
+}
+
+function ouvrirFormExercice(ref = null) {
+  const custom   = getExercicesCustom();
+  const existant = ref ? custom.find(e => e.ref === ref) : null;
+  const modal    = document.getElementById('modal-info');
+  const content  = document.getElementById('modal-info-content');
+
+  const muscles = [
+    'Pectoraux','Dos','Épaules','Biceps','Triceps',
+    'Abdominaux','Quadriceps','Ischio-jambiers',
+    'Mollets','Fessiers','Avant-bras','Autre'
+  ];
+
+  content.innerHTML = `
+    <h3 style="margin-bottom:var(--space-md)">
+      ${existant ? '✏️ Modifier' : '➕ Créer'} un exercice
+    </h3>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;
+                gap:var(--space-sm);
+                margin-bottom:var(--space-sm)">
+      <div>
+        <div class="input-label">Nom *</div>
+        <input class="input" id="ex-nom"
+               placeholder="ex: Hip Thrust"
+               value="${existant?.nom || ''}" />
+      </div>
+      <div>
+        <div class="input-label">Émoji</div>
+        <input class="input" id="ex-emoji"
+               placeholder="🏋️" maxlength="2"
+               value="${existant?.emoji || '💪'}" />
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;
+                gap:var(--space-sm);
+                margin-bottom:var(--space-sm)">
+      <div>
+        <div class="input-label">Muscle principal *</div>
+        <select class="input" id="ex-muscle">
+          ${muscles.map(m => `
+            <option value="${m}"
+              ${existant?.muscle === m ? 'selected' : ''}>
+              ${m}
+            </option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div class="input-label">Difficulté</div>
+        <select class="input" id="ex-diff">
+          ${[1,2,3,4].map(d => `
+            <option value="${d}"
+              ${(existant?.difficulte||2) === d ? 'selected' : ''}>
+              ${'⭐'.repeat(d)} (${d}/4)
+            </option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div class="input-label">Équipement</div>
+    <input class="input mb-md" id="ex-equip"
+           placeholder="ex: Barre + rack"
+           value="${existant?.equipement || ''}" />
+
+    <div class="input-label">Description</div>
+    <textarea class="input mb-md" id="ex-desc" rows="3"
+              placeholder="Décris l'exercice..."
+              style="resize:none">${existant?.description || ''}</textarea>
+
+    <div class="input-label">Conseils (un par ligne)</div>
+    <textarea class="input mb-md" id="ex-conseils" rows="3"
+              placeholder="Garde le dos droit&#10;Descends lentement"
+              style="resize:none">${(existant?.conseils||[]).join('\n')}</textarea>
+
+    <button class="btn-primary w-full"
+            onclick="sauvegarderFormExercice('${ref || ''}')">
+      💾 ${existant ? 'Modifier' : 'Créer'}
+    </button>
+  `;
+
+  modal.classList.remove('hidden');
+  document.getElementById('modal-info-close').onclick =
+    () => modal.classList.add('hidden');
+  modal.querySelector('.modal-overlay').onclick =
+    () => modal.classList.add('hidden');
+}
+
+function sauvegarderFormExercice(refExistant = '') {
+  const nom    = document.getElementById('ex-nom')?.value?.trim();
+  const emoji  = document.getElementById('ex-emoji')?.value?.trim() || '💪';
+  const muscle = document.getElementById('ex-muscle')?.value;
+  const diff   = parseInt(document.getElementById('ex-diff')?.value) || 2;
+  const equip  = document.getElementById('ex-equip')?.value?.trim() || '';
+  const desc   = document.getElementById('ex-desc')?.value?.trim()  || '';
+  const conseils = (document.getElementById('ex-conseils')?.value || '')
+    .split('\n').map(c => c.trim()).filter(Boolean);
+
+  if (!nom || !muscle) {
+    Utils.toast('Nom et muscle sont obligatoires !', 'error');
+    return;
+  }
+
+  const custom = getExercicesCustom();
+
+  if (refExistant) {
+    const idx = custom.findIndex(e => e.ref === refExistant);
+    if (idx >= 0) {
+      custom[idx] = {
+        ...custom[idx], nom, emoji, muscle,
+        difficulte:  diff,
+        equipement:  equip,
+        description: desc,
+        conseils
+      };
+    }
+  } else {
+    const ref = 'custom_' +
+      nom.toLowerCase()
+         .replace(/\s+/g, '_')
+         .replace(/[^a-z0-9_]/g, '')
+      + '_' + Date.now();
+
+    custom.push({
+      ref, nom, emoji, muscle,
+      difficulte:   diff,
+      equipement:   equip,
+      description:  desc,
+      conseils,
+      dateCreation: Utils.aujourd_hui()
+    });
+  }
+
+  sauvegarderExercicesCustom(custom);
+  Utils.toast(
+    refExistant ? '✅ Exercice modifié !' : '✅ Exercice créé !',
+    'success'
+  );
+  document.getElementById('modal-info')?.classList.add('hidden');
+  const el = document.getElementById('profil-content');
+  if (el) renderExercicesCustom(el);
+}
+
+async function supprimerExerciceCustom(ref) {
+  const ok = await Utils.confirmer(
+    'Supprimer cet exercice ?',
+    'Tes données liées seront conservées.'
+  );
+  if (!ok) return;
+  const custom = getExercicesCustom().filter(e => e.ref !== ref);
+  sauvegarderExercicesCustom(custom);
+  delete window.EXERCICES[ref];
+  Utils.toast('Exercice supprimé.', 'info');
+  const el = document.getElementById('profil-content');
+  if (el) renderExercicesCustom(el);
+}
+
+// ════════════════════════════════════════════════════════════
+// OUTILS
+// ════════════════════════════════════════════════════════════
 function renderOutils(el) {
   const config = Notifications.getConfig();
 
   el.innerHTML = `
+
+    <!-- Données -->
     <div class="card mb-md">
       <div class="card-label">💾 Données</div>
-      <!-- ✅ Input file caché -->
       <input type="file" id="file-import" accept=".json"
              style="display:none"
              onchange="handleImport(this)" />
       <div style="display:grid;grid-template-columns:1fr 1fr;
-            gap:var(--space-sm);margin-top:var(--space-md)">
-  <button class="btn-secondary" onclick="Utils.exporterJSON()">
-    📤 Export JSON
-  </button>
-  <button class="btn-secondary" onclick="Utils.exporterCSV()">
-    📊 Export CSV
-  </button>
-  <button class="btn-secondary" onclick="importerFichier()">
-    📥 Importer
-  </button>
-  <button class="btn-secondary" onclick="genererQRSync()">
-    📱 QR Sync
-  </button>
-  <!-- ✅ NOUVEAU -->
-  <button class="btn-secondary" onclick="Utils.exporterPDF()"
-          style="grid-column:span 2">
-    📄 Rapport PDF
-  </button>
-</div>
+                  gap:var(--space-sm);margin-top:var(--space-md)">
+        <button class="btn-secondary"
+                onclick="Utils.exporterJSON()">
+          📤 Export JSON
+        </button>
+        <button class="btn-secondary"
+                onclick="Utils.exporterCSV()">
+          📊 Export CSV
+        </button>
+        <button class="btn-secondary"
+                onclick="importerFichier()">
+          📥 Importer
+        </button>
+        <button class="btn-secondary"
+                onclick="genererQRSync()">
+          📱 QR Sync
+        </button>
+        <button class="btn-secondary"
+                onclick="Utils.exporterPDF()"
+                style="grid-column:span 2">
+          📄 Rapport PDF
+        </button>
+      </div>
 
-      <!-- Stats GIFs -->
       <div style="margin-top:var(--space-md);padding:var(--space-sm);
-                  background:var(--bg-input);border-radius:var(--radius-sm)">
+                  background:var(--bg-input);
+                  border-radius:var(--radius-sm)">
         <div style="font-size:.78rem;color:var(--text-secondary);
-                    display:flex;justify-content:space-between;align-items:center">
+                    display:flex;justify-content:space-between;
+                    align-items:center">
           <span>🎞️ GIFs en cache:
-            <strong>${ExerciseGIF.statsCache().cached}/${ExerciseGIF.statsCache().total}</strong>
+            <strong>
+              ${ExerciseGIF.statsCache().cached}/${ExerciseGIF.statsCache().total}
+            </strong>
           </span>
           <button onclick="rechargerGIFs()"
-                  style="background:none;border:none;color:var(--fd-indigo);
-                         font-size:.78rem;cursor:pointer;font-weight:600">
+                  style="background:none;border:none;
+                         color:var(--fd-indigo);font-size:.78rem;
+                         cursor:pointer;font-weight:600">
             🔄 Recharger
           </button>
         </div>
-        <div class="progress-bar" style="margin-top:var(--space-xs)">
+        <div class="progress-bar"
+             style="margin-top:var(--space-xs)">
           <div class="progress-fill"
                style="width:${ExerciseGIF.statsCache().pct}%"></div>
         </div>
       </div>
-      <div style="font-size:.72rem;color:var(--text-muted);margin-top:var(--space-sm)">
+      <div style="font-size:.72rem;color:var(--text-muted);
+                  margin-top:var(--space-sm)">
         Données: ${Utils.storage.taille()}
       </div>
     </div>
@@ -1914,44 +2450,53 @@ function renderOutils(el) {
       <div class="card-label">🔔 Notifications</div>
       <div style="margin-top:var(--space-md)">
         ${[
-          { id:'rappelQuotidien', label:'Rappel quotidien' },
-          { id:'absence1j',       label:'Absent 1 jour'    },
-          { id:'absence2j',       label:'Absent 2 jours'   },
-          { id:'absence5j',       label:'Absent 5 jours+'  },
-          { id:'streakDanger',    label:'Streak en danger'  },
-          { id:'semaineParf',     label:'Semaine parfaite'  },
-          { id:'motivationMatin', label:'Motivation matin'  }
+          { id:'rappelQuotidien', label:'Rappel quotidien'  },
+          { id:'absence1j',       label:'Absent 1 jour'     },
+          { id:'absence2j',       label:'Absent 2 jours'    },
+          { id:'absence5j',       label:'Absent 5 jours+'   },
+          { id:'streakDanger',    label:'Streak en danger'   },
+          { id:'semaineParf',     label:'Semaine parfaite'   },
+          { id:'motivationMatin', label:'Motivation matin'   }
         ].map(n => `
           <div class="toggle-row">
             <span class="toggle-label">${n.label}</span>
             <label class="toggle">
-              <input type="checkbox" ${config[n.id]?'checked':''}
-                     onchange="Notifications.sauvegarderConfig({'${n.id}':this.checked})">
+              <input type="checkbox"
+                     ${config[n.id] ? 'checked' : ''}
+                     onchange="Notifications.sauvegarderConfig(
+                       {'${n.id}':this.checked})">
               <span class="toggle-slider"></span>
             </label>
           </div>`).join('')}
 
         <div style="margin-top:var(--space-md)">
           <div class="input-label">Heure rappel</div>
-          <input class="input" type="time" value="${config.heureRappel}"
-                 onchange="Notifications.sauvegarderConfig({heureRappel:this.value})"/>
+          <input class="input" type="time"
+                 value="${config.heureRappel}"
+                 onchange="Notifications.sauvegarderConfig(
+                   {heureRappel:this.value})"/>
         </div>
         <div style="margin-top:var(--space-md)">
           <div class="input-label">Ton des messages</div>
           <select class="input"
-                  onchange="Notifications.sauvegarderConfig({ton:this.value})">
-            <option value="motivant" ${config.ton==='motivant'?'selected':''}>
+                  onchange="Notifications.sauvegarderConfig(
+                    {ton:this.value})">
+            <option value="motivant"
+              ${config.ton==='motivant' ? 'selected' : ''}>
               💪 Motivant
             </option>
-            <option value="doux" ${config.ton==='doux'?'selected':''}>
+            <option value="doux"
+              ${config.ton==='doux' ? 'selected' : ''}>
               🌸 Doux
             </option>
-            <option value="severe" ${config.ton==='severe'?'selected':''}>
+            <option value="severe"
+              ${config.ton==='severe' ? 'selected' : ''}>
               🔥 Sévère
             </option>
           </select>
         </div>
-        <button class="btn-secondary mt-md" onclick="Notifications.tester()">
+        <button class="btn-secondary mt-md"
+                onclick="Notifications.tester()">
           🔔 Tester une notification
         </button>
       </div>
@@ -1960,46 +2505,90 @@ function renderOutils(el) {
     <!-- Paramètres -->
     <div class="card mb-md">
       <div class="card-label">⚙️ Paramètres</div>
-      <div class="toggle-row">
-        <span class="toggle-label">Thème sombre</span>
-        <label class="toggle">
-          <input type="checkbox" ${AppState.thème==='dark'?'checked':''}
-                 onchange="appliquerTheme(this.checked?'dark':'light');
-                           Utils.storage.set('ft_theme',this.checked?'dark':'light')">
-          <span class="toggle-slider"></span>
-        </label>
+
+      <!-- Thème -->
+      <div style="margin-bottom:var(--space-md)">
+        <div class="input-label">Thème</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);
+                    gap:var(--space-xs);margin-top:var(--space-xs)">
+          ${[
+            { val:'dark',     label:'🌙 Dark',     color:'#09092d' },
+            { val:'light',    label:'☀️ Light',    color:'#f3f3f7' },
+            { val:'indigo',   label:'💜 Indigo',   color:'#4b4bf9' },
+            { val:'midnight', label:'⭐ Midnight', color:'#0d0d3d' }
+          ].map(t => `
+            <button onclick="appliquerTheme('${t.val}');
+                             Utils.storage.set('ft_theme','${t.val}')"
+                    style="padding:var(--space-sm) 4px;
+                           border-radius:var(--radius-sm);
+                           border:2px solid ${
+                             AppState.thème === t.val
+                               ? 'var(--fd-indigo)'
+                               : 'var(--border-color)'};
+                           background:${
+                             AppState.thème === t.val
+                               ? 'var(--fd-indigo-dim)'
+                               : 'var(--bg-card)'};
+                           font-size:.7rem;font-weight:600;
+                           cursor:pointer;transition:all .2s">
+              ${t.label}
+            </button>`).join('')}
+        </div>
       </div>
-      <div style="margin-top:var(--space-md)">
+
+      <!-- Objectif séances -->
+      <div style="margin-bottom:var(--space-md)">
         <div class="input-label">Objectif séances/semaine</div>
-        <select class="input"
-                onchange="Utils.storage.set('ft_objectif_seances_semaine',parseInt(this.value))">
+        <select class="input" onchange="Utils.storage.set(
+          'ft_objectif_seances_semaine',parseInt(this.value))">
           ${[3,4,5].map(n => `
             <option value="${n}"
-              ${Utils.storage.get('ft_objectif_seances_semaine',4)===n?'selected':''}>
+              ${Utils.storage.get(
+                'ft_objectif_seances_semaine',4) === n
+                ? 'selected' : ''}>
               ${n} séances
             </option>`).join('')}
+        </select>
+      </div>
+
+      <!-- Unités -->
+      <div>
+        <div class="input-label">Unités de poids</div>
+        <select class="input" onchange="Utils.storage.set(
+          'ft_unite_poids',this.value)">
+          <option value="kg"
+            ${Utils.storage.get('ft_unite_poids','kg') === 'kg'
+              ? 'selected' : ''}>
+            ⚖️ Kilogrammes (kg)
+          </option>
+          <option value="lbs"
+            ${Utils.storage.get('ft_unite_poids','kg') === 'lbs'
+              ? 'selected' : ''}>
+            🇺🇸 Livres (lbs)
+          </option>
         </select>
       </div>
     </div>
 
     <!-- Danger zone -->
     <div class="card" style="border-color:rgba(255,141,150,0.3)">
-      <div class="card-label" style="color:var(--fd-coral)">⚠️ Zone danger</div>
-      <button class="btn-danger mt-md w-full" onclick="resetDonnees()">
+      <div class="card-label" style="color:var(--fd-coral)">
+        ⚠️ Zone danger
+      </div>
+      <button class="btn-danger mt-md w-full"
+              onclick="resetDonnees()">
         🗑️ Réinitialiser toutes les données
       </button>
     </div>
   `;
 }
 
-// ✅ FIX — Fonction manquante ajoutée
+// ─── OUTILS — Fonctions ───────────────────────────────────────
 function rechargerGIFs() {
   ExerciseGIF.viderCache();
   Utils.toast('Cache GIFs vidé — Rechargement...', 'info');
   setTimeout(() => {
     ExerciseGIF.prechargerTout((current, total) => {
-      const el = document.getElementById('gif-cache-count');
-      if (el) el.textContent = `${current}/${total}`;
       if (current === total) {
         Utils.toast(`✅ ${total} GIFs rechargés !`, 'success', 2000);
       }
@@ -2040,18 +2629,21 @@ async function genererQRSync() {
   const content = document.getElementById('modal-info-content');
 
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md);text-align:center">📱 QR Code Sync</h3>
-    <p style="font-size:.82rem;color:var(--text-muted);text-align:center;
-              margin-bottom:var(--space-md)">
+    <h3 style="margin-bottom:var(--space-md);text-align:center">
+      📱 QR Code Sync
+    </h3>
+    <p style="font-size:.82rem;color:var(--text-muted);
+              text-align:center;margin-bottom:var(--space-md)">
       Scanne ce QR sur ton autre appareil.
     </p>
     <div style="text-align:center">
       <canvas id="qr-canvas" width="200" height="200"
-              style="border-radius:var(--radius-md);background:white;padding:8px">
+              style="border-radius:var(--radius-md);
+                     background:white;padding:8px">
       </canvas>
     </div>
-    <p style="font-size:.72rem;color:var(--text-muted);text-align:center;
-              margin-top:var(--space-md)">
+    <p style="font-size:.72rem;color:var(--text-muted);
+              text-align:center;margin-top:var(--space-md)">
       ${(json.length/1024).toFixed(1)} KB
     </p>`;
 
@@ -2059,6 +2651,8 @@ async function genererQRSync() {
   document.getElementById('modal-info-close').onclick =
     () => modal.classList.add('hidden');
 
-  await Utils.genererQR(json.substring(0,500),
-    document.getElementById('qr-canvas'));
+  await Utils.genererQR(
+    json.substring(0, 500),
+    document.getElementById('qr-canvas')
+  );
 }
