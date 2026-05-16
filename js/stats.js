@@ -846,103 +846,419 @@ const Stats = {
   },
 
   // ─── CALENDRIER ───────────────────────────────────────────
-  _renderCalendrier(el) {
-    const heatmap = this.getHeatmap(12);
-    const today   = Utils.aujourd_hui();
-    const jours   = ['L','M','M','J','V','S','D'];
+// ─── CALENDRIER INTERACTIF ────────────────────────────────
+  _renderCalendrier(el, annee = null, mois = null) {
+    const today    = new Date();
+    const an       = annee || today.getFullYear();
+    const mo       = mois  !== null ? mois : today.getMonth(); // 0-11
+    const heatmap  = this.getHeatmap(24); // 24 semaines d'historique
+    const nomsMois = [
+      'Janvier','Février','Mars','Avril','Mai','Juin',
+      'Juillet','Août','Septembre','Octobre','Novembre','Décembre'
+    ];
+    const nomsJours = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 
-    const debutGrille = Utils.debutSemaine(
-      Utils.ajouterJours(today, -77)
-    );
+    // ── Premier jour du mois (0=dim → converti lun=0)
+    const premierJour = new Date(an, mo, 1);
+    const offsetDebut = (premierJour.getDay() + 6) % 7; // 0=Lun
+    const nbJours     = new Date(an, mo + 1, 0).getDate();
 
+    // ── Stats du mois
+    const statsMois = { seances: 0, volume: 0, prs: 0, manquees: 0 };
+    for (let j = 1; j <= nbJours; j++) {
+      const dateStr = `${an}-${String(mo+1).padStart(2,'0')}-${String(j).padStart(2,'0')}`;
+      const etat    = heatmap[dateStr];
+      if (etat === 'done')   statsMois.seances++;
+      if (etat === 'missed') statsMois.manquees++;
+    }
+
+    // ── Construire cellules
     let cellules = '';
-    for (let s = 0; s < 12; s++) {
-      for (let j = 0; j < 7; j++) {
-        const date  = Utils.ajouterJours(debutGrille, s*7 + j);
-        const etat  = heatmap[date] || 'none';
-        const title = `${date} — ${
-          etat==='done'   ? '✅ Séance'  :
-          etat==='rest'   ? '😴 Repos'  :
-          etat==='missed' ? '❌ Manquée': '⬜ Vide'
-        }`;
-        cellules += `
-          <div class="heatmap-cell level-${
-            etat==='done' ? '3' : '0'
-          } ${etat==='rest'?'rest':''} ${etat==='missed'?'missed':''}"
-               title="${title}"
-               style="${date===today
-                 ? 'outline:2px solid var(--fd-indigo)'
-                 : ''}">
-          </div>`;
-      }
+
+    // Cellules vides début
+    for (let i = 0; i < offsetDebut; i++) {
+      cellules += `<div class="cal-cell cal-empty"></div>`;
+    }
+
+    // Jours du mois
+    for (let j = 1; j <= nbJours; j++) {
+      const dateStr  = `${an}-${String(mo+1).padStart(2,'0')}-${String(j).padStart(2,'0')}`;
+      const etat     = heatmap[dateStr] || 'none';
+      const estAuj   = dateStr === Utils.aujourd_hui();
+      const estFutur = dateStr > Utils.aujourd_hui();
+
+      const bg = etat === 'done'   ? 'var(--fd-indigo)'             :
+                 etat === 'missed' ? 'rgba(255,141,150,0.3)'        :
+                 etat === 'rest'   ? 'rgba(139,240,187,0.15)'       :
+                 estFutur          ? 'transparent'                   :
+                                    'var(--bg-input)';
+
+      const border = estAuj
+        ? '2px solid var(--fd-lemon)'
+        : etat === 'done'
+          ? '2px solid var(--fd-indigo)'
+          : '1px solid var(--border-color)';
+
+      const emoji = etat === 'done'   ? '✅' :
+                    etat === 'missed' ? '❌' :
+                    etat === 'rest'   ? '😴' : '';
+
+      cellules += `
+        <div class="cal-cell ${etat} ${estAuj?'today':''} ${estFutur?'future':''}"
+             onclick="Stats._afficherJour('${dateStr}')"
+             style="background:${bg};
+                    border:${border};
+                    border-radius:var(--radius-sm);
+                    min-height:52px;
+                    padding:4px;
+                    cursor:${estFutur?'default':'pointer'};
+                    position:relative;
+                    transition:transform .15s ease">
+          <div style="font-size:.72rem;font-weight:${estAuj?'800':'500'};
+                      color:${estAuj
+                        ? 'var(--fd-lemon)'
+                        : etat==='done'
+                          ? 'white'
+                          : 'var(--text-muted)'}">
+            ${j}
+          </div>
+          ${emoji ? `
+            <div style="font-size:.9rem;text-align:center;
+                        margin-top:2px">${emoji}</div>` : ''}
+        </div>`;
     }
 
     el.innerHTML = `
-      <div class="flex gap-md items-center mb-md"
-           style="flex-wrap:wrap">
-        <div class="flex items-center gap-sm">
-          <div class="heatmap-cell level-3"
-               style="width:16px;height:16px;display:inline-block"></div>
-          <span style="font-size:.75rem;color:var(--text-muted)">Séance</span>
+
+      <!-- Navigation mois -->
+      <div class="flex items-center justify-between mb-md">
+        <button class="btn-icon"
+                onclick="Stats._renderCalendrier(
+                  document.getElementById('stats-content'),
+                  ${mo === 0 ? an - 1 : an},
+                  ${mo === 0 ? 11 : mo - 1}
+                )">◄</button>
+
+        <div style="text-align:center">
+          <div style="font-weight:700;font-size:1.1rem">
+            ${nomsMois[mo]} ${an}
+          </div>
+          <div style="font-size:.72rem;color:var(--text-muted)">
+            ${statsMois.seances} séance${statsMois.seances>1?'s':''}
+            · ${statsMois.manquees} manquée${statsMois.manquees>1?'s':''}
+          </div>
         </div>
-        <div class="flex items-center gap-sm">
-          <div class="heatmap-cell rest"
-               style="width:16px;height:16px;display:inline-block"></div>
-          <span style="font-size:.75rem;color:var(--text-muted)">Repos</span>
-        </div>
-        <div class="flex items-center gap-sm">
-          <div class="heatmap-cell missed"
-               style="width:16px;height:16px;display:inline-block"></div>
-          <span style="font-size:.75rem;color:var(--text-muted)">Manquée</span>
-        </div>
+
+        <button class="btn-icon"
+                onclick="Stats._renderCalendrier(
+                  document.getElementById('stats-content'),
+                  ${mo === 11 ? an + 1 : an},
+                  ${mo === 11 ? 0 : mo + 1}
+                )"
+                ${an === today.getFullYear() && mo === today.getMonth()
+                  ? 'disabled style="opacity:.3"' : ''}>►</button>
       </div>
 
-      <div class="card mb-md">
-        <div class="card-label">📅 12 dernières semaines</div>
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);
-                    gap:3px;margin-bottom:4px;margin-top:var(--space-sm)">
-          ${jours.map(j => `
-            <div style="text-align:center;font-size:.65rem;
-                        color:var(--text-muted)">${j}</div>
-          `).join('')}
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
-          ${cellules}
-        </div>
-      </div>
-
-      <div class="stats-grid">
+      <!-- Stats du mois -->
+      <div class="stats-grid mb-md">
         <div class="stat-card">
-          <span class="stat-value" style="color:var(--fd-mint)">
-            ${Object.values(heatmap).filter(v=>v==='done').length}
+          <span class="stat-value" style="color:var(--fd-indigo)">
+            ${statsMois.seances}
           </span>
           <span class="stat-label">Séances</span>
         </div>
         <div class="stat-card">
           <span class="stat-value" style="color:var(--fd-coral)">
-            ${Object.values(heatmap).filter(v=>v==='missed').length}
+            ${statsMois.manquees}
           </span>
           <span class="stat-label">Manquées</span>
         </div>
         <div class="stat-card">
-          <span class="stat-value" style="color:var(--fd-lemon)">
-            ${Tracker.getStreak().max}🔥
-          </span>
-          <span class="stat-label">Streak Max</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" style="color:var(--fd-lavender)">
-            ${Math.round(
-              (Object.values(heatmap).filter(v=>v==='done').length /
-               Math.max(1,
-                Object.values(heatmap).filter(v=>v!=='none').length
-               )) * 100
-            )}%
+          <span class="stat-value" style="color:var(--fd-mint)">
+            ${nbJours > 0
+              ? Math.round((statsMois.seances / Math.max(1,
+                  statsMois.seances + statsMois.manquees)) * 100)
+              : 0}%
           </span>
           <span class="stat-label">Assiduité</span>
         </div>
+        <div class="stat-card">
+          <span class="stat-value" style="color:var(--fd-lemon)">
+            ${Tracker.getStreak().count}🔥
+          </span>
+          <span class="stat-label">Streak</span>
+        </div>
+      </div>
+
+      <!-- Légende -->
+      <div class="flex gap-md items-center mb-md" style="flex-wrap:wrap">
+        ${[
+          { couleur:'var(--fd-indigo)',            label:'✅ Séance'  },
+          { couleur:'rgba(255,141,150,0.3)',        label:'❌ Manquée' },
+          { couleur:'rgba(139,240,187,0.15)',       label:'😴 Repos'   },
+          { couleur:'var(--bg-input)',              label:'⬜ Vide'    }
+        ].map(l => `
+          <div class="flex items-center gap-sm">
+            <div style="width:14px;height:14px;border-radius:3px;
+                        background:${l.couleur};
+                        border:1px solid var(--border-color)"></div>
+            <span style="font-size:.72rem;color:var(--text-muted)">
+              ${l.label}
+            </span>
+          </div>`).join('')}
+      </div>
+
+      <!-- Grille jours -->
+      <div class="card mb-md" style="padding:var(--space-sm)">
+
+        <!-- Headers -->
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);
+                    gap:3px;margin-bottom:4px">
+          ${nomsJours.map(j => `
+            <div style="text-align:center;font-size:.65rem;
+                        font-weight:600;color:var(--text-muted);
+                        padding:4px 0">${j}</div>
+          `).join('')}
+        </div>
+
+        <!-- Cellules -->
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+          ${cellules}
+        </div>
+      </div>
+
+      <!-- Détail jour sélectionné -->
+      <div id="detail-jour"></div>
+
+      <!-- Heatmap 12 semaines -->
+      <div class="card">
+        <div class="card-label">🗺️ Vue 12 semaines</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);
+                    gap:3px;margin-bottom:4px;margin-top:var(--space-sm)">
+          ${['L','M','M','J','V','S','D'].map(j => `
+            <div style="text-align:center;font-size:.6rem;
+                        color:var(--text-muted)">${j}</div>
+          `).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+          ${(() => {
+            const debutG = Utils.debutSemaine(Utils.ajouterJours(Utils.aujourd_hui(),-77));
+            let cells = '';
+            for (let s = 0; s < 12; s++) {
+              for (let j = 0; j < 7; j++) {
+                const d    = Utils.ajouterJours(debutG, s*7+j);
+                const etat = heatmap[d] || 'none';
+                cells += `
+                  <div class="heatmap-cell level-${etat==='done'?'3':'0'}
+                       ${etat==='rest'?'rest':''} ${etat==='missed'?'missed':''}"
+                       title="${d}"
+                       onclick="Stats._afficherJour('${d}')"
+                       style="cursor:pointer;${
+                         d===Utils.aujourd_hui()
+                           ?'outline:2px solid var(--fd-lemon)':''
+                       }">
+                  </div>`;
+              }
+            }
+            return cells;
+          })()}
+        </div>
       </div>
     `;
+  },
+
+  // ─── AFFICHER DÉTAIL D'UN JOUR ────────────────────────────
+  _afficherJour(dateStr) {
+    const el = document.getElementById('detail-jour');
+    if (!el) return;
+
+    const heatmap = this.getHeatmap(24);
+    const etat    = heatmap[dateStr] || 'none';
+
+    // Chercher la séance de ce jour
+    let seanceData = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const cle = localStorage.key(i);
+      if (cle.startsWith(`ft_seance_${dateStr}`)) {
+        seanceData = JSON.parse(localStorage.getItem(cle));
+        break;
+      }
+    }
+
+    // Planning prévu ce jour
+    const indexJour  = Utils.indexJourSemaine(dateStr);
+    const planning   = PLANNING_SEMAINE[indexJour];
+    const seancePrev = planning?.seanceId
+      ? Programme.getSeanceComplete(planning.seanceId)
+      : null;
+
+    const estFutur  = dateStr > Utils.aujourd_hui();
+    const estAuj    = dateStr === Utils.aujourd_hui();
+
+    el.innerHTML = `
+      <div class="card mt-md"
+           style="border-color:${
+             etat==='done'   ? 'var(--fd-indigo)'  :
+             etat==='missed' ? 'var(--fd-coral)'   :
+             etat==='rest'   ? 'var(--fd-mint)'    :
+             'var(--border-color)'
+           }">
+
+        <!-- Header jour -->
+        <div class="flex items-center justify-between mb-md">
+          <div>
+            <div style="font-weight:700;font-size:1rem">
+              ${Utils.jourSemaineComplet(dateStr)}
+              ${Utils.formatDateCourt(dateStr)}
+              ${estAuj ? '<span class="chip chip-lemon" style="font-size:.65rem;margin-left:4px">Aujourd\'hui</span>' : ''}
+            </div>
+            <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">
+              ${etat==='done'   ? '✅ Séance complétée'  :
+                etat==='missed' ? '❌ Séance manquée'    :
+                etat==='rest'   ? '😴 Jour de repos'     :
+                estFutur        ? '🔮 À venir'           :
+                                  '⬜ Pas de données'}
+            </div>
+          </div>
+          <button onclick="document.getElementById('detail-jour').innerHTML=''"
+                  style="background:none;border:none;color:var(--text-muted);
+                         font-size:1.2rem;cursor:pointer">✕</button>
+        </div>
+
+        ${seanceData?.complete ? `
+
+          <!-- Séance réalisée -->
+          <div class="stats-grid mb-md">
+            <div class="stat-card">
+              <span class="stat-value" style="font-size:1rem">
+                ${Utils.formatDuree(seanceData.duree || 0)}
+              </span>
+              <span class="stat-label">Durée</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" style="font-size:1rem">
+                ${Utils.formatVolume(seanceData.volumeTotal || 0)}
+              </span>
+              <span class="stat-label">Volume</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" style="font-size:1rem">
+                ${seanceData.series?.length || 0}
+              </span>
+              <span class="stat-label">Séries</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" style="font-size:1rem">
+                ${seanceData.rpesMoyen || '—'}
+              </span>
+              <span class="stat-label">RPE moy.</span>
+            </div>
+          </div>
+
+          <!-- Exercices réalisés -->
+          ${seanceData.series?.length > 0 ? `
+            <div style="font-size:.72rem;font-weight:700;
+                        color:var(--text-muted);
+                        text-transform:uppercase;
+                        letter-spacing:.06em;
+                        margin-bottom:var(--space-sm)">
+              Exercices
+            </div>
+            ${[...new Set(seanceData.series.map(s => s.exerciceRef))]
+              .map(ref => {
+                const ex      = EXERCICES[ref] || {};
+                const series  = seanceData.series.filter(
+                  s => s.exerciceRef === ref
+                );
+                const chargeMax = Math.max(...series.map(s => s.poids||0));
+                const repsMax   = series.find(
+                  s => s.poids === chargeMax
+                )?.reps || 0;
+                const isPR = Tracker.getPR(ref)?.date === dateStr;
+                return `
+                  <div class="flex items-center justify-between"
+                       style="padding:var(--space-xs) 0;
+                              border-bottom:1px solid var(--border-color);
+                              font-size:.82rem">
+                    <span>
+                      ${ex.emoji||'💪'} ${ex.nom||ref}
+                      ${isPR ? '<span style="color:var(--fd-lemon);font-size:.7rem">🏆 PR</span>' : ''}
+                    </span>
+                    <span style="font-weight:600;color:var(--fd-indigo)">
+                      ${chargeMax}kg × ${repsMax}
+                      <span style="color:var(--text-muted);font-weight:400">
+                        (${series.length} séries)
+                      </span>
+                    </span>
+                  </div>`;
+              }).join('')}` : ''}
+
+          <!-- PRs de la séance -->
+          ${seanceData.prs?.length > 0 ? `
+            <div class="pr-alert mt-md"
+                 style="background:rgba(249,239,119,0.1);
+                        border:1px solid rgba(249,239,119,0.3);
+                        border-radius:var(--radius-sm);padding:var(--space-sm)">
+              <div style="font-size:.78rem;font-weight:700;
+                          color:var(--fd-lemon);margin-bottom:4px">
+                🏆 Records battus ce jour
+              </div>
+              ${seanceData.prs.map(p => `
+                <div style="font-size:.75rem;color:var(--text-secondary)">
+                  ${EXERCICES[p.ref]?.nom||p.ref}: ${p.poids}kg × ${p.reps}
+                </div>`).join('')}
+            </div>` : ''}
+
+        ` : estFutur && seancePrev ? `
+
+          <!-- Séance future prévue -->
+          <div style="text-align:center;padding:var(--space-md)">
+            <div style="font-size:2rem;margin-bottom:var(--space-sm)">
+              ${seancePrev.emoji}
+            </div>
+            <div style="font-weight:700">${seancePrev.nom}</div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px">
+              ${seancePrev.exercices?.length || 0} exercices
+              · ~${seancePrev.duree_estimee}min
+            </div>
+            ${estAuj ? `
+              <button class="btn-primary mt-md"
+                      onclick="naviguer('live')">
+                ⚡ Démarrer maintenant
+              </button>` : ''}
+          </div>
+
+        ` : etat === 'rest' ? `
+
+          <!-- Jour de repos -->
+          <div style="text-align:center;padding:var(--space-md);
+                      color:var(--text-muted)">
+            <div style="font-size:2rem">😴</div>
+            <div style="margin-top:var(--space-sm);font-size:.85rem">
+              Jour de repos planifié
+            </div>
+            <div style="font-size:.75rem;margin-top:4px">
+              La récupération fait partie de la progression !
+            </div>
+          </div>
+
+        ` : `
+
+          <!-- Pas de données -->
+          <div style="text-align:center;padding:var(--space-md);
+                      color:var(--text-muted)">
+            <div style="font-size:2rem">⬜</div>
+            <div style="margin-top:var(--space-sm);font-size:.85rem">
+              Aucune donnée pour ce jour
+            </div>
+          </div>
+
+        `}
+      </div>
+    `;
+
+    // Scroll vers le détail
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   },
 
   // ─── TROPHÉES ─────────────────────────────────────────────
