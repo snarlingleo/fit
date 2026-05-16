@@ -241,8 +241,8 @@ function naviguer(page) {
     case 'training': renderTraining(); break;
     case 'live':     renderLive();     break;
     case 'stats':   Stats.render();    break;
+    case 'nutrition': Nutrition.render(); break;    
     case 'profile':  renderProfil();   break;
-   case 'nutrition': Nutrition.render(); break;
     default:         renderAccueil();
   }
 }
