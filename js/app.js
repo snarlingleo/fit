@@ -218,6 +218,22 @@ function lancerApp() {
   // Notifications
   Notifications.init();
 
+  // ── Précharger les GIFs en arrière-plan ──────────────────
+  const stats = ExerciseGIF.statsCache();
+  console.log(`[GIF] Cache: ${stats.cached}/${stats.total} GIFs`);
+
+  if (stats.cached < stats.total) {
+    // Précharger silencieusement après 3 secondes
+    setTimeout(() => {
+      ExerciseGIF.prechargerTout((current, total) => {
+        // Optionnel : afficher progression
+        if (current === total) {
+          Utils.toast(`✅ ${total} GIFs exercices chargés !`, 'success', 2000);
+        }
+      });
+    }, 3000);
+  }
+
   // Vérifier URL params
   const params = new URLSearchParams(window.location.search);
   const page   = params.get('page') || 'home';
@@ -673,30 +689,72 @@ function renderListeExercices(el) {
 
   el.innerHTML = `
     <div class="card mb-md">
-      <input class="input" id="search-ex" placeholder="🔍 Rechercher un exercice..."
+      <input class="input" id="search-ex"
+             placeholder="🔍 Rechercher un exercice..."
              oninput="filtrerExercices(this.value)" />
     </div>
+
     <div id="ex-list">
       ${Object.entries(groupes).map(([muscle, exos]) => `
         <div class="section-title">${exos[0]?.emoji || '💪'} ${muscle}</div>
-        ${exos.map(ex => `
-          <div class="exercice-card mb-md" onclick="afficherDetailExercice('${ex.ref}')">
-            <div class="exercice-header">
-              <div class="exercice-gif-placeholder">${ex.emoji}</div>
-              <div class="exercice-details">
-                <div class="exercice-name">${ex.nom}</div>
-                <div class="exercice-muscle">${ex.muscle}</div>
-                <div class="exercice-volume">${ex.equipement}</div>
-                <div style="display:flex;gap:4px;margin-top:4px">
-                  ${'⭐'.repeat(ex.difficulte)}${'☆'.repeat(4-ex.difficulte)}
+        ${exos.map(ex => {
+          const gifUID = `list_gif_${ex.ref}`;
+          return `
+            <div class="exercice-card mb-md"
+                 onclick="afficherDetailExercice('${ex.ref}')">
+              <div class="exercice-header">
+
+                <!-- Mini GIF -->
+                <div id="${gifUID}"
+                     style="width:70px;height:70px;border-radius:var(--radius-md);
+                            background:var(--fd-indigo-dim);display:flex;
+                            align-items:center;justify-content:center;
+                            font-size:1.8rem;flex-shrink:0;overflow:hidden">
+                  ${ex.emoji}
+                </div>
+
+                <div class="exercice-details">
+                  <div class="exercice-name">${ex.nom}</div>
+                  <div class="exercice-muscle">${ex.muscle}</div>
+                  <div class="exercice-volume">${ex.equipement}</div>
+                  <div style="display:flex;gap:4px;margin-top:4px;font-size:.75rem">
+                    ${'⭐'.repeat(ex.difficulte)}${'☆'.repeat(4-ex.difficulte)}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       `).join('')}
     </div>
   `;
+
+  // ── Charger les GIFs mini en différé ──────────────────────
+  // On charge seulement les GIFs visibles (Intersection Observer)
+  _observerGIFs();
+}
+
+// Observer pour lazy load des GIFs
+function _observerGIFs() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el  = entry.target;
+        const ref = el.dataset.ref;
+        if (ref && !el.dataset.loaded) {
+          el.dataset.loaded = 'true';
+          ExerciseGIF.chargerDans(ref, el.id);
+        }
+      }
+    });
+  }, { rootMargin: '100px' });
+
+  // Observer tous les conteneurs GIF de la liste
+  document.querySelectorAll('[id^="list_gif_"]').forEach(el => {
+    const ref = el.id.replace('list_gif_', '');
+    el.dataset.ref = ref;
+    observer.observe(el);
+  });
 }
 
 function filtrerExercices(query) {
@@ -709,34 +767,49 @@ function filtrerExercices(query) {
 }
 
 function afficherDetailExercice(ref) {
-  const ex  = EXERCICES[ref];
-  const pr  = Tracker.getPR(ref);
+  const ex    = EXERCICES[ref];
+  const pr    = Tracker.getPR(ref);
   if (!ex) return;
 
-  const modalContent = document.getElementById('modal-info-content');
-  const modal        = document.getElementById('modal-info');
+  const gifUID = `modal_gif_${ref}`;
+  const modal  = document.getElementById('modal-info');
+  const content = document.getElementById('modal-info-content');
 
-  modalContent.innerHTML = `
+  content.innerHTML = `
+    <!-- GIF grand format en modal -->
+    <div id="${gifUID}"
+         style="width:100%;height:200px;display:flex;align-items:center;
+                justify-content:center;background:var(--fd-indigo-dim);
+                border-radius:var(--radius-lg);margin-bottom:var(--space-md);
+                font-size:4rem;overflow:hidden">
+      ${ex.emoji}
+    </div>
+
     <div style="text-align:center;margin-bottom:var(--space-lg)">
-      <div style="font-size:3rem;margin-bottom:var(--space-sm)">${ex.emoji}</div>
       <h3 style="font-size:1.3rem;font-weight:700">${ex.nom}</h3>
       <span class="chip chip-mint">${ex.muscle}</span>
+      <span style="margin-left:var(--space-sm)">
+        ${'⭐'.repeat(ex.difficulte)}${'☆'.repeat(4-ex.difficulte)}
+      </span>
     </div>
 
     <div class="card mb-md">
-      <div class="card-label">📍 Équipement</div>
+      <div class="card-label">📍 Équipement Basic-Fit</div>
       <p style="font-size:.9rem;margin-top:var(--space-xs)">${ex.equipement}</p>
     </div>
 
     <div class="card mb-md">
       <div class="card-label">📖 Description</div>
-      <p style="font-size:.88rem;line-height:1.6;margin-top:var(--space-xs)">${ex.description}</p>
+      <p style="font-size:.88rem;line-height:1.6;margin-top:var(--space-xs)">
+        ${ex.description}
+      </p>
     </div>
 
     <div class="card mb-md">
-      <div class="card-label">💡 Conseils</div>
+      <div class="card-label">💡 Conseils technique</div>
       ${ex.conseils.map(c => `
-        <div style="display:flex;gap:var(--space-sm);padding:4px 0;font-size:.85rem">
+        <div style="display:flex;gap:var(--space-sm);
+                    padding:4px 0;font-size:.85rem">
           <span style="color:var(--fd-mint)">✓</span>
           <span>${c}</span>
         </div>
@@ -745,18 +818,24 @@ function afficherDetailExercice(ref) {
 
     ${pr ? `
       <div class="card">
-        <div class="card-label">🏆 Ton record</div>
+        <div class="card-label">🏆 Ton record personnel</div>
         <div class="flex justify-between mt-md">
           <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-lemon)">${pr.rm1}kg</div>
+            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-lemon)">
+              ${pr.rm1}kg
+            </div>
             <div style="font-size:.7rem;color:var(--text-muted)">1RM estimé</div>
           </div>
           <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-indigo)">${pr.poids}kg</div>
+            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-indigo)">
+              ${pr.poids}kg
+            </div>
             <div style="font-size:.7rem;color:var(--text-muted)">Meilleur poids</div>
           </div>
           <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-mint)">${pr.reps}</div>
+            <div style="font-size:1.3rem;font-weight:800;color:var(--fd-mint)">
+              ${pr.reps}
+            </div>
             <div style="font-size:.7rem;color:var(--text-muted)">Meilleur reps</div>
           </div>
         </div>
@@ -765,8 +844,13 @@ function afficherDetailExercice(ref) {
   `;
 
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick = () => modal.classList.add('hidden');
-  modal.querySelector('.modal-overlay').onclick = () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close').onclick =
+    () => modal.classList.add('hidden');
+  modal.querySelector('.modal-overlay').onclick =
+    () => modal.classList.add('hidden');
+
+  // ── Charger GIF async ────────────────────────────────────
+  ExerciseGIF.chargerDans(ref, gifUID);
 }
 
 // ── Timer standalone ──────────────────────────────────────────
@@ -1006,11 +1090,98 @@ function renderRecup(el) {
 
 // ── Ouvrir une séance ─────────────────────────────────────────
 function ouvrirSeance(seanceId) {
-  const seance = Programme.getSeanceComplete(seanceId);
+  const seance   = Programme.getSeanceComplete(seanceId);
   if (!seance) return;
 
   AppState.seanceChoisie = seance;
-  naviguer('live');
+
+  // Afficher aperçu de la séance avec GIFs
+  const container = document.getElementById('page-content');
+
+  container.innerHTML = `
+    <!-- Header -->
+    <div class="flex items-center gap-md mb-md">
+      <button class="btn-icon" onclick="renderTraining()">←</button>
+      <div>
+        <div style="font-weight:700;font-size:1.1rem">
+          ${seance.emoji} ${seance.nom}
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted)">
+          ${seance.exercices.length} exercices · ~${seance.duree_estimee}min
+        </div>
+      </div>
+    </div>
+
+    <!-- Warm-up -->
+    <div class="card mb-md">
+      <div class="card-label">🔥 Warm-up (${seance.warmup?.length || 0} exercices)</div>
+      ${(seance.warmup || []).map(w => `
+        <div style="display:flex;justify-content:space-between;
+                    padding:var(--space-xs) 0;font-size:.85rem;
+                    border-bottom:1px solid var(--border-color)">
+          <span>${w.nom}</span>
+          <span style="color:var(--fd-mint)">${Utils.formatDuree(w.duree)}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Liste exercices avec mini GIFs -->
+    <div class="card mb-md">
+      <div class="card-label">📋 Exercices</div>
+      ${seance.exercicesDetails.map((item, i) => {
+        const ex     = item.details;
+        const pr     = Tracker.getPR(item.ref);
+        const gifUID = `preview_gif_${item.ref}_${i}`;
+
+        return `
+          <div style="display:flex;gap:var(--space-md);
+                      padding:var(--space-md) 0;
+                      border-bottom:1px solid var(--border-color);
+                      align-items:center">
+
+            <!-- Mini GIF -->
+            <div id="${gifUID}"
+                 style="width:60px;height:60px;border-radius:var(--radius-md);
+                        background:var(--fd-indigo-dim);display:flex;
+                        align-items:center;justify-content:center;
+                        font-size:1.5rem;flex-shrink:0;overflow:hidden">
+              ${ex?.emoji || '💪'}
+            </div>
+
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:.92rem">
+                ${i+1}. ${ex?.nom || item.ref}
+              </div>
+              <div style="font-size:.75rem;color:var(--fd-mint)">
+                ${ex?.muscle || ''}
+              </div>
+              <div style="font-size:.75rem;color:var(--text-muted)">
+                ${item.series} × ${item.reps} · Repos ${item.repos}s
+              </div>
+              ${pr ? `
+                <div style="font-size:.7rem;color:var(--fd-lemon);margin-top:2px">
+                  🏆 Record: ${pr.poids}kg × ${pr.reps}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+
+    <!-- Bouton démarrer -->
+    <button class="btn-primary" onclick="demarrerNouvelleSeance(AppState.seanceChoisie)"
+            style="position:sticky;bottom:calc(var(--nav-height) + var(--space-md))">
+      ⚡ Démarrer la séance
+    </button>
+  `;
+
+  // ── Charger GIFs preview ──────────────────────────────────
+  seance.exercicesDetails.forEach((item, i) => {
+    setTimeout(() => {
+      ExerciseGIF.chargerDans(item.ref, `preview_gif_${item.ref}_${i}`);
+    }, i * 100); // Décalage pour ne pas tout charger en même temps
+  });
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1036,38 +1207,149 @@ function renderLive() {
   renderExerciceActuel(container);
 }
 
-function renderSelecteurSeance(container) {
-  const seances = Programme.getAllSeances();
-  const prochaine = Programme.getProchaineSeance();
+function renderExerciceActuel(container) {
+  const seance   = AppState.seanceEnCours;
+  if (!seance) return;
+
+  const item     = seance.exercicesDetails[AppState.exerciceIndex];
+  const ex       = item?.details;
+  const derniere = Tracker.getDernierePerf(seance.id, item?.ref);
+  const gifUID   = `live_gif_${item?.ref}`;
 
   container.innerHTML = `
-    <div style="text-align:center;padding:var(--space-lg) 0;margin-bottom:var(--space-md)">
-      <div style="font-size:2.5rem;margin-bottom:var(--space-sm)">⚡</div>
-      <h2 style="font-size:1.3rem;font-weight:700">Quelle séance aujourd'hui ?</h2>
+    <!-- Header séance -->
+    <div class="flex items-center justify-between mb-md">
+      <button class="btn-secondary btn-sm"
+              onclick="confirmerAbandon()">✕ Arrêter</button>
+      <div style="text-align:center">
+        <div style="font-weight:700;font-size:.9rem">
+          ${AppState.exerciceIndex + 1}/${seance.exercicesDetails.length}
+        </div>
+        <div style="font-size:.72rem;color:var(--text-muted)" id="chrono-global">
+          00:00
+        </div>
+      </div>
+      <button class="btn-secondary btn-sm"
+              onclick="afficherDetailExercice('${item?.ref}')">
+        ℹ️ Info
+      </button>
     </div>
 
-    ${prochaine ? `
-      <div class="card card-indigo mb-md" onclick="ouvrirSeance('${prochaine.id}')"
-           style="cursor:pointer">
-        <div style="font-size:.72rem;opacity:.8;margin-bottom:4px">⭐ Recommandée aujourd'hui</div>
-        <div style="font-size:1.1rem;font-weight:700">${prochaine.emoji} ${prochaine.nom}</div>
-        <div style="font-size:.78rem;opacity:.8;margin-top:4px">
-          ${prochaine.exercices.length} exercices · ~${prochaine.duree_estimee}min
-        </div>
-      </div>
-    ` : ''}
+    <!-- Exercice principal -->
+    <div class="exercice-card mb-md">
 
-    ${seances.map(s => `
-      <div class="seance-card" onclick="ouvrirSeance('${s.id}')">
-        <span style="font-size:1.5rem;margin-right:var(--space-md)">${s.emoji}</span>
-        <div class="seance-info">
-          <div class="seance-name">${s.nom}</div>
-          <div class="seance-meta">${s.exercices.length} exercices · ~${s.duree_estimee}min</div>
-        </div>
-        <span style="color:var(--fd-indigo)">▶</span>
+      <!-- GIF démo grand format -->
+      <div id="${gifUID}"
+           style="width:100%;height:220px;display:flex;align-items:center;
+                  justify-content:center;background:var(--fd-indigo-dim);
+                  border-radius:var(--radius-md) var(--radius-md) 0 0;
+                  font-size:4rem;overflow:hidden">
+        ${ex?.emoji || '💪'}
       </div>
-    `).join('')}
+
+      <div style="padding:var(--space-md);text-align:center;
+                  border-bottom:1px solid var(--border-color)">
+        <div style="font-size:1.2rem;font-weight:700">${ex?.nom || item?.ref}</div>
+        <div style="font-size:.8rem;color:var(--fd-mint);margin-top:4px">
+          ${ex?.muscle || ''}
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
+          ${item?.series} séries × ${item?.reps} reps · Repos ${item?.repos}s
+        </div>
+        ${derniere ? `
+          <div style="font-size:.72rem;color:var(--fd-lemon);margin-top:4px">
+            📊 Dernière fois : ${derniere.poids}kg × ${derniere.reps} reps
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- Indicateurs séries -->
+      <div style="padding:var(--space-sm) var(--space-md)">
+        <div class="series-indicators">
+          ${Array.from({length: item?.series || 4}, (_,i) => `
+            <div class="serie-dot ${
+              i + 1 < AppState.serieActuelle  ? 'done'    :
+              i + 1 === AppState.serieActuelle ? 'current' : ''}">
+              ${i + 1 < AppState.serieActuelle ? '✓' : i + 1}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div style="padding:var(--space-md)">
+        <div style="font-size:.85rem;font-weight:600;text-align:center;
+                    color:var(--text-secondary);margin-bottom:var(--space-sm)">
+          Série ${AppState.serieActuelle} / ${item?.series}
+        </div>
+
+        <div class="input-group mb-md">
+          <div style="flex:1">
+            <div class="input-label" style="text-align:center">Poids (kg)</div>
+            <input class="input" id="inp-poids" type="number"
+                   placeholder="${derniere?.poids || '0'}"
+                   value="${derniere?.poids || ''}" step="2.5" />
+          </div>
+          <div style="flex:1">
+            <div class="input-label" style="text-align:center">Reps</div>
+            <input class="input" id="inp-reps" type="number"
+                   placeholder="${derniere?.reps || '0'}"
+                   value="${derniere?.reps || ''}" />
+          </div>
+        </div>
+
+        <!-- RPE -->
+        <div class="rpe-selector">
+          <div class="rpe-label">Effort ressenti (RPE)</div>
+          <div class="rpe-grid">
+            ${Array.from({length:10},(_,i) => `
+              <button class="rpe-btn" data-rpe="${i+1}"
+                      onclick="selectionnerRPE(${i+1}, this)">
+                ${i+1}
+              </button>`).join('')}
+          </div>
+        </div>
+
+        <button class="btn-primary mt-md" onclick="validerSerie()">
+          ✅ Valider série ${AppState.serieActuelle}
+        </button>
+      </div>
+    </div>
+
+    <!-- Zone repos (cachée) -->
+    <div id="zone-repos" class="hidden">
+      <div class="card" style="text-align:center;padding:var(--space-xl)">
+        <div class="timer-title">💤 Repos</div>
+        <div class="countdown-ring" style="width:160px;height:160px;margin:var(--space-md) auto">
+          <svg width="160" height="160" viewBox="0 0 160 160">
+            <circle class="ring-bg" cx="80" cy="80" r="70"
+                    stroke-dasharray="${2*Math.PI*70}" />
+            <circle class="ring-fill" id="live-ring" cx="80" cy="80" r="70"
+                    stroke-dasharray="${2*Math.PI*70}"
+                    stroke-dashoffset="0" />
+          </svg>
+          <div class="countdown-text">
+            <div class="countdown-number" id="live-countdown" style="font-size:2.2rem">
+              ${Utils.formatDureeMin(item?.repos || 90)}
+            </div>
+            <div class="countdown-label">secondes</div>
+          </div>
+        </div>
+        <div class="timer-controls">
+          <button class="timer-adjust-btn"
+                  onclick="timerRepos.ajuster(-15);updateLiveTimer()">-15s</button>
+          <button class="timer-adjust-btn"
+                  onclick="passerRepos()"
+                  style="color:var(--fd-mint)">⏭ Passer</button>
+          <button class="timer-adjust-btn"
+                  onclick="timerRepos.ajuster(15);updateLiveTimer()">+15s</button>
+        </div>
+      </div>
+    </div>
   `;
+
+  // ── Charger le GIF de manière asynchrone ──────────────────
+  ExerciseGIF.chargerDans(item?.ref, gifUID);
 }
 
 function demarrerNouvelleSeance(seance) {
@@ -1847,20 +2129,43 @@ function renderOutils(el) {
 
   el.innerHTML = `
     <!-- Export / Import -->
-    <div class="card mb-md">
-      <div class="card-label">💾 Données</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-sm);margin-top:var(--space-md)">
-        <button class="btn-secondary" onclick="Utils.exporterJSON()">📤 Export JSON</button>
-        <button class="btn-secondary" onclick="Utils.exporterCSV()">📊 Export CSV</button>
-        <button class="btn-secondary" onclick="importerFichier()">📥 Importer</button>
-        <button class="btn-secondary" onclick="genererQRSync()">📱 QR Sync</button>
-      </div>
-      <input type="file" id="file-import" accept=".json"
-             style="display:none" onchange="handleImport(this)" />
-      <div style="font-size:.72rem;color:var(--text-muted);margin-top:var(--space-sm)">
-        Taille données: ${Utils.storage.taille()}
-      </div>
+ <div class="card mb-md">
+  <div class="card-label">💾 Données</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;
+              gap:var(--space-sm);margin-top:var(--space-md)">
+    <button class="btn-secondary" onclick="Utils.exporterJSON()">📤 Export JSON</button>
+    <button class="btn-secondary" onclick="Utils.exporterCSV()">📊 Export CSV</button>
+    <button class="btn-secondary" onclick="importerFichier()">📥 Importer</button>
+    <button class="btn-secondary" onclick="genererQRSync()">📱 QR Sync</button>
+  </div>
+
+  <!-- Stats GIFs -->
+  <div style="margin-top:var(--space-md);padding:var(--space-sm);
+              background:var(--bg-input);border-radius:var(--radius-sm)">
+    <div style="font-size:.78rem;color:var(--text-secondary);
+                display:flex;justify-content:space-between;align-items:center">
+      <span>
+        🎞️ GIFs en cache :
+        <strong id="gif-cache-count">
+          ${ExerciseGIF.statsCache().cached}/${ExerciseGIF.statsCache().total}
+        </strong>
+      </span>
+      <button onclick="rechargerGIFs()"
+              style="background:none;border:none;color:var(--fd-indigo);
+                     font-size:.78rem;cursor:pointer;font-weight:600">
+        🔄 Recharger
+      </button>
     </div>
+    <div class="progress-bar" style="margin-top:var(--space-xs)">
+      <div class="progress-fill"
+           style="width:${ExerciseGIF.statsCache().pct}%"></div>
+    </div>
+  </div>
+
+  <div style="font-size:.72rem;color:var(--text-muted);margin-top:var(--space-sm)">
+    Données app: ${Utils.storage.taille()}
+  </div>
+</div>
 
     <!-- Notifications -->
     <div class="card mb-md">
