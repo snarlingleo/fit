@@ -179,40 +179,49 @@ const Stats = {
   },
 
   // ─── RENDU PAGE STATS ─────────────────────────────────────
-  render(tab = 'dashboard') {
-    const container = document.getElementById('page-content');
-    if (!container) return;
+  render(containerExterne = null, tab = 'dashboard') {
 
-    container.innerHTML = `
-      <div class="tabs-container">
-        ${['dashboard','corps','charges','graphiques','calendrier','trophees']
-          .map(t => `
-            <button class="tab-btn ${tab===t?'active':''}"
-                    onclick="Stats.render('${t}')">
-              ${{
-                dashboard:  '📊 Dashboard',
-                corps:      '⚖️ Corps',
-                charges:    '🏋️ Charges',
-                graphiques: '📈 Graphiques',
-                calendrier: '🗓️ Calendrier',
-                trophees:   '🏆 Trophées'
-              }[t]}
-            </button>`).join('')}
-      </div>
-      <div id="stats-content"></div>
-    `;
+  // Si appelé depuis Profil → utilise le container passé
+  // Si appelé depuis la nav → utilise page-content
+  const container = containerExterne
+    || document.getElementById('page-content');
+  if (!container) return;
 
-    const content = document.getElementById('stats-content');
+  container.innerHTML = `
+    <div class="tabs-container">
+      ${['dashboard','corps','charges','graphiques','calendrier','trophees']
+        .map(t => `
+          <button class="tab-btn ${tab===t?'active':''}"
+                  onclick="Stats.render(
+                    document.getElementById('stats-content')
+                      ?.closest('[id]') === document.getElementById('page-content')
+                      ? null
+                      : document.getElementById('profil-content'),
+                    '${t}')">
+            ${{
+              dashboard:  '📊 Dashboard',
+              corps:      '⚖️ Corps',
+              charges:    '🏋️ Charges',
+              graphiques: '📈 Graphiques',
+              calendrier: '🗓️ Calendrier',
+              trophees:   '🏆 Trophées'
+            }[t]}
+          </button>`).join('')}
+    </div>
+    <div id="stats-content"></div>
+  `;
 
-    switch(tab) {
-      case 'dashboard':  this._renderDashboard(content);  break;
-      case 'corps':      this._renderCorps(content);      break;
-      case 'charges':    this._renderCharges(content);    break;
-      case 'graphiques': this._renderGraphiques(content); break;
-      case 'calendrier': this._renderCalendrier(content); break;
-      case 'trophees':   this._renderTrophees(content);   break;
-    }
-  },
+  const content = document.getElementById('stats-content');
+
+  switch(tab) {
+    case 'dashboard':  this._renderDashboard(content);  break;
+    case 'corps':      this._renderCorps(content);      break;
+    case 'charges':    this._renderCharges(content);    break;
+    case 'graphiques': this._renderGraphiques(content); break;
+    case 'calendrier': this._renderCalendrier(content); break;
+    case 'trophees':   this._renderTrophees(content);   break;
+  }
+},
 
   // ─── DASHBOARD ────────────────────────────────────────────
   _renderDashboard(el) {
