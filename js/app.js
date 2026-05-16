@@ -261,16 +261,18 @@ function toggleTheme() {
 }
 
 function appliquerTheme(theme) {
+  // Appliquer sur <html> ET <body>
   document.documentElement.setAttribute('data-theme', theme);
-  const icones = {
-    dark:     '☀️',
-    light:    '🌙',
-    indigo:   '💜',
-    midnight: '⭐'
-  };
-  const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = icones[theme] || '☀️';
-  AppState.thème = theme;
+  document.body.setAttribute('data-theme', theme);
+  Utils.storage.set('ft_theme', theme);
+
+  // Mettre à jour les boutons
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle(
+      'active',
+      btn.dataset.theme === theme
+    );
+  });
 }
 
 // ─── INSTALL PROMPT ───────────────────────────────────────────
