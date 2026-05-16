@@ -7,37 +7,37 @@ const Tracker = {
 
   // ─── CLÉS STORAGE ─────────────────────────────────────────
   CLE: {
-    SEANCE:    (date, id)            => `ft_seance_${date}_${id}`,
-    SERIE:     (date, id, ref, s)    => `ft_${date}_${id}_${ref}_s${s}`,
-    PR:        (ref)                 => `ft_pr_${ref}`,
-    STREAK:    ()                    => 'ft_streak',
-    HUMEUR:    (date)                => `ft_humeur_${date}`,
-    FATIGUE:   (date)                => `ft_fatigue_${date}`,
-    RPE_MOY:   (date)                => `ft_rpe_${date}`,
-    PROFIL:    ()                    => 'ft_profil',
-    MESURES:   ()                    => 'ft_mesures',
-    OBJECTIFS: ()                    => 'ft_objectifs',
-    BLESSURES: ()                    => 'ft_blessures',
-    JOURNAL:   ()                    => 'ft_journal',
-    NOTIFS:    ()                    => 'ft_notifs_config',
-    XP:        ()                    => 'ft_xp',
-    TROPHEES:  ()                    => 'ft_trophees'
+    SEANCE:    (date, id)         => `ft_seance_${date}_${id}`,
+    SERIE:     (date, id, ref, s) => `ft_${date}_${id}_${ref}_s${s}`,
+    PR:        (ref)              => `ft_pr_${ref}`,
+    STREAK:    ()                 => 'ft_streak',
+    HUMEUR:    (date)             => `ft_humeur_${date}`,
+    FATIGUE:   (date)             => `ft_fatigue_${date}`,
+    RPE_MOY:   (date)             => `ft_rpe_${date}`,
+    PROFIL:    ()                 => 'ft_profil',
+    MESURES:   ()                 => 'ft_mesures',
+    OBJECTIFS: ()                 => 'ft_objectifs',
+    BLESSURES: ()                 => 'ft_blessures',
+    JOURNAL:   ()                 => 'ft_journal',
+    NOTIFS:    ()                 => 'ft_notifs_config',
+    XP:        ()                 => 'ft_xp',
+    TROPHEES:  ()                 => 'ft_trophees'
   },
 
   // ─── SÉANCE ───────────────────────────────────────────────
   demarrerSeance(seanceId, date = null) {
-    const d = date || Utils.aujourd_hui();
+    const d    = date || Utils.aujourd_hui();
     const data = {
-      id: seanceId,
-      date: d,
-      debut: Date.now(),
-      fin: null,
-      duree: null,
-      series: [],
-      prs: [],
+      id:          seanceId,
+      date:        d,
+      debut:       Date.now(),
+      fin:         null,
+      duree:       null,
+      series:      [],
+      prs:         [],
       volumeTotal: 0,
-      rpesMoyen: null,
-      complete: false
+      rpesMoyen:   null,
+      complete:    false
     };
     Utils.storage.set(this.CLE.SEANCE(d, seanceId), data);
     return data;
@@ -54,15 +54,13 @@ const Tracker = {
     data.duree    = Math.floor((data.fin - data.debut) / 1000);
     data.complete = true;
 
-    // Calcul RPE moyen
-    const rpes = data.series.filter(s => s.rpe).map(s => s.rpe);
+    const rpes     = data.series.filter(s => s.rpe).map(s => s.rpe);
     data.rpesMoyen = rpes.length
       ? Utils.arrondir(rpes.reduce((a,b) => a+b, 0) / rpes.length)
       : null;
 
     Utils.storage.set(cle, data);
     this.mettreAJourStreak(d);
-
     return data;
   },
 
@@ -72,24 +70,22 @@ const Tracker = {
     const cle  = this.CLE.SERIE(date, seanceId, exerciceRef, serie);
 
     const data = {
-      reps:   parseInt(reps) || 0,
-      poids:  parseFloat(poids) || 0,
-      rpe:    rpe ? parseInt(rpe) : null,
-      rm1:    Utils.calculer1RM(parseFloat(poids) || 0, parseInt(reps) || 1),
+      reps:      parseInt(reps)   || 0,
+      poids:     parseFloat(poids)|| 0,
+      rpe:       rpe ? parseInt(rpe) : null,
+      rm1:       Utils.calculer1RM(parseFloat(poids)||0, parseInt(reps)||1),
       timestamp: Date.now()
     };
 
     Utils.storage.set(cle, data);
 
-    // Vérifier PR
     const isPR = this.verifierEtSauvegarderPR(exerciceRef, data);
 
-    // Mettre à jour séance
     const seanceCle  = this.CLE.SEANCE(date, seanceId);
     const seanceData = Utils.storage.get(seanceCle, {});
     if (!seanceData.series) seanceData.series = [];
     seanceData.series.push({ exerciceRef, serie, ...data });
-    seanceData.volumeTotal = (seanceData.volumeTotal || 0) + (data.poids * data.reps);
+    seanceData.volumeTotal = (seanceData.volumeTotal||0) + (data.poids * data.reps);
     Utils.storage.set(seanceCle, seanceData);
 
     return { ...data, isPR };
@@ -97,30 +93,19 @@ const Tracker = {
 
   // ─── RECORDS PERSONNELS ───────────────────────────────────
   verifierEtSauvegarderPR(exerciceRef, { poids, reps, rm1 }) {
-    const cle     = this.CLE.PR(exerciceRef);
-    const actuel  = Utils.storage.get(cle, { poids: 0, reps: 0, rm1: 0 });
+    const cle    = this.CLE.PR(exerciceRef);
+    const actuel = Utils.storage.get(cle, { poids:0, reps:0, rm1:0 });
     let   nouveau = false;
-
     const updates = {};
 
-    if (poids > (actuel.poids || 0)) {
-      updates.poids = poids;
-      nouveau = true;
-    }
-    if (reps > (actuel.reps || 0)) {
-      updates.reps = reps;
-      nouveau = true;
-    }
-    if (rm1 > (actuel.rm1 || 0)) {
-      updates.rm1 = rm1;
-      nouveau = true;
-    }
+    if (poids > (actuel.poids||0)) { updates.poids = poids; nouveau = true; }
+    if (reps  > (actuel.reps ||0)) { updates.reps  = reps;  nouveau = true; }
+    if (rm1   > (actuel.rm1  ||0)) { updates.rm1   = rm1;   nouveau = true; }
 
     if (nouveau) {
       Utils.storage.set(cle, {
-        ...actuel,
-        ...updates,
-        date: Utils.aujourd_hui(),
+        ...actuel, ...updates,
+        date:     Utils.aujourd_hui(),
         exercice: exerciceRef
       });
     }
@@ -137,8 +122,8 @@ const Tracker = {
     for (let i = 0; i < localStorage.length; i++) {
       const cle = localStorage.key(i);
       if (cle.startsWith('ft_pr_')) {
-        const ref  = cle.replace('ft_pr_', '');
-        prs[ref]   = JSON.parse(localStorage.getItem(cle));
+        const ref = cle.replace('ft_pr_', '');
+        prs[ref]  = JSON.parse(localStorage.getItem(cle));
       }
     }
     return prs;
@@ -164,13 +149,13 @@ const Tracker = {
   },
 
   getDernierePerf(seanceId, exerciceRef) {
-    // Chercher la dernière série S1 de cet exercice dans la séance
-    const today = Utils.aujourd_hui();
+    const today     = Utils.aujourd_hui();
     const resultats = [];
 
     for (let i = 0; i < localStorage.length; i++) {
       const cle = localStorage.key(i);
-      if (cle.includes(`_${seanceId}_${exerciceRef}_s1`) && cle.startsWith('ft_')) {
+      if (cle.includes(`_${seanceId}_${exerciceRef}_s1`)
+          && cle.startsWith('ft_')) {
         const parts = cle.split('_');
         const date  = parts[1];
         if (date < today) {
@@ -180,7 +165,7 @@ const Tracker = {
       }
     }
 
-    if (resultats.length === 0) return null;
+    if (!resultats.length) return null;
     return resultats.sort((a,b) => new Date(b.date) - new Date(a.date))[0];
   },
 
@@ -218,32 +203,29 @@ const Tracker = {
 
   // ─── STREAK ───────────────────────────────────────────────
   mettreAJourStreak(date = null) {
-    const d       = date || Utils.aujourd_hui();
-    const streak  = Utils.storage.get(this.CLE.STREAK(), {
+    const d      = date || Utils.aujourd_hui();
+    const streak = Utils.storage.get(this.CLE.STREAK(), {
       count: 0, dernierJour: null, max: 0
     });
 
     const hier = Utils.ajouterJours(d, -1);
 
     if (streak.dernierJour === hier || streak.dernierJour === d) {
-      if (streak.dernierJour !== d) {
-        streak.count++;
-      }
+      if (streak.dernierJour !== d) streak.count++;
     } else if (streak.dernierJour === null) {
       streak.count = 1;
     } else {
-      streak.count = 1; // Reset
+      streak.count = 1;
     }
 
     streak.dernierJour = d;
     streak.max = Math.max(streak.max, streak.count);
-
     Utils.storage.set(this.CLE.STREAK(), streak);
     return streak;
   },
 
   getStreak() {
-    return Utils.storage.get(this.CLE.STREAK(), { count: 0, max: 0 });
+    return Utils.storage.get(this.CLE.STREAK(), { count:0, max:0 });
   },
 
   getJoursAbsence() {
@@ -258,7 +240,9 @@ const Tracker = {
   // ─── HUMEUR & FATIGUE ─────────────────────────────────────
   sauvegarderHumeur(humeur, date = null) {
     const d = date || Utils.aujourd_hui();
-    Utils.storage.set(this.CLE.HUMEUR(d), { humeur, timestamp: Date.now() });
+    Utils.storage.set(this.CLE.HUMEUR(d), {
+      humeur, timestamp: Date.now()
+    });
   },
 
   getHumeur(date = null) {
@@ -268,7 +252,9 @@ const Tracker = {
 
   sauvegarderFatigue(niveau, date = null) {
     const d = date || Utils.aujourd_hui();
-    Utils.storage.set(this.CLE.FATIGUE(d), { niveau, timestamp: Date.now() });
+    Utils.storage.set(this.CLE.FATIGUE(d), {
+      niveau, timestamp: Date.now()
+    });
   },
 
   getFatigue(date = null) {
@@ -283,7 +269,7 @@ const Tracker = {
 
   getVolumeSemaine(dateStr = null) {
     const debut = Utils.debutSemaine(dateStr || Utils.aujourd_hui());
-    const fin   = Utils.finSemaine(dateStr || Utils.aujourd_hui());
+    const fin   = Utils.finSemaine(dateStr   || Utils.aujourd_hui());
     let   total = 0;
 
     for (let i = 0; i < localStorage.length; i++) {
@@ -314,7 +300,7 @@ const Tracker = {
 
   getSeancesParSemaine(date = null) {
     const debut = Utils.debutSemaine(date || Utils.aujourd_hui());
-    const fin   = Utils.finSemaine(date || Utils.aujourd_hui());
+    const fin   = Utils.finSemaine(date   || Utils.aujourd_hui());
     let   count = 0;
 
     for (let i = 0; i < localStorage.length; i++) {
@@ -328,7 +314,7 @@ const Tracker = {
   },
 
   getProgressionExercice(exerciceRef, nbSemaines = 8) {
-    const hist = this.getHistoriqueExercice(exerciceRef, 200);
+    const hist       = this.getHistoriqueExercice(exerciceRef, 200);
     const parSemaine = {};
 
     hist.forEach(h => {
@@ -372,7 +358,7 @@ const Tracker = {
     const data = {};
 
     for (let i = 0; i < nbJours; i++) {
-      const date = Utils.ajouterJours(Utils.aujourd_hui(), -i);
+      const date     = Utils.ajouterJours(Utils.aujourd_hui(), -i);
       const planning = PLANNING_SEMAINE[Utils.indexJourSemaine(date)];
       const seance   = this.getSeanceDuJour(date);
 
@@ -380,7 +366,8 @@ const Tracker = {
         data[date] = 'rest';
       } else if (seance && seance.complete) {
         data[date] = 'done';
-      } else if (date < Utils.aujourd_hui() && planning && planning.seanceId) {
+      } else if (date < Utils.aujourd_hui()
+                 && planning && planning.seanceId) {
         data[date] = 'missed';
       } else {
         data[date] = 'none';
@@ -392,45 +379,45 @@ const Tracker = {
 
   // ─── SCORE FORME ──────────────────────────────────────────
   calculerScoreForme() {
-    // Récupération (0-100)
-    const joursAbsence = this.getJoursAbsence();
-    const fatigue      = this.getFatigue();
-    const niveauFat    = fatigue ? fatigue.niveau : 2;
-    const recup        = Math.min(100, Math.max(0,
+    const joursAbsence   = this.getJoursAbsence();
+    const fatigue        = this.getFatigue();
+    const niveauFat      = fatigue ? fatigue.niveau : 2;
+    const recup          = Math.min(100, Math.max(0,
       100 - (niveauFat * 20) - (Math.max(0, joursAbsence - 1) * 10)
     ));
 
-    // Assiduité (0-100)
-    const seancesSemaine = this.getSeancesParSemaine();
+    const seancesSemaine  = this.getSeancesParSemaine();
     const objectifSemaine = Utils.storage.get('ft_objectif_seances_semaine', 4);
-    const assiduite = Math.min(100, Math.round((seancesSemaine / objectifSemaine) * 100));
+    const assiduite       = Math.min(100,
+      Math.round((seancesSemaine / objectifSemaine) * 100)
+    );
 
-    // Progression (0-100)
-    const prs    = Object.keys(this.getAllPRs()).length;
+    const prs         = Object.keys(this.getAllPRs()).length;
     const progression = Math.min(100, prs * 12);
 
-    // Score total pondéré
-    const score = Math.round(recup * 0.4 + assiduite * 0.35 + progression * 0.25);
+    const score = Math.round(
+      recup * 0.4 + assiduite * 0.35 + progression * 0.25
+    );
 
     return {
-      score: Math.max(0, Math.min(100, score)),
+      score:       Math.max(0, Math.min(100, score)),
       recup,
       assiduite,
       progression,
       niveau: score >= 80 ? '🟢 Excellent' :
-              score >= 60 ? '🟡 Bon'      :
-              score >= 40 ? '🟠 Moyen'    : '🔴 Bas'
+              score >= 60 ? '🟡 Bon'       :
+              score >= 40 ? '🟠 Moyen'     : '🔴 Bas'
     };
   },
 
   // ─── PROFIL ───────────────────────────────────────────────
   getProfil() {
     return Utils.storage.get(this.CLE.PROFIL(), {
-      nom: 'Athlète',
-      poids: 80,
-      taille: 175,
+      nom:       'Athlète',
+      poids:     80,
+      taille:    175,
       dateDebut: Utils.aujourd_hui(),
-      avatar: '💪'
+      avatar:    '💪'
     });
   },
 
@@ -448,7 +435,7 @@ const Tracker = {
     const mesures = this.getMesures();
     mesures.push({
       ...mesure,
-      date: mesure.date || Utils.aujourd_hui(),
+      date:      mesure.date || Utils.aujourd_hui(),
       timestamp: Date.now()
     });
     Utils.storage.set(this.CLE.MESURES(), mesures);
@@ -469,9 +456,9 @@ const Tracker = {
     const objectifs = this.getObjectifs();
     objectifs.push({
       ...objectif,
-      id: Date.now().toString(),
+      id:           Date.now().toString(),
       dateCreation: Utils.aujourd_hui(),
-      complete: false
+      complete:     false
     });
     Utils.storage.set(this.CLE.OBJECTIFS(), objectifs);
   },
@@ -497,8 +484,8 @@ const Tracker = {
   ajouterEntreeJournal(texte, seanceId = null) {
     const journal = this.getJournal();
     journal.unshift({
-      id: Date.now().toString(),
-      date: Utils.aujourd_hui(),
+      id:        Date.now().toString(),
+      date:      Utils.aujourd_hui(),
       texte,
       seanceId,
       timestamp: Date.now()
@@ -519,44 +506,26 @@ const Tracker = {
   ajouterBlessure(zone, severite, notes = '') {
     const blessures = this.getBlessures();
     blessures.push({
-      id: Date.now().toString(),
+      id:       Date.now().toString(),
       zone,
       severite,
       notes,
-      date: Utils.aujourd_hui(),
-      active: true
+      date:     Utils.aujourd_hui(),
+      active:   true
     });
     Utils.storage.set(this.CLE.BLESSURES(), blessures);
   },
 
   guerirBlessure(id) {
     const blessures = this.getBlessures().map(b =>
-      b.id === id ? { ...b, active: false, dateGuerison: Utils.aujourd_hui() } : b
+      b.id === id
+        ? { ...b, active: false, dateGuerison: Utils.aujourd_hui() }
+        : b
     );
     Utils.storage.set(this.CLE.BLESSURES(), blessures);
   },
 
-  // ─── RESET ────────────────────────────────────────────────
-  resetComplet() {
-    Utils.storage.clear('ft_');
-    console.log('[Tracker] Données réinitialisées');
-  },
-
-  resetSeules() {
-    // Garder profil, supprimer séances et séries
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const cle = localStorage.key(i);
-      if (cle && cle.startsWith('ft_') &&
-          !cle.includes('profil') &&
-          !cle.includes('notifs') &&
-          !cle.includes('objectifs')) {
-        localStorage.removeItem(cle);
-      }
-    }
-  }
-};
-
-// ─── RÉPARTITION MUSCLES ──────────────────────────────────
+  // ─── RÉPARTITION MUSCLES ──────────────────────────────────
   getRepartitionMuscles() {
     const seances = this.getHistoriqueSeances(999);
     const muscles = {};
@@ -565,7 +534,7 @@ const Tracker = {
       (s.series || []).forEach(sr => {
         const ex     = window.EXERCICES?.[sr.exerciceRef];
         const muscle = ex?.muscle || 'Autre';
-        const vol    = (sr.poids || 0) * (sr.reps || 0);
+        const vol    = (sr.poids||0) * (sr.reps||0);
         muscles[muscle] = (muscles[muscle] || 0) + vol;
       });
     });
@@ -579,12 +548,12 @@ const Tracker = {
   // ─── SÉANCES PAR JOUR DE SEMAINE ──────────────────────────
   getSeancesParJourSemaine() {
     const seances = this.getHistoriqueSeances(999);
-    const jours   = [0, 0, 0, 0, 0, 0, 0]; // Lun → Dim
+    const jours   = [0, 0, 0, 0, 0, 0, 0];
 
     seances.forEach(s => {
       if (!s.date) return;
       const d   = new Date(s.date);
-      const idx = (d.getDay() + 6) % 7; // 0 = Lundi
+      const idx = (d.getDay() + 6) % 7;
       jours[idx]++;
     });
 
@@ -599,13 +568,13 @@ const Tracker = {
     seances.forEach(s => {
       if (!s.rpesMoyen) return;
       const sem = Utils.debutSemaine(s.date);
-      if (!semaines[sem]) semaines[sem] = { total: 0, count: 0 };
+      if (!semaines[sem]) semaines[sem] = { total:0, count:0 };
       semaines[sem].total += s.rpesMoyen;
       semaines[sem].count++;
     });
 
     return Object.entries(semaines)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a],[b]) => a.localeCompare(b))
       .slice(-n)
       .map(([date, d]) => ({
         semaine: Utils.formatDateCourt(date),
@@ -621,13 +590,11 @@ const Tracker = {
   // ─── AJOUTER POIDS CORPOREL ───────────────────────────────
   ajouterPoids(poids) {
     const historique = Utils.storage.get('ft_poids_historique', []);
-
-    // Évite les doublons du même jour
-    const today = Utils.aujourd_hui();
-    const idx   = historique.findIndex(h => h.date === today);
+    const today      = Utils.aujourd_hui();
+    const idx        = historique.findIndex(h => h.date === today);
 
     if (idx >= 0) {
-      historique[idx].poids = poids; // Mise à jour si déjà entré
+      historique[idx].poids = poids;
     } else {
       historique.push({ date: today, poids });
     }
@@ -635,6 +602,26 @@ const Tracker = {
     Utils.storage.set('ft_poids_historique', historique);
     return historique;
   },
+
+  // ─── RESET ────────────────────────────────────────────────
+  resetComplet() {
+    Utils.storage.clear('ft_');
+    console.log('[Tracker] Données réinitialisées');
+  },
+
+  resetSeules() {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const cle = localStorage.key(i);
+      if (cle && cle.startsWith('ft_') &&
+          !cle.includes('profil')   &&
+          !cle.includes('notifs')   &&
+          !cle.includes('objectifs')) {
+        localStorage.removeItem(cle);
+      }
+    }
+  }
+
+}; // ← FIN de Tracker
 
 window.Tracker = Tracker;
 console.log('✅ Tracker chargé');
