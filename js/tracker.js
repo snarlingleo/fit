@@ -556,5 +556,85 @@ const Tracker = {
   }
 };
 
+// ─── RÉPARTITION MUSCLES ──────────────────────────────────
+  getRepartitionMuscles() {
+    const seances = this.getHistoriqueSeances(999);
+    const muscles = {};
+
+    seances.forEach(s => {
+      (s.series || []).forEach(sr => {
+        const ex     = window.EXERCICES?.[sr.exerciceRef];
+        const muscle = ex?.muscle || 'Autre';
+        const vol    = (sr.poids || 0) * (sr.reps || 0);
+        muscles[muscle] = (muscles[muscle] || 0) + vol;
+      });
+    });
+
+    return Object.entries(muscles)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([muscle, volume]) => ({ muscle, volume }));
+  },
+
+  // ─── SÉANCES PAR JOUR DE SEMAINE ──────────────────────────
+  getSeancesParJourSemaine() {
+    const seances = this.getHistoriqueSeances(999);
+    const jours   = [0, 0, 0, 0, 0, 0, 0]; // Lun → Dim
+
+    seances.forEach(s => {
+      if (!s.date) return;
+      const d   = new Date(s.date);
+      const idx = (d.getDay() + 6) % 7; // 0 = Lundi
+      jours[idx]++;
+    });
+
+    return jours;
+  },
+
+  // ─── RPE PAR SEMAINE ──────────────────────────────────────
+  getRPEParSemaine(n = 10) {
+    const seances  = this.getHistoriqueSeances(999);
+    const semaines = {};
+
+    seances.forEach(s => {
+      if (!s.rpesMoyen) return;
+      const sem = Utils.debutSemaine(s.date);
+      if (!semaines[sem]) semaines[sem] = { total: 0, count: 0 };
+      semaines[sem].total += s.rpesMoyen;
+      semaines[sem].count++;
+    });
+
+    return Object.entries(semaines)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-n)
+      .map(([date, d]) => ({
+        semaine: Utils.formatDateCourt(date),
+        rpe:     Math.round((d.total / d.count) * 10) / 10
+      }));
+  },
+
+  // ─── HISTORIQUE POIDS CORPOREL ────────────────────────────
+  getHistoriquePoids(n = 30) {
+    return Utils.storage.get('ft_poids_historique', []).slice(-n);
+  },
+
+  // ─── AJOUTER POIDS CORPOREL ───────────────────────────────
+  ajouterPoids(poids) {
+    const historique = Utils.storage.get('ft_poids_historique', []);
+
+    // Évite les doublons du même jour
+    const today = Utils.aujourd_hui();
+    const idx   = historique.findIndex(h => h.date === today);
+
+    if (idx >= 0) {
+      historique[idx].poids = poids; // Mise à jour si déjà entré
+    } else {
+      historique.push({ date: today, poids });
+    }
+
+    Utils.storage.set('ft_poids_historique', historique);
+    return historique;
+  },
+
 window.Tracker = Tracker;
 console.log('✅ Tracker chargé');
