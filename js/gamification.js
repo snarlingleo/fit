@@ -145,7 +145,6 @@ const Gamification = {
     const nivApres = this.getNiveau(apres);
 
     if (nivApres.numero > nivAvant.numero) {
-      // 🎉 Level Up !
       timerRepos.jouerSon('levelup');
       Utils.vibrer([200,100,200,100,400]);
       Utils.confetti(3000);
@@ -167,8 +166,8 @@ const Gamification = {
     const debloquees = Utils.storage.get('ft_trophees', []);
     return this.TROPHEES_DEF.map(t => ({
       ...t,
-      debloquee:       debloquees.includes(t.id),
-      dateDeblocage:   Utils.storage.get(`ft_trophy_date_${t.id}`, null)
+      debloquee:     debloquees.includes(t.id),
+      dateDeblocage: Utils.storage.get(`ft_trophy_date_${t.id}`, null)
     }));
   },
 
@@ -240,176 +239,172 @@ const Gamification = {
       this.ajouterXP(montant, action.toLowerCase().replace(/_/g,' '));
     }
     setTimeout(() => this.verifierTrophees(), 500);
-  }
-};
+  },
 
-// À ajouter dans gamification.js
+  // ─── RENDER GAMIFICATION TAB ──────────────────────────────
+  renderGamificationTab(container) {
+    const xp         = this.getXP();
+    const trophees   = this.getTrophees();
+    const debloquees = trophees.filter(t =>  t.debloquee);
+    const verrous    = trophees.filter(t => !t.debloquee);
 
-renderGamificationTab(container) {
-  const xp       = this.getXP();
-  const trophees = this.getTrophees();
-  const debloquees = trophees.filter(t => t.debloquee);
-  const verrous    = trophees.filter(t => !t.debloquee);
+    container.innerHTML = `
 
-  container.innerHTML = `
-
-    <!-- XP + Niveau -->
-    <div class="card mb-md"
-         style="background:linear-gradient(135deg,
-                var(--fd-indigo) 0%, #7b2ff7 100%);
-                border:none;text-align:center">
-      <div style="font-size:2rem;margin-bottom:4px">
-        ${xp.niveau.emoji}
-      </div>
-      <div style="font-size:1.2rem;font-weight:800">
-        Niveau ${xp.niveau.numero} — ${xp.niveau.nom}
-      </div>
-      <div style="font-size:.78rem;opacity:.8;margin-top:4px">
-        ${xp.total} XP total
-      </div>
-
-      <!-- Barre XP -->
-      <div style="margin-top:var(--space-md)">
-        <div style="display:flex;justify-content:space-between;
-                    font-size:.68rem;opacity:.7;margin-bottom:6px">
-          <span>${xp.niveau.xpMin} XP</span>
-          <span>${xp.pourcentage}%</span>
-          <span>${xp.niveau.xpSuivant} XP</span>
+      <!-- XP + Niveau -->
+      <div class="card mb-md"
+           style="background:linear-gradient(135deg,
+                  var(--fd-indigo) 0%, #7b2ff7 100%);
+                  border:none;text-align:center">
+        <div style="font-size:2rem;margin-bottom:4px">
+          ${xp.niveau.emoji}
         </div>
-        <div style="height:8px;background:rgba(255,255,255,0.2);
-                    border-radius:99px;overflow:hidden">
-          <div style="height:100%;width:${xp.pourcentage}%;
-                      background:var(--fd-lemon);
-                      border-radius:99px;
-                      transition:width 1s ease">
+        <div style="font-size:1.2rem;font-weight:800">
+          Niveau ${xp.niveau.numero} — ${xp.niveau.nom}
+        </div>
+        <div style="font-size:.78rem;opacity:.8;margin-top:4px">
+          ${xp.total} XP total
+        </div>
+
+        <div style="margin-top:var(--space-md)">
+          <div style="display:flex;justify-content:space-between;
+                      font-size:.68rem;opacity:.7;margin-bottom:6px">
+            <span>${xp.niveau.xpMin} XP</span>
+            <span>${xp.pourcentage}%</span>
+            <span>${xp.niveau.xpSuivant} XP</span>
+          </div>
+          <div style="height:8px;background:rgba(255,255,255,0.2);
+                      border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:${xp.pourcentage}%;
+                        background:var(--fd-lemon);
+                        border-radius:99px;
+                        transition:width 1s ease">
+            </div>
           </div>
         </div>
+
+        ${xp.niveau.numero < 7 ? `
+          <div style="margin-top:var(--space-md);
+                      font-size:.72rem;opacity:.7">
+            ${xp.niveau.xpSuivant - xp.total} XP
+            jusqu'au niveau suivant
+          </div>` : `
+          <div style="margin-top:var(--space-md);
+                      font-size:.72rem;color:var(--fd-lemon)">
+            👑 Niveau maximum atteint !
+          </div>`}
       </div>
 
-      <!-- Prochain niveau -->
-      ${xp.niveau.numero < 7 ? `
-        <div style="margin-top:var(--space-md);
-                    font-size:.72rem;opacity:.7">
-          ${xp.niveau.xpSuivant - xp.total} XP
-          jusqu'au niveau suivant
+      <!-- Compteur trophées -->
+      <div class="stats-grid mb-md">
+        <div class="stat-card">
+          <span class="stat-value">${debloquees.length}</span>
+          <span class="stat-label">Débloqués</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">${trophees.length}</span>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">
+            ${Math.round((debloquees.length / trophees.length) * 100)}%
+          </span>
+          <span class="stat-label">Complété</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">${xp.total}</span>
+          <span class="stat-label">XP Total</span>
+        </div>
+      </div>
+
+      <!-- Trophées débloqués -->
+      ${debloquees.length > 0 ? `
+        <div class="card-label mb-sm">
+          🏆 Trophées débloqués (${debloquees.length})
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);
+                    gap:var(--space-sm);margin-bottom:var(--space-md)">
+          ${debloquees.map(t => `
+            <div style="background:rgba(249,239,119,0.08);
+                        border:1px solid rgba(249,239,119,0.3);
+                        border-radius:var(--radius-md);
+                        padding:var(--space-md) var(--space-sm);
+                        text-align:center">
+              <div style="font-size:1.8rem;margin-bottom:4px">
+                ${t.emoji}
+              </div>
+              <div style="font-size:.65rem;font-weight:700;
+                          color:var(--fd-lemon)">
+                ${t.nom}
+              </div>
+              <div style="font-size:.6rem;color:var(--text-muted);
+                          margin-top:2px">
+                +${t.xp} XP
+              </div>
+              ${t.dateDeblocage ? `
+                <div style="font-size:.55rem;color:var(--text-muted);
+                            margin-top:2px">
+                  ${Utils.formatDateCourt(t.dateDeblocage)}
+                </div>` : ''}
+            </div>`).join('')}
         </div>` : `
-        <div style="margin-top:var(--space-md);
-                    font-size:.72rem;color:var(--fd-lemon)">
-          👑 Niveau maximum atteint !
+        <div class="card mb-md"
+             style="text-align:center;padding:var(--space-xl)">
+          <div style="font-size:2rem;margin-bottom:var(--space-sm)">🔒</div>
+          <div style="font-size:.88rem;color:var(--text-muted)">
+            Aucun trophée débloqué pour l'instant.
+            <br>Commence tes séances !
+          </div>
         </div>`}
-    </div>
 
-    <!-- Compteur trophées -->
-    <div class="stats-grid mb-md">
-      <div class="stat-card">
-        <span class="stat-value">${debloquees.length}</span>
-        <span class="stat-label">Débloqués</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${trophees.length}</span>
-        <span class="stat-label">Total</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">
-          ${Math.round((debloquees.length/trophees.length)*100)}%
-        </span>
-        <span class="stat-label">Complété</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${xp.total}</span>
-        <span class="stat-label">XP Total</span>
-      </div>
-    </div>
-
-    <!-- Trophées débloqués -->
-    ${debloquees.length > 0 ? `
+      <!-- Trophées verrouillés -->
       <div class="card-label mb-sm">
-        🏆 Trophées débloqués (${debloquees.length})
+        🔒 À débloquer (${verrous.length})
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);
                   gap:var(--space-sm);margin-bottom:var(--space-md)">
-        ${debloquees.map(t => `
-          <div style="background:rgba(249,239,119,0.08);
-                      border:1px solid rgba(249,239,119,0.3);
+        ${verrous.map(t => `
+          <div style="background:var(--bg-card);
+                      border:1px solid var(--border-color);
                       border-radius:var(--radius-md);
                       padding:var(--space-md) var(--space-sm);
-                      text-align:center">
+                      text-align:center;
+                      opacity:0.4;filter:grayscale(1)">
             <div style="font-size:1.8rem;margin-bottom:4px">
               ${t.emoji}
             </div>
             <div style="font-size:.65rem;font-weight:700;
-                        color:var(--fd-lemon)">
+                        color:var(--text-secondary)">
               ${t.nom}
             </div>
             <div style="font-size:.6rem;color:var(--text-muted);
                         margin-top:2px">
               +${t.xp} XP
             </div>
-            ${t.dateDeblocage ? `
-              <div style="font-size:.55rem;color:var(--text-muted);
-                          margin-top:2px">
-                ${t.dateDeblocage}
-              </div>` : ''}
+            <div style="font-size:.55rem;color:var(--text-muted);
+                        margin-top:4px;line-height:1.3">
+              ${t.description}
+            </div>
           </div>`).join('')}
-      </div>` : `
-      <div class="card mb-md" style="text-align:center;
-                                      padding:var(--space-xl)">
-        <div style="font-size:2rem;margin-bottom:var(--space-sm)">
-          🔒
-        </div>
-        <div style="font-size:.88rem;color:var(--text-muted)">
-          Aucun trophée débloqué pour l'instant.
-          <br>Commence tes séances !
-        </div>
-      </div>`}
+      </div>
 
-    <!-- Trophées verrouillés -->
-    <div class="card-label mb-sm">
-      🔒 À débloquer (${verrous.length})
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);
-                gap:var(--space-sm);margin-bottom:var(--space-md)">
-      ${verrous.map(t => `
-        <div style="background:var(--bg-card);
-                    border:1px solid var(--border-color);
-                    border-radius:var(--radius-md);
-                    padding:var(--space-md) var(--space-sm);
-                    text-align:center;
-                    opacity:0.4;filter:grayscale(1)">
-          <div style="font-size:1.8rem;margin-bottom:4px">
-            ${t.emoji}
-          </div>
-          <div style="font-size:.65rem;font-weight:700;
-                      color:var(--text-secondary)">
-            ${t.nom}
-          </div>
-          <div style="font-size:.6rem;color:var(--text-muted);
-                      margin-top:2px">
-            +${t.xp} XP
-          </div>
-          <div style="font-size:.55rem;color:var(--text-muted);
-                      margin-top:4px;line-height:1.3">
-            ${t.description}
-          </div>
-        </div>`).join('')}
-    </div>
+      <!-- Actions XP -->
+      <div class="card">
+        <div class="card-label">⚡ Comment gagner des XP</div>
+        ${Object.entries(this.XP_ACTIONS).map(([action, xp]) => `
+          <div class="score-row">
+            <span class="score-row-label">
+              ${action.toLowerCase().replace(/_/g,' ')}
+            </span>
+            <span class="score-row-value"
+                  style="color:var(--fd-lemon)">
+              +${xp} XP
+            </span>
+          </div>`).join('')}
+      </div>
+    `;
+  }
 
-    <!-- Actions XP -->
-    <div class="card">
-      <div class="card-label">⚡ Comment gagner des XP</div>
-      ${Object.entries(this.XP_ACTIONS).map(([action, xp]) => `
-        <div class="score-row">
-          <span class="score-row-label">
-            ${action.toLowerCase().replace(/_/g,' ')}
-          </span>
-          <span class="score-row-value"
-                style="color:var(--fd-lemon)">
-            +${xp} XP
-          </span>
-        </div>`).join('')}
-    </div>
-  `;
-},
+}; // ← FIN de Gamification
 
 window.Gamification = Gamification;
 console.log('✅ Gamification v2 chargé');
