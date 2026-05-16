@@ -230,7 +230,7 @@ const Tracker = {
 
   getJoursAbsence() {
     const derniere = this.getDerniereSéance();
-    if (!derniere) return 999;
+    if (!derniere) return -1;
     return Utils.diffJours(
       new Date(derniere).toISOString().split('T')[0],
       Utils.aujourd_hui()
