@@ -1636,7 +1636,7 @@ function sauvegarderNoteJournal(seanceId) {
 function renderProfil(tab = 'moi') {
   const container = document.getElementById('page-content');
   const tabs = [
-    'moi','journal','objectifs','blessure',
+    'moi','stats','journal','objectifs','blessure',
     'coach','custom','programme','outils'
   ];
 
@@ -1647,6 +1647,7 @@ function renderProfil(tab = 'moi') {
                 onclick="renderProfil('${t}')">
           ${{
             moi:        '👤 Moi',
+            stats:      '📊 Stats',
             journal:    '📔 Journal',
             objectifs:  '🎯 Objectifs',
             blessure:   '🩹 Blessure',
@@ -1662,6 +1663,7 @@ function renderProfil(tab = 'moi') {
   const content = document.getElementById('profil-content');
   switch(tab) {
     case 'moi':        renderProfilMoi(content);            break;
+    case 'stats':      Stats.render(content);               break;
     case 'journal':    renderJournal(content);              break;
     case 'objectifs':  renderObjectifs(content);            break;
     case 'blessure':   renderBlessure(content);             break;
