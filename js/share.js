@@ -8,52 +8,52 @@ const Share = {
   // ─── PLAYLISTS APPLE MUSIC FRANCE ─────────────────────────
   PLAYLISTS: {
     reprise: {
-      nom:         'Motivation Fitness',
+      nom:         'Motivation Sport',
       description: 'Pour bien démarrer',
       emoji:       '🌱',
-      url:         'https://music.apple.com/fr/playlist/motivation-fitness/pl.u-leyl0D9t6gyqyV',
+      url:         'https://music.apple.com/fr/playlist/motivation-sport/pl.567c541878f94246',
       genre:       'Pop / Urban'
     },
     construction: {
-      nom:         'Beast Mode',
+      nom:         'Rap Français 2024',
       description: 'Pour les séances intenses',
       emoji:       '💪',
-      url:         'https://music.apple.com/fr/playlist/beast-mode/pl.u-XkD02mXT6gyqyV',
-      genre:       'Hip-Hop / Rap FR'
+      url:         'https://music.apple.com/fr/playlist/rap-fran%C3%A7ais/pl.d5a4c6d838fc4e0f',
+      genre:       'Rap FR'
     },
     intensite: {
-      nom:         'Workout Intense',
+      nom:         'Électro Workout',
       description: 'Pour dépasser tes limites',
       emoji:       '🔥',
-      url:         'https://music.apple.com/fr/playlist/workout/pl.u-YkD02mXT6gyqyV',
+      url:         'https://music.apple.com/fr/playlist/%C3%A9lectro-workout/pl.6bf4415de29a4d73',
       genre:       'Electronic / EDM'
     },
     peak: {
-      nom:         'Champions',
+      nom:         'Hip-Hop Classiques',
       description: 'Pour les jours de PR',
       emoji:       '🏆',
-      url:         'https://music.apple.com/fr/playlist/hits-workout/pl.u-ZkD02mXT6gyqyV',
-      genre:       'Rap FR / Trap'
+      url:         'https://music.apple.com/fr/playlist/hip-hop-classiques/pl.0af53e5a4e5749d7',
+      genre:       'Hip-Hop'
     },
     jambes: {
-      nom:         'Rap FR Workout',
+      nom:         'Rap FR Essentiels',
       description: 'Pour les séances jambes',
       emoji:       '🦵',
-      url:         'https://music.apple.com/fr/playlist/rap-fr/pl.u-AkD02mXT6gyqyV',
+      url:         'https://music.apple.com/fr/playlist/rap-fr-essentiels/pl.aa9de0eeffd641d5',
       genre:       'Rap Français'
     },
     cardio: {
-      nom:         'Cardio Mix',
+      nom:         'Dance Hits',
       description: 'Rythme parfait pour le cardio',
       emoji:       '🚴',
-      url:         'https://music.apple.com/fr/playlist/cardio/pl.u-BkD02mXT6gyqyV',
+      url:         'https://music.apple.com/fr/playlist/dance-hits/pl.6ce2c4b859c948c5',
       genre:       'Dance / Pop'
     },
     repos: {
-      nom:         'Récupération Active',
+      nom:         'Méditation & Bien-être',
       description: 'Stretching & récupération',
       emoji:       '😴',
-      url:         'https://music.apple.com/fr/playlist/zen/pl.u-CkD02mXT6gyqyV',
+      url:         'https://music.apple.com/fr/playlist/m%C3%A9ditation-bien-%C3%AAtre/pl.e99c4b8a4f6f45a2',
       genre:       'Ambient / Chill'
     }
   },
