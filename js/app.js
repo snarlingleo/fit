@@ -1688,20 +1688,27 @@ function renderProfilMoi(el) {
         <div style="display:flex;flex-wrap:wrap;gap:6px;
                     justify-content:center">
           ${avatars.map(a => `
-            <button onclick="changerAvatar('${a}')"
-                    style="font-size:1.4rem;padding:4px 8px;
-                           border-radius:var(--radius-sm);
-                           border:2px solid ${
-                             (profil.avatar||'💪') === a
-                               ? 'var(--fd-lemon)'
-                               : 'transparent'};
-                           background:${
-                             (profil.avatar||'💪') === a
-                               ? 'rgba(249,239,119,0.1)'
-                               : 'transparent'};
-                           cursor:pointer;transition:all .2s">
-              ${a}
-            </button>`).join('')}
+  <button onclick="changerAvatar('${a}')"
+          data-avatar="${a}"
+          class="avatar-option ${
+            (profil.avatar || '💪').trim() === a.trim()
+              ? 'avatar-selected'
+              : ''
+          }"
+          style="font-size:1.4rem;padding:4px 8px;
+                 border-radius:var(--radius-sm);
+                 border:2px solid ${
+                   (profil.avatar || '💪').trim() === a.trim()
+                     ? 'var(--fd-lemon)'
+                     : 'transparent'};
+                 background:${
+                   (profil.avatar || '💪').trim() === a.trim()
+                     ? 'rgba(249,239,119,0.1)'
+                     : 'transparent'};
+                 cursor:pointer;
+                 transition:all .2s ease">
+    ${a}
+  </button>`).join('')}
         </div>
       </div>
       <div class="profil-name">${profil.nom||'Athlète'}</div>
@@ -1789,9 +1796,32 @@ function renderProfilMoi(el) {
 }
 
 function changerAvatar(avatar) {
+  // Sauvegarder
   Tracker.sauvegarderProfil({ avatar });
+
+  // Retirer la sélection de TOUS les boutons
+  document.querySelectorAll('.avatar-option').forEach(btn => {
+    btn.style.border      = '2px solid transparent';
+    btn.style.background  = 'transparent';
+    btn.classList.remove('avatar-selected');
+  });
+
+  // Appliquer sur le bouton cliqué UNIQUEMENT
+  const btnActif = document.querySelector(
+    `.avatar-option[data-avatar="${avatar}"]`
+  );
+  if (btnActif) {
+    btnActif.style.border     = '2px solid var(--fd-lemon)';
+    btnActif.style.background = 'rgba(249,239,119,0.1)';
+    btnActif.classList.add('avatar-selected');
+  }
+
+  // Mettre à jour l'avatar affiché en grand
+  const grand = document.querySelector('.profil-card .avatar-grand');
+  if (grand) grand.textContent = avatar;
+
+  Utils.toast(`Avatar mis à jour !`, 'success');
   Utils.vibrerBeep();
-  renderProfilMoi(document.getElementById('profil-content'));
 }
 
 function sauvegarderMesures() {
