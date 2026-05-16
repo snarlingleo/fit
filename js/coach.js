@@ -416,43 +416,45 @@ const Coach = {
         </div>
 
         <!-- ── Input zone ──────────────────────────────── -->
-        <div style="display:flex;
-                    gap:var(--space-sm);
-                    align-items:center">
+<div style="display:grid;
+            grid-template-columns:1fr auto;
+            gap:var(--space-sm);
+            align-items:stretch">
 
-          <input id="coach-input"
-                 type="text"
-                 class="input"
-                 style="flex:1;
-                        min-width:0;
-                        -webkit-appearance:none;
-                        border-radius:var(--radius-full)"
-                 placeholder="Ex: Comment progresser sur le squat ?"
-                 autocomplete="off"
-                 autocorrect="off"
-                 autocapitalize="sentences"
-                 onkeydown="if(event.key==='Enter'){
-                   event.preventDefault();
-                   Coach._envoyerChat();
-                 }" />
+  <input id="coach-input"
+         type="text"
+         class="input"
+         style="width:100%;
+                min-width:0;
+                box-sizing:border-box;
+                -webkit-appearance:none;
+                border-radius:var(--radius-full)"
+         placeholder="Ta question..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="sentences"
+         onkeydown="if(event.key==='Enter'){
+           event.preventDefault();
+           Coach._envoyerChat();
+         }" />
 
-          <button onclick="Coach._envoyerChat()"
-                  style="flex-shrink:0;
-                         height:44px;
-                         padding:0 var(--space-md);
-                         background:var(--fd-indigo);
-                         color:white;
-                         border:none;
-                         border-radius:var(--radius-full);
-                         font-size:.88rem;
-                         font-weight:700;
-                         cursor:pointer;
-                         white-space:nowrap;
-                         -webkit-tap-highlight-color:transparent;
-                         transition:opacity .2s ease">
-            Envoyer ↗
-          </button>
-        </div>
+  <button onclick="Coach._envoyerChat()"
+          style="height:44px;
+                 width:auto;
+                 padding:0 16px;
+                 background:var(--fd-indigo);
+                 color:white;
+                 border:none;
+                 border-radius:var(--radius-full);
+                 font-size:.85rem;
+                 font-weight:700;
+                 cursor:pointer;
+                 white-space:nowrap;
+                 -webkit-tap-highlight-color:transparent">
+    Envoyer ↗
+  </button>
+
+</div>
 
       </div>
 
