@@ -242,6 +242,7 @@ function naviguer(page) {
     case 'live':     renderLive();     break;
     case 'stats':   Stats.render();    break;
     case 'profile':  renderProfil();   break;
+   case 'nutrition': Nutrition.render(); break;
     default:         renderAccueil();
   }
 }
