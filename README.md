@@ -11,7 +11,7 @@
 
 ## 📱 Demo
 
-🔗 **[Voir l'app en live](https://TON-USERNAME.github.io/fittracker-pro)**
+🔗 **[Voir l'app en live](https://snarlingleo.github.io/fit/)**
 
 ---
 
