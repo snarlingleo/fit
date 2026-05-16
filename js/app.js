@@ -169,6 +169,7 @@ function lancerApp() {
   initInstallPrompt();
   initTheme();
   Notifications.init();
+  Utils.verifierBackupAuto(); 
 
   // Préchargement GIFs en arrière-plan
   const stats = ExerciseGIF.statsCache();
@@ -1864,20 +1865,25 @@ function renderOutils(el) {
              style="display:none"
              onchange="handleImport(this)" />
       <div style="display:grid;grid-template-columns:1fr 1fr;
-                  gap:var(--space-sm);margin-top:var(--space-md)">
-        <button class="btn-secondary" onclick="Utils.exporterJSON()">
-          📤 Export JSON
-        </button>
-        <button class="btn-secondary" onclick="Utils.exporterCSV()">
-          📊 Export CSV
-        </button>
-        <button class="btn-secondary" onclick="importerFichier()">
-          📥 Importer
-        </button>
-        <button class="btn-secondary" onclick="genererQRSync()">
-          📱 QR Sync
-        </button>
-      </div>
+            gap:var(--space-sm);margin-top:var(--space-md)">
+  <button class="btn-secondary" onclick="Utils.exporterJSON()">
+    📤 Export JSON
+  </button>
+  <button class="btn-secondary" onclick="Utils.exporterCSV()">
+    📊 Export CSV
+  </button>
+  <button class="btn-secondary" onclick="importerFichier()">
+    📥 Importer
+  </button>
+  <button class="btn-secondary" onclick="genererQRSync()">
+    📱 QR Sync
+  </button>
+  <!-- ✅ NOUVEAU -->
+  <button class="btn-secondary" onclick="Utils.exporterPDF()"
+          style="grid-column:span 2">
+    📄 Rapport PDF
+  </button>
+</div>
 
       <!-- Stats GIFs -->
       <div style="margin-top:var(--space-md);padding:var(--space-sm);
