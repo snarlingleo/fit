@@ -648,6 +648,258 @@ const Utils = {
   }
 };
 
+/* ============================================================
+   ExerciseGIF — Chargement automatique GIFs via ExerciseDB
+   ============================================================ */
+
+const ExerciseGIF = {
+
+  // ─── IDs ExerciseDB ───────────────────────────────────────
+  IDS: {
+    bench_press:             '0025',
+    incline_halteres:        '0090',
+    chest_press_machine:     '0076',
+    ecarte_poulie:           '0260',
+    dips:                    '0158',
+    pompes:                  '0472',
+    tractions:               '0656',
+    rowing_barre:            '0445',
+    lat_pulldown:            '0319',
+    rowing_machine:          '0513',
+    soulevé_terre:           '0301',
+    pullover:                '0560',
+    dev_militaire:           '0526',
+    elev_laterales:          '0329',
+    shoulder_press_machine:  '0745',
+    face_pull:               '0355',
+    oiseau:                  '0342',
+    curl_halteres:           '0299',
+    curl_barre:              '0031',
+    curl_marteau:            '0320',
+    curl_machine:            '0637',
+    ext_triceps_poulie:      '0076',
+    barre_front:             '0065',
+    dips_triceps:            '0435',
+    squat:                   '0685',
+    presse_cuisses:          '0356',
+    fentes:                  '0700',
+    leg_curl:                '0322',
+    leg_extension:           '0370',
+    mollets:                 '0309',
+    hip_thrust:              '1460',
+    planche:                 '0573',
+    crunch_machine:          '0476',
+    releve_jambes:           '0340',
+    russian_twist:           '0553',
+    rameur:                  '0667',
+    velo:                    '0628'
+  },
+
+  BASE_URL: 'https://exercisedb.io/api/exercises',
+
+  // ─── Récupérer URL d'un GIF ───────────────────────────────
+  async getGIF(exerciceRef) {
+    // 1. Cache localStorage d'abord
+    const cached = localStorage.getItem(`ft_gif_${exerciceRef}`);
+    if (cached && cached !== 'null') return cached;
+
+    // 2. Pas d'ID connu → retourner null
+    const id = this.IDS[exerciceRef];
+    if (!id) return null;
+
+    // 3. Fetch API
+    try {
+      const res  = await fetch(`${this.BASE_URL}/${id}`, {
+        headers: { 'x-rapidapi-host': 'exercisedb.p.rapidapi.com' }
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data   = await res.json();
+      const gifUrl = data.gifUrl;
+
+      if (gifUrl) {
+        localStorage.setItem(`ft_gif_${exerciceRef}`, gifUrl);
+        return gifUrl;
+      }
+      return null;
+
+    } catch(e) {
+      console.warn(`[GIF] Erreur chargement ${exerciceRef}:`, e.message);
+
+      // Fallback → URL alternative MuscleWiki
+      const fallback = this.FALLBACK_URLS[exerciceRef];
+      if (fallback) {
+        localStorage.setItem(`ft_gif_${exerciceRef}`, fallback);
+        return fallback;
+      }
+      return null;
+    }
+  },
+
+  // ─── URLs de fallback (MuscleWiki) ────────────────────────
+  FALLBACK_URLS: {
+    bench_press:    'https://musclewiki.com/media/uploads/videos/branded/male-barbell-bench-press-front.gif',
+    squat:          'https://musclewiki.com/media/uploads/videos/branded/male-barbell-squat-front.gif',
+    tractions:      'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-pull-up-front.gif',
+    rowing_barre:   'https://musclewiki.com/media/uploads/videos/branded/male-barbell-bent-over-row-front.gif',
+    dev_militaire:  'https://musclewiki.com/media/uploads/videos/branded/male-barbell-overhead-press-front.gif',
+    soulevé_terre:  'https://musclewiki.com/media/uploads/videos/branded/male-barbell-deadlift-front.gif',
+    lat_pulldown:   'https://musclewiki.com/media/uploads/videos/branded/male-cable-lat-pulldown-front.gif',
+    curl_halteres:  'https://musclewiki.com/media/uploads/videos/branded/male-dumbbell-bicep-curl-front.gif',
+    elev_laterales: 'https://musclewiki.com/media/uploads/videos/branded/male-dumbbell-lateral-raise-front.gif',
+    planche:        'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-plank-front.gif',
+    fentes:         'https://musclewiki.com/media/uploads/videos/branded/male-dumbbell-lunge-front.gif',
+    presse_cuisses: 'https://musclewiki.com/media/uploads/videos/branded/male-machine-leg-press-front.gif',
+    dips:           'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-dip-front.gif',
+    pompes:         'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-push-up-front.gif'
+  },
+
+  // ─── Précharger tous les GIFs en arrière-plan ─────────────
+  async prechargerTout(onProgress = null) {
+    const refs  = Object.keys(this.IDS);
+    let   count = 0;
+
+    console.log(`[GIF] Préchargement de ${refs.length} GIFs...`);
+
+    for (const ref of refs) {
+      const deja = localStorage.getItem(`ft_gif_${ref}`);
+      if (!deja) {
+        await this.getGIF(ref);
+        await new Promise(r => setTimeout(r, 150)); // Anti-spam
+      }
+      count++;
+      if (onProgress) onProgress(count, refs.length);
+    }
+
+    console.log('✅ GIFs préchargés');
+  },
+
+  // ─── Vider le cache GIFs ──────────────────────────────────
+  viderCache() {
+    Object.keys(this.IDS).forEach(ref => {
+      localStorage.removeItem(`ft_gif_${ref}`);
+    });
+    console.log('[GIF] Cache vidé');
+  },
+
+  // ─── Stats cache ──────────────────────────────────────────
+  statsCache() {
+    const total   = Object.keys(this.IDS).length;
+    const cached  = Object.keys(this.IDS)
+      .filter(ref => localStorage.getItem(`ft_gif_${ref}`)).length;
+    return { total, cached, pct: Math.round((cached/total)*100) };
+  },
+
+  // ─── Rendu HTML d'un GIF ──────────────────────────────────
+  // → Appelle cette fonction dans les templates HTML
+  render(exerciceRef, options = {}) {
+    const {
+      taille    = 'grand',   // 'grand' | 'mini'
+      className = '',
+      style     = ''
+    } = options;
+
+    const ex      = window.EXERCICES?.[exerciceRef] || {};
+    const cached  = localStorage.getItem(`ft_gif_${exerciceRef}`);
+    const isGrand = taille === 'grand';
+    const w       = isGrand ? '100%'  : '70px';
+    const h       = isGrand ? '220px' : '70px';
+    const fs      = isGrand ? '4rem'  : '1.8rem';
+    const uid     = `gif_${exerciceRef}_${Date.now()}`;
+
+    if (cached && cached !== 'null') {
+      return `
+        <div style="position:relative;width:${w};height:${h}">
+          <img id="img_${uid}"
+               src="${cached}"
+               alt="${ex.nom || exerciceRef}"
+               class="${className}"
+               style="width:100%;height:100%;object-fit:contain;
+                      border-radius:var(--radius-md);
+                      background:rgba(0,0,0,0.2);${style}"
+               onerror="ExerciseGIF._onImgError('${exerciceRef}', '${uid}')" />
+        </div>
+      `;
+    }
+
+    // Pas en cache → placeholder emoji + chargement async
+    return `
+      <div id="gifbox_${uid}"
+           data-ref="${exerciceRef}"
+           style="width:${w};height:${h};display:flex;flex-direction:column;
+                  align-items:center;justify-content:center;
+                  background:var(--fd-indigo-dim);
+                  border-radius:var(--radius-md);
+                  gap:8px;${style}">
+        <span style="font-size:${fs}">${ex.emoji || '💪'}</span>
+        ${this.IDS[exerciceRef] ? `
+          <span style="font-size:.65rem;color:var(--text-muted)">
+            ⏳ Chargement...
+          </span>
+        ` : ''}
+      </div>
+      <script>
+        (async () => {
+          const url = await ExerciseGIF.getGIF('${exerciceRef}');
+          const box = document.getElementById('gifbox_${uid}');
+          if (url && box) {
+            box.innerHTML = \`
+              <img src="\${url}"
+                   alt="${ex.nom || exerciceRef}"
+                   style="width:100%;height:100%;object-fit:contain;
+                          border-radius:var(--radius-md)"
+                   onerror="this.parentElement.innerHTML='${ex.emoji || '💪'}'" />
+            \`;
+          }
+        })();
+      <\/script>
+    `;
+  },
+
+  // ─── Erreur image → retry fallback ────────────────────────
+  _onImgError(exerciceRef, uid) {
+    localStorage.removeItem(`ft_gif_${exerciceRef}`);
+    const fallback = this.FALLBACK_URLS[exerciceRef];
+    const img      = document.getElementById(`img_${uid}`);
+    if (img && fallback) {
+      img.src = fallback;
+      localStorage.setItem(`ft_gif_${exerciceRef}`, fallback);
+    } else if (img) {
+      const ex = window.EXERCICES?.[exerciceRef] || {};
+      img.parentElement.innerHTML = `
+        <div style="width:100%;height:100%;display:flex;align-items:center;
+                    justify-content:center;font-size:3rem;
+                    background:var(--fd-indigo-dim);border-radius:var(--radius-md)">
+          ${ex.emoji || '💪'}
+        </div>
+      `;
+    }
+  },
+
+  // ─── Charger GIF dans un élément existant ─────────────────
+  async chargerDans(exerciceRef, elementId) {
+    const el  = document.getElementById(elementId);
+    if (!el) return;
+
+    const ex  = window.EXERCICES?.[exerciceRef] || {};
+    const url = await this.getGIF(exerciceRef);
+
+    if (url) {
+      el.innerHTML = `
+        <img src="${url}"
+             alt="${ex.nom || exerciceRef}"
+             style="width:100%;height:100%;object-fit:contain;
+                    border-radius:var(--radius-md)"
+             onerror="this.parentElement.innerHTML='<span style=font-size:3rem>${ex.emoji||'💪'}</span>'" />
+      `;
+    }
+  }
+};
+
+window.ExerciseGIF = ExerciseGIF;
+console.log('✅ ExerciseGIF chargé');
+
 // Exposer globalement
 window.Utils = Utils;
 console.log('✅ Utils chargé');
