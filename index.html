@@ -6,45 +6,47 @@
        Version 1.0.0
   ═══════════════════════════════════════ -->
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="Ton coach de salle personnel — Programme long terme Basic-Fit" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0,
+                 viewport-fit=cover" />
+  <meta name="description"
+        content="Ton coach de salle personnel —
+                 Programme long terme Basic-Fit" />
 
-<!-- ═══ PWA META COMPLET ══════════════════════════════════ -->
+  <!-- ═══ PWA META ════════════════════════════════════════ -->
+  <meta name="theme-color" content="#4b4bf9" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="./manifest.json" />
 
-<!-- Android / Chrome -->
-<meta name="theme-color" content="#4b4bf9" />
-<meta name="mobile-web-app-capable" content="yes" />
-<link rel="manifest" href="./manifest.json" />
+  <!-- iOS / Safari -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style"
+        content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FitTracker" />
 
-<!-- iOS / Safari -->
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="FitTracker" />
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon"
+        href="./assets/icons/icon-180.png" />
+  <link rel="apple-touch-icon" sizes="152x152"
+        href="./assets/icons/icon-152.png" />
+  <link rel="apple-touch-icon" sizes="167x167"
+        href="./assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180"
+        href="./assets/icons/icon-180.png" />
 
-<!-- Apple Touch Icons — TOUTES LES TAILLES -->
-<link rel="apple-touch-icon"
-      href="./assets/icons/icon-180.png" />
-<link rel="apple-touch-icon" sizes="152x152"
-      href="./assets/icons/icon-152.png" />
-<link rel="apple-touch-icon" sizes="167x167"
-      href="./assets/icons/icon-192.png" />
-<link rel="apple-touch-icon" sizes="180x180"
-      href="./assets/icons/icon-180.png" />
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32"
+        href="./assets/icons/badge-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16"
+        href="./assets/icons/favicon-16.png" />
+  <link rel="shortcut icon"
+        href="./assets/icons/icon-192.png" />
 
-<!-- Favicon standard -->
-<link rel="icon" type="image/png" sizes="32x32"
-      href="./assets/icons/badge-32.png" />
-<link rel="icon" type="image/png" sizes="16x16"
-      href="./assets/icons/favicon-16.png" />
-<link rel="shortcut icon"
-      href="./assets/icons/icon-192.png" />
-
-<!-- Microsoft Tiles -->
-<meta name="msapplication-TileColor" content="#09092d" />
-<meta name="msapplication-TileImage"
-      content="./assets/icons/icon-192.png" />
-<meta name="msapplication-config" content="none" />
+  <!-- Microsoft Tiles -->
+  <meta name="msapplication-TileColor" content="#09092d" />
+  <meta name="msapplication-TileImage"
+        content="./assets/icons/icon-192.png" />
+  <meta name="msapplication-config" content="none" />
 
   <title>FitTracker Pro</title>
 
@@ -54,7 +56,7 @@
 
 <body>
 
-  <!-- ═══ SPLASH SCREEN ═══════════════════════════════════ -->
+  <!-- ═══ SPLASH SCREEN ══════════════════════════════════ -->
   <div id="splash-screen" class="splash">
     <div class="splash-content">
       <div class="splash-icon">🏋️</div>
@@ -66,21 +68,7 @@
     </div>
   </div>
 
-  <!-- Dans le <head> ou avant app.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="./js/exercice-videos.js"></script>
-<script src="./js/utils.js"></script>
-<script src="./js/programme.js"></script>
-<script src="./js/tracker.js"></script>
-<script src="./js/timer.js"></script>
-<script src="./js/notifications.js"></script>
-<script src="./js/stats.js"></script>
-<script src="./js/coach.js"></script>
-<script src="./js/gamification.js"></script>
-<script src="./js/charts.js"></script>
-<script src="./js/app.js"></script>
-  
-  <!-- ═══ ONBOARDING (premier lancement) ══════════════════ -->
+  <!-- ═══ ONBOARDING ══════════════════════════════════════ -->
   <div id="onboarding" class="onboarding hidden">
     <!-- Géré par app.js -->
   </div>
@@ -94,47 +82,57 @@
         <span class="header-icon">🏋️</span>
         <div class="header-text">
           <span class="header-title">Training 4M</span>
-          <span class="header-sub" id="header-phase">Semaine 1 · Phase Reprise</span>
+          <span class="header-sub" id="header-phase">
+            Semaine 1 · Phase Reprise
+          </span>
         </div>
       </div>
       <div class="header-right">
-        <button class="btn-icon" id="btn-theme" title="Changer le thème" aria-label="Thème">
+        <button class="btn-icon" id="btn-theme"
+                title="Changer le thème" aria-label="Thème">
           🌙
         </button>
-        <button class="btn-icon" id="btn-profile-quick" title="Profil" aria-label="Profil">
+        <button class="btn-icon" id="btn-profile-quick"
+                title="Profil" aria-label="Profil">
           💪
         </button>
       </div>
     </header>
 
-    <!-- Contenu principal — SPA Router -->
+    <!-- Contenu principal -->
     <main id="page-content" class="page-content" role="main">
       <!-- Injecté dynamiquement par app.js -->
     </main>
 
-    <!-- ═══ BOTTOM NAVIGATION ════════════════════════════ -->
-    <nav id="bottom-nav" class="bottom-nav" role="navigation" aria-label="Navigation principale">
-      <button class="nav-item active" data-page="home" aria-label="Accueil">
+    <!-- ═══ BOTTOM NAVIGATION ══════════════════════════════ -->
+    <nav id="bottom-nav" class="bottom-nav"
+         role="navigation" aria-label="Navigation principale">
+      <button class="nav-item active"
+              data-page="home" aria-label="Accueil">
         <span class="nav-icon">🏠</span>
         <span class="nav-label">Accueil</span>
       </button>
-      <button class="nav-item" data-page="training" aria-label="Training">
+      <button class="nav-item"
+              data-page="training" aria-label="Training">
         <span class="nav-icon">🏋️</span>
         <span class="nav-label">Training</span>
       </button>
 
       <!-- Bouton central Live -->
       <div class="nav-center-wrapper">
-        <button class="nav-center-btn" data-page="live" aria-label="Lancer séance">
+        <button class="nav-center-btn"
+                data-page="live" aria-label="Lancer séance">
           <span class="nav-center-icon">⚡</span>
         </button>
       </div>
 
-      <button class="nav-item" data-page="stats" aria-label="Statistiques">
+      <button class="nav-item"
+              data-page="stats" aria-label="Statistiques">
         <span class="nav-icon">📊</span>
         <span class="nav-label">Stats</span>
       </button>
-      <button class="nav-item" data-page="profile" aria-label="Profil">
+      <button class="nav-item"
+              data-page="profile" aria-label="Profil">
         <span class="nav-icon">👤</span>
         <span class="nav-label">Profil</span>
       </button>
@@ -142,23 +140,27 @@
 
   </div><!-- /app-wrapper -->
 
-  <!-- ═══ MODALS GLOBALES ══════════════════════════════════ -->
+  <!-- ═══ MODALS ═══════════════════════════════════════════ -->
 
   <!-- Modal Confirmation -->
-  <div id="modal-confirm" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="modal-confirm" class="modal hidden"
+       role="dialog" aria-modal="true">
     <div class="modal-overlay"></div>
     <div class="modal-box">
       <h3 id="modal-confirm-title">Confirmer ?</h3>
       <p id="modal-confirm-msg"></p>
       <div class="modal-actions">
-        <button id="modal-confirm-cancel" class="btn-secondary">Annuler</button>
-        <button id="modal-confirm-ok" class="btn-primary">Confirmer</button>
+        <button id="modal-confirm-cancel"
+                class="btn-secondary">Annuler</button>
+        <button id="modal-confirm-ok"
+                class="btn-primary">Confirmer</button>
       </div>
     </div>
   </div>
 
   <!-- Modal Info / Coach -->
-  <div id="modal-info" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="modal-info" class="modal hidden"
+       role="dialog" aria-modal="true">
     <div class="modal-overlay"></div>
     <div class="modal-box">
       <button class="modal-close" id="modal-info-close">✕</button>
@@ -167,18 +169,20 @@
   </div>
 
   <!-- Toast Notifications -->
-  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+  <div id="toast-container" class="toast-container"
+       aria-live="polite"></div>
 
   <!-- Confetti Canvas -->
-  <canvas id="confetti-canvas" class="confetti-canvas" aria-hidden="true"></canvas>
+  <canvas id="confetti-canvas" class="confetti-canvas"
+          aria-hidden="true"></canvas>
 
-  <!-- ═══ UPDATE PWA BANNER ═════════════════════════════════ -->
+  <!-- ═══ UPDATE PWA BANNER ══════════════════════════════════ -->
   <div id="update-banner" class="update-banner hidden">
     <span>🆕 Nouvelle version disponible !</span>
     <button id="btn-update">Mettre à jour</button>
   </div>
 
-  <!-- ═══ INSTALL PROMPT ════════════════════════════════════ -->
+  <!-- ═══ INSTALL PROMPT ═════════════════════════════════════ -->
   <div id="install-prompt" class="install-prompt hidden">
     <div class="install-content">
       <span class="install-icon">📱</span>
@@ -191,7 +195,9 @@
     </div>
   </div>
 
-  <!-- ═══ SCRIPTS ══════════════════════════════════════════ -->
+  <!-- ═══ SCRIPTS — ordre de dépendances ════════════════════ -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="./js/exercice-videos.js"></script>
   <script src="./js/utils.js"></script>
   <script src="./js/programme.js"></script>
   <script src="./js/tracker.js"></script>
@@ -200,10 +206,13 @@
   <script src="./js/gamification.js"></script>
   <script src="./js/coach.js"></script>
   <script src="./js/notifications.js"></script>
+  <script src="./js/charts.js"></script>
   <script src="./js/app.js"></script>
 
   <!-- Powered by EverGPT -->
-  <small class="evergpt-tag" aria-hidden="true">Powered by EverGPT</small>
+  <small class="evergpt-tag" aria-hidden="true">
+    Powered by EverGPT
+  </small>
 
 </body>
 </html>
