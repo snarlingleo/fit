@@ -1,123 +1,150 @@
 /* ============================================================
-   FitTracker Pro — Coach IA
-   Recommandations, messages, analyse
+   FitTracker Pro — Coach IA v2
+   Recommandations avancées + messages enrichis
    ============================================================ */
 
 const Coach = {
 
   // ─── MESSAGE DU JOUR ──────────────────────────────────────
   getMessageDuJour() {
-    const humeur   = Tracker.getHumeur();
-    const fatigue  = Tracker.getFatigue();
-    const rpe      = Tracker.getRPEMoyen7Jours();
-    const absence  = Tracker.getJoursAbsence();
-    const infos    = Programme.getInfosProgramme();
-    const seance   = Programme.getProchaineSeance();
+    const humeur  = Tracker.getHumeur();
+    const fatigue = Tracker.getFatigue();
+    const rpe     = Tracker.getRPEMoyen7Jours();
+    const absence = Tracker.getJoursAbsence();
+    const infos   = Programme.getInfosProgramme();
+    const streak  = Tracker.getStreak();
+    const profil  = Tracker.getProfil();
+    const nom     = profil.nom || 'Athlète';
 
-    // Déload recommandé ?
-    if (rpe > 8.5 && rpe > 0) {
-      return {
-        type: 'deload',
-        emoji: '⚡',
-        message: `Ton RPE moyen sur 7 jours est de ${rpe}/10. Ton corps réclame une semaine de décharge. Réduis les charges de 40% cette semaine — c'est là que la vraie progression se fait.`
-      };
-    }
+    // ── Déload urgent
+    if (rpe > 8.5 && rpe > 0) return {
+      type: 'deload', emoji: '⚡',
+      message: `RPE moyen ${rpe}/10 sur 7 jours ${nom}. Ton système nerveux crie au repos. Cette semaine : -40% des charges. C'est maintenant que la vraie progression se construit.`
+    };
 
-    // Longue absence
-    if (absence >= 5) {
-      return {
-        type: 'reprise',
-        emoji: '🌱',
-        message: `${absence} jours de pause. Pas de panique — on repart doucement. Réduis les charges de 20% pour cette séance et retrouve tes sensations avant de progresser.`
-      };
-    }
+    // ── Longue absence
+    if (absence >= 7) return {
+      type: 'reprise', emoji: '🌱',
+      message: `${absence} jours de pause ${nom}. Pas de jugement — on repart. Réduis les charges de 25% cette séance, retrouve les sensations, puis on reprend la progression normale.`
+    };
 
-    // Fatigue élevée
-    if (fatigue?.niveau >= 3) {
-      return {
-        type: 'fatigue',
-        emoji: '😴',
-        message: `Tu te sens très fatigué. Privilégie une bonne exécution technique sur des charges modérées. La récupération fait partie de la progression.`
-      };
-    }
+    if (absence >= 3) return {
+      type: 'relance', emoji: '🔥',
+      message: `3 jours sans séance ${nom}. Le corps attend. Une séance même courte vaut mieux que la perfection reportée. Lance-toi — le premier set est toujours le plus dur.`
+    };
 
-    // Humeur basse
-    if (humeur?.humeur === '😒' || humeur?.humeur === '😤') {
-      return {
-        type: 'motivation',
-        emoji: '💡',
-        message: `Pas la grande forme aujourd'hui ? C'est normal. Les meilleures séances sont souvent celles où on y allait sans envie. Lance-toi — tu ne le regretteras pas.`
-      };
-    }
+    // ── Fatigue élevée
+    if (fatigue?.niveau >= 3) return {
+      type: 'fatigue', emoji: '😴',
+      message: `Tu te sens épuisé ${nom}. Écoute ton corps — technique parfaite sur charges modérées aujourd'hui. La récupération n'est pas de la faiblesse, c'est de la stratégie.`
+    };
 
-    // Phase actuelle
-    const phase = infos.phase;
-    const messages = {
+    // ── Humeur basse
+    if (['😒','😤'].includes(humeur?.humeur)) return {
+      type: 'motivation', emoji: '💡',
+      message: `Pas dans ton assiette ${nom} ? Les champions s'entraînent quand ils n'en ont pas envie. Dans 20 minutes tu seras content d'y être allé. Promis.`
+    };
+
+    // ── Super forme
+    if (humeur?.humeur === '🔥' && (fatigue?.niveau || 0) <= 1) return {
+      type: 'peak', emoji: '🚀',
+      message: `Tu es en feu ${nom} ! C'est le moment de tenter un PR. Corps frais, mental affûté — donne tout sur les exercices principaux aujourd'hui !`
+    };
+
+    // ── Streak exceptionnel
+    if (streak.count >= 14) return {
+      type: 'streak', emoji: '🏆',
+      message: `${streak.count} jours consécutifs ${nom} ! Tu es dans la zone. Continue à surveiller la récupération pour maintenir cette régularité sans te blesser.`
+    };
+
+    // ── Messages par phase
+    const msgs = {
       'Reprise': [
-        `Phase Reprise : focus sur la technique. Poids légers, amplitude maximale. Ces séances construisent les bases de tout ce qui suit.`,
-        `Semaine de reprise — chaque répétition parfaite compte plus que les kilos. Maîtrise le mouvement avant tout.`
+        `Phase Reprise ${nom} : la technique prime sur tout. Chaque répétition parfaite aujourd'hui construit la base de tes futurs records. Poids légers, amplitude maximale.`,
+        `Semaine de reprise — construis les fondations. Dans quelques semaines tu soulèveras bien plus lourd grâce à ce travail technique d'aujourd'hui.`
       ],
       'Construction': [
-        `Phase Construction : cherche à augmenter le volume progressivement. Si tu complètes toutes les séries sans difficulté, augmente les charges de 2.5kg.`,
-        `Volume élevé cette semaine. Ton objectif : dépasser le tonnage de la semaine dernière. Chaque kilo compte !`
+        `Phase Construction ${nom} : cherche à dépasser le volume de la semaine dernière. Si tu complètes toutes les séries facilement → augmente de 2.5kg la prochaine fois.`,
+        `Volume élevé cette semaine ${nom}. Concentre-toi sur la connexion musculaire plutôt que sur les charges brutes. Qualité + quantité = résultats.`
       ],
       'Intensité': [
-        `Phase Intensité : on pousse fort ! Concentre-toi sur les exercices principaux — bench, squat, soulevé de terre. Les PR approchent.`,
-        `Séances lourdes cette semaine. Échauffement soigné, technique irréprochable, et donne tout sur les séries de travail.`
+        `Phase Intensité ${nom} : charges lourdes, concentration maximale. Échauffement soigné, puis donne tout sur les exercices compound. Les PRs approchent.`,
+        `Séances intenses cette semaine ${nom}. Un bon échauffement vaut autant que la séance elle-même. Prépare bien ton corps avant de charger.`
       ],
       'Peak': [
-        `Phase Peak : la semaine des records ! Tu as tout construit pour ça. Confiance, bonne alimentation, récupération. C'est le moment.`,
-        `Tu es au sommet du cycle. Tes muscles ont absorbé des semaines de travail — aujourd'hui, libère cette énergie !`
+        `Phase Peak ${nom} : tu as accumulé des semaines de travail pour ça. Aujourd'hui tu libères cette énergie. Confiance totale en ton processus.`,
+        `C'est la semaine des records ${nom} ! Alimentation soignée, sommeil optimal, et donne absolument tout. Tu es prêt pour ça.`
       ]
     };
 
-    const msgs = messages[phase?.nom] || messages['Reprise'];
+    const phase = infos.phase?.nom || 'Reprise';
+    const liste = msgs[phase] || msgs['Reprise'];
     return {
       type: 'programme',
-      emoji: phase?.emoji || '💡',
-      message: Utils.random(msgs)
+      emoji: infos.phase?.emoji || '💡',
+      message: Utils.random(liste)
     };
+  },
+
+  // ─── CITATION MOTIVATION ──────────────────────────────────
+  getCitationDuJour() {
+    const citations = [
+      { texte: "Le corps accomplit ce que l'esprit croit possible.", auteur: "Napoleon Hill" },
+      { texte: "La douleur est temporaire. Abandonner dure toujours.", auteur: "Lance Armstrong" },
+      { texte: "Chaque rep que tu fais change ton futur.", auteur: "Unknown" },
+      { texte: "La force ne vient pas de la capacité physique mais d'une volonté indomptable.", auteur: "Gandhi" },
+      { texte: "Le seul mauvais entraînement est celui qui n'a pas eu lieu.", auteur: "Unknown" },
+      { texte: "Tu n'as pas à être extrême, juste consistant.", auteur: "Unknown" },
+      { texte: "Les champions ne deviennent pas champions dans la salle — ils y sont simplement reconnus.", auteur: "Joe Frazier" },
+      { texte: "Construis ton corps, construis ta confiance.", auteur: "Unknown" },
+      { texte: "Souffre maintenant et vis le reste de ta vie en champion.", auteur: "Muhammad Ali" },
+      { texte: "La progression n'est pas un accident, c'est un choix quotidien.", auteur: "Unknown" }
+    ];
+
+    // Citation du jour basée sur la date (stable toute la journée)
+    const index = new Date().getDate() % citations.length;
+    return citations[index];
   },
 
   // ─── WARM-UP DU JOUR ──────────────────────────────────────
   getWarmupDuJour() {
-    const seance = Programme.getProchaineSeance();
-    if (!seance) return WARMUP.general;
-    return WARMUP[seance.id] || WARMUP.general;
+    const indexJour = Utils.indexJourSemaine(Utils.aujourd_hui());
+    const planning  = PLANNING_SEMAINE[indexJour];
+    const seanceId  = planning?.seanceId;
+    return seanceId ? (WARMUP[seanceId] || WARMUP.general) : WARMUP.general;
   },
 
   // ─── ANALYSE SEMAINE ──────────────────────────────────────
   getAnalyseSemaine() {
-    const volume    = Tracker.getVolumeSemaine();
-    const seances   = Tracker.getSeancesParSemaine();
-    const rpe       = Tracker.getRPEMoyen7Jours();
-    const objectif  = Utils.storage.get('ft_objectif_seances_semaine', 4);
+    const volume   = Tracker.getVolumeSemaine();
+    const seances  = Tracker.getSeancesParSemaine();
+    const rpe      = Tracker.getRPEMoyen7Jours();
+    const objectif = Utils.storage.get('ft_objectif_seances_semaine', 4);
+    const comp     = Stats.getComparaisonSemaines();
 
-    let recommendation = '';
-    let intensite = 'Normale';
+    let intensite     = '🟢 Faible';
+    let recommendation = 'Augmente l\'intensité ou le volume cette semaine.';
+    let couleur        = 'var(--fd-mint)';
 
     if (rpe >= 9) {
-      intensite = '🔴 Très élevée';
-      recommendation = 'Décharge recommandée — -40% charges';
-    } else if (rpe >= 7) {
-      intensite = '🟠 Élevée';
-      recommendation = 'Maintien du volume actuel';
-    } else if (rpe >= 5) {
-      intensite = '🟡 Modérée';
-      recommendation = 'Augmentation progressive possible (+5%)';
-    } else {
-      intensite = '🟢 Faible';
-      recommendation = 'Augmenter l\'intensité ou le volume';
+      intensite      = '🔴 Très élevée';
+      recommendation = 'Décharge recommandée — réduis les charges de 40%.';
+      couleur        = 'var(--fd-coral)';
+    } else if (rpe >= 7.5) {
+      intensite      = '🟠 Élevée';
+      recommendation = 'Maintiens le volume actuel sans augmenter.';
+      couleur        = 'var(--fd-lemon)';
+    } else if (rpe >= 5.5) {
+      intensite      = '🟡 Modérée';
+      recommendation = 'Augmentation progressive possible (+5% volume).';
+      couleur        = 'var(--fd-lemon)';
     }
 
     return {
-      volume,
-      seances,
-      objectif,
-      rpe,
-      intensite,
-      recommendation,
-      progressionVolume: Stats.getComparaisonSemaines()
+      volume, seances, objectif, rpe,
+      intensite, recommendation, couleur,
+      deltaVolume: comp.delta,
+      objectifAtteint: seances >= objectif
     };
   },
 
@@ -125,43 +152,44 @@ const Coach = {
   suggererCharge(exerciceRef) {
     const pr    = Tracker.getPR(exerciceRef);
     const phase = Programme.getPhaseActuelle();
-
     if (!pr?.rm1) return null;
 
-    const chargeIdeal = Math.round(pr.rm1 * phase.intensite / 2.5) * 2.5;
-
+    const charge = Math.round(pr.rm1 * phase.intensite / 2.5) * 2.5;
     return {
-      charge:      chargeIdeal,
+      charge,
       pourcentage: Math.round(phase.intensite * 100),
-      rm1:         pr.rm1,
-      phase:       phase.nom
+      rm1:  pr.rm1,
+      phase: phase.nom
     };
   },
 
-  // ─── DÉLOAD AUTOMATIQUE ────────────────────────────────────
+  // ─── DÉLOAD AUTOMATIQUE ───────────────────────────────────
   necessiteDeload() {
-    const rpe    = Tracker.getRPEMoyen7Jours();
+    const rpe     = Tracker.getRPEMoyen7Jours();
     const fatigue = Tracker.getFatigue();
     const absence = Tracker.getJoursAbsence();
 
-    if (rpe > 0 && rpe >= 8.5) return { oui: true, raison: `RPE moyen: ${rpe}/10` };
-    if (fatigue?.niveau >= 3)   return { oui: true, raison: 'Fatigue déclarée élevée' };
-    if (absence >= 7)           return { oui: true, raison: `${absence} jours d'absence` };
+    if (rpe > 0 && rpe >= 8.5)
+      return { oui: true, raison: `RPE moyen élevé: ${rpe}/10` };
+    if (fatigue?.niveau >= 3)
+      return { oui: true, raison: 'Fatigue déclarée maximale' };
+    if (absence >= 7)
+      return { oui: true, raison: `${absence} jours d'absence` };
 
     return { oui: false };
   },
 
-  // ─── EXERCICES À ÉVITER (blessures) ──────────────────────
+  // ─── EXERCICES À ÉVITER ───────────────────────────────────
   getExercicesAEviter() {
-    const blessures = Tracker.getBlessures().filter(b => b.active);
-    const aEviter   = new Set();
-
+    const blessures   = Tracker.getBlessures().filter(b => b.active);
+    const aEviter     = new Set();
     const restrictions = {
-      'epaule':    ['dev_militaire','bench_press','elev_laterales','incline_halteres','dips'],
-      'genou':     ['squat','presse_cuisses','fentes','leg_extension'],
-      'dos_bas':   ['soulevé_terre','rowing_barre','squat'],
-      'coude':     ['curl_halteres','curl_barre','barre_front','ext_triceps_poulie'],
-      'poignet':   ['bench_press','curl_barre','barre_front']
+      'epaule':  ['dev_militaire','bench_press','elev_laterales',
+                  'incline_halteres','dips'],
+      'genou':   ['squat','presse_cuisses','fentes','leg_extension'],
+      'dos_bas': ['soulevé_terre','rowing_barre','squat'],
+      'coude':   ['curl_halteres','curl_barre','barre_front','ext_triceps_poulie'],
+      'poignet': ['bench_press','curl_barre','barre_front']
     };
 
     blessures.forEach(b => {
@@ -174,15 +202,37 @@ const Coach = {
     return [...aEviter];
   },
 
-  // ─── RENDER COACH TAB ─────────────────────────────────────
+  // ─── RENDER TAB COACH ─────────────────────────────────────
   renderCoachTab(container) {
-    const msg    = this.getMessageDuJour();
+    const msg     = this.getMessageDuJour();
     const analyse = this.getAnalyseSemaine();
     const warmup  = this.getWarmupDuJour();
     const deload  = this.necessiteDeload();
+    const citation = this.getCitationDuJour();
+    const aEviter  = this.getExercicesAEviter();
 
     container.innerHTML = `
-      <!-- Message du jour -->
+
+      <!-- Citation du jour -->
+      <div class="card mb-md"
+           style="border-left:3px solid var(--fd-lemon);
+                  background:rgba(249,239,119,0.06)">
+        <div style="font-size:.72rem;font-weight:700;
+                    text-transform:uppercase;letter-spacing:.08em;
+                    color:var(--fd-lemon);margin-bottom:var(--space-sm)">
+          💬 Citation du jour
+        </div>
+        <p style="font-size:.9rem;font-style:italic;
+                  line-height:1.6;color:var(--text-primary)">
+          "${citation.texte}"
+        </p>
+        <p style="font-size:.72rem;color:var(--text-muted);
+                  margin-top:var(--space-xs)">
+          — ${citation.auteur}
+        </p>
+      </div>
+
+      <!-- Message coach -->
       <div class="coach-card mb-md">
         <div class="coach-header">
           <span class="coach-icon">${msg.emoji}</span>
@@ -191,70 +241,100 @@ const Coach = {
         <p class="coach-message">${msg.message}</p>
       </div>
 
+      <!-- Alerte déload -->
       ${deload.oui ? `
-        <!-- Alerte déload -->
-        <div class="card mb-md" style="border-color:var(--fd-coral);background:rgba(255,141,150,0.08)">
-          <div class="card-label" style="color:var(--fd-coral)">⚠️ Décharge recommandée</div>
-          <p style="font-size:.88rem;color:var(--text-primary);margin-top:var(--space-sm)">
-            ${deload.raison}. Cette semaine, réduis les charges de <strong>40%</strong>.
-            C'est pendant la décharge que les muscles super-compensent !
+        <div class="card mb-md"
+             style="border-color:var(--fd-coral);
+                    background:rgba(255,141,150,0.08)">
+          <div class="card-label" style="color:var(--fd-coral)">
+            ⚠️ Décharge recommandée
+          </div>
+          <p style="font-size:.88rem;color:var(--text-primary);
+                    margin-top:var(--space-sm)">
+            ${deload.raison}. Réduis les charges de
+            <strong>40%</strong> cette semaine.
+            La super-compensation se fait pendant la décharge !
           </p>
-        </div>
-      ` : ''}
+        </div>` : ''}
+
+      <!-- Exercices à éviter -->
+      ${aEviter.length > 0 ? `
+        <div class="card mb-md"
+             style="border-color:var(--fd-lemon);
+                    background:rgba(249,239,119,0.06)">
+          <div class="card-label" style="color:var(--fd-lemon)">
+            ⚠️ Exercices à éviter (blessures actives)
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-xs);
+                      margin-top:var(--space-sm)">
+            ${aEviter.map(ref => `
+              <span class="chip chip-lemon">
+                ${EXERCICES[ref]?.nom || ref}
+              </span>`).join('')}
+          </div>
+        </div>` : ''}
 
       <!-- Analyse semaine -->
       <div class="card mb-md">
-        <div class="card-label">📊 Analyse semaine</div>
+        <div class="card-label">📊 Analyse semaine en cours</div>
         <div style="margin-top:var(--space-sm)">
-          <div class="score-row">
-            <span class="score-row-label">Séances</span>
-            <span class="score-row-value">${analyse.seances}/${analyse.objectif}</span>
-          </div>
-          <div class="score-row">
-            <span class="score-row-label">Volume</span>
-            <span class="score-row-value">${Utils.formatVolume(analyse.volume)}</span>
-          </div>
-          <div class="score-row">
-            <span class="score-row-label">RPE moyen</span>
-            <span class="score-row-value">${analyse.rpe > 0 ? analyse.rpe + '/10' : '—'}</span>
-          </div>
-          <div class="score-row">
-            <span class="score-row-label">Intensité</span>
-            <span class="score-row-value">${analyse.intensite}</span>
-          </div>
+          ${[
+            { label:'Séances',   val:`${analyse.seances}/${analyse.objectif}` },
+            { label:'Volume',    val:Utils.formatVolume(analyse.volume)        },
+            { label:'RPE moyen', val:analyse.rpe>0?`${analyse.rpe}/10`:'—'    },
+            { label:'Intensité', val:analyse.intensite                         },
+            { label:'vs S-1',    val:`${analyse.deltaVolume>=0?'+':''}${analyse.deltaVolume}%` }
+          ].map(r => `
+            <div class="score-row">
+              <span class="score-row-label">${r.label}</span>
+              <span class="score-row-value">${r.val}</span>
+            </div>`).join('')}
+
           <div class="progress-bar mt-md">
-            <div class="progress-fill" style="width:${Math.min(100, (analyse.seances/analyse.objectif)*100)}%"></div>
+            <div class="progress-fill"
+                 style="width:${Math.min(100,(analyse.seances/
+                   Math.max(analyse.objectif,1))*100)}%">
+            </div>
           </div>
         </div>
-        <div style="margin-top:var(--space-md);padding:var(--space-sm);background:var(--fd-indigo-dim);border-radius:var(--radius-sm)">
-          <span style="font-size:.82rem;color:var(--fd-lavender)">💡 ${analyse.recommendation}</span>
+
+        <div style="margin-top:var(--space-md);padding:var(--space-sm);
+                    background:var(--fd-indigo-dim);
+                    border-radius:var(--radius-sm)">
+          <span style="font-size:.82rem;color:var(--fd-lavender)">
+            💡 ${analyse.recommendation}
+          </span>
         </div>
       </div>
 
       <!-- Warm-up -->
       <div class="card">
-        <div class="card-label">🔥 Warm-up recommandé</div>
+        <div class="card-label">🔥 Warm-up recommandé aujourd'hui</div>
         ${warmup.map((w, i) => `
           <div class="flex items-center gap-md"
-               style="padding:var(--space-sm) 0;border-bottom:1px solid var(--border-color)">
-            <div style="width:28px;height:28px;border-radius:50%;background:var(--fd-indigo-dim);
-                        display:flex;align-items:center;justify-content:center;
-                        font-size:.75rem;font-weight:700;color:var(--fd-indigo);flex-shrink:0">
+               style="padding:var(--space-sm) 0;
+                      border-bottom:1px solid var(--border-color)">
+            <div style="width:28px;height:28px;border-radius:50%;
+                        background:var(--fd-indigo-dim);display:flex;
+                        align-items:center;justify-content:center;
+                        font-size:.75rem;font-weight:700;
+                        color:var(--fd-indigo);flex-shrink:0">
               ${i + 1}
             </div>
-            <div>
+            <div style="flex:1">
               <div style="font-size:.88rem;font-weight:600">${w.nom}</div>
-              <div style="font-size:.72rem;color:var(--text-muted)">${w.description}</div>
+              <div style="font-size:.72rem;color:var(--text-muted)">
+                ${w.description}
+              </div>
             </div>
-            <div style="margin-left:auto;font-size:.78rem;color:var(--fd-mint)">
+            <div style="font-size:.78rem;color:var(--fd-mint);font-weight:600">
               ${Utils.formatDuree(w.duree)}
             </div>
-          </div>
-        `).join('')}
+          </div>`).join('')}
       </div>
     `;
   }
 };
 
 window.Coach = Coach;
-console.log('✅ Coach chargé');
+console.log('✅ Coach v2 chargé');
