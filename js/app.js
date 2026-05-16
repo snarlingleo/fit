@@ -240,7 +240,7 @@ function naviguer(page) {
     case 'home':     renderAccueil();  break;
     case 'training': renderTraining(); break;
     case 'live':     renderLive();     break;
-    case 'stats':   Stats.render();    break;
+    case 'stats': Stats.render(null, 'dashboard'); break;
     case 'nutrition': Nutrition.render(); break;    
     case 'profile':  renderProfil();   break;
     default:         renderAccueil();
@@ -1663,7 +1663,7 @@ function renderProfil(tab = 'moi') {
   const content = document.getElementById('profil-content');
   switch(tab) {
     case 'moi':        renderProfilMoi(content);            break;
-    case 'stats':      Stats.render(content);               break;
+    case 'stats':      Stats.render(content, 'dashboard');  break;
     case 'journal':    renderJournal(content);              break;
     case 'objectifs':  renderObjectifs(content);            break;
     case 'blessure':   renderBlessure(content);             break;
