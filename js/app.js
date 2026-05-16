@@ -1,27 +1,34 @@
 /* ============================================================
-   FitTracker Pro — App.js v1.3
+   FitTracker Pro — App.js v2.0
    Router SPA + Init + Pages complètes
-   + Feature 6 : Personnalisation
-   + Feature 7 : Programme personnalisé
+   + Séance Express + Défis + Share + Predict + i18n
+   + Dashboard amélioré + Apple Music
    ============================================================ */
 
 // ─── ÉTAT GLOBAL ──────────────────────────────────────────────
 const AppState = {
-  pageCourante:  'home',
-  seanceEnCours: null,
-  seanceChoisie: null,
-  exerciceIndex: 0,
-  serieActuelle: 1,
-  prsSeance:     [],
-  thème:         'dark',
-  installPrompt: null
+  pageCourante:   'home',
+  seanceEnCours:  null,
+  seanceChoisie:  null,
+  exerciceIndex:  0,
+  serieActuelle:  1,
+  prsSeance:      [],
+  thème:          'dark',
+  installPrompt:  null,
+  expressActif:   false,
+  expressIndex:   0,
+  expressSerieN:  1,
+  expressDebut:   null
 };
 
 // ─── INITIALISATION ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🏋️ FitTracker Pro — Démarrage');
+  console.log('🏋️ FitTracker Pro v2.0 — Démarrage');
   await initServiceWorker();
   await afficherSplash();
+
+  // Init i18n en premier
+  i18n.init();
 
   const profil = Tracker.getProfil();
   if (!profil.nom || profil.nom === 'Athlète') {
@@ -85,24 +92,23 @@ function afficherOnboarding() {
 function renderOnboardingStep(step) {
   const wrapper = document.getElementById('onboarding');
   const etapes  = [
-    { emoji:'🏋️', titre:'Bienvenue sur FitTracker Pro',
-      desc:'Ton coach personnel pour Basic-Fit. Programme long terme, suivi complet, notifications intelligentes.',
-      action:'Commencer' },
-    { emoji:'👤', titre:'Comment tu t\'appelles ?', desc:'',
-      champ:{ id:'ob-nom', placeholder:'Ton prénom', type:'text' },
-      action:'Continuer' },
-    { emoji:'⚖️', titre:'Tes mesures',
+    { emoji:'🏋️', titre: t('onboarding.bienvenue'),
+      desc: t('onboarding.sous_titre'), action: t('onboarding.commencer') },
+    { emoji:'👤', titre: t('onboarding.etape1'), desc:'',
+      champ:{ id:'ob-nom', placeholder: t('onboarding.prenom'), type:'text' },
+      action: t('onboarding.suivant') },
+    { emoji:'⚖️', titre: t('onboarding.etape2'),
       desc:'Pour calculer tes stats et personnaliser ton programme.',
       champs:[
-        { id:'ob-poids',  placeholder:'Poids (kg)',  type:'number' },
-        { id:'ob-taille', placeholder:'Taille (cm)', type:'number' }
-      ], action:'Continuer' },
+        { id:'ob-poids',  placeholder: t('onboarding.poids'),  type:'number' },
+        { id:'ob-taille', placeholder: t('onboarding.taille'), type:'number' }
+      ], action: t('onboarding.suivant') },
     { emoji:'🔔', titre:'Activer les rappels ?',
       desc:'Reçois des notifications si tu sautes une séance.',
       action:'Activer', actionAlt:'Plus tard' },
-    { emoji:'🚀', titre:'Tout est prêt !',
+    { emoji:'🚀', titre: t('onboarding.etape4'),
       desc:'Ton programme commence aujourd\'hui. Allons-y !',
-      action:'Lancer l\'app' }
+      action: t('onboarding.commencer') }
   ];
 
   const e = etapes[step];
@@ -163,6 +169,7 @@ async function avancerOnboarding(step, alt = false) {
   if (step === 4) {
     Programme.setDateDebut(Utils.aujourd_hui());
     Gamification.recompenser('PREMIERE_SEANCE');
+    Defis.genererDefis();
     document.getElementById('onboarding').classList.add('hidden');
     lancerApp();
     return;
@@ -182,6 +189,9 @@ function lancerApp() {
   Notifications.init();
   Utils.verifierBackupAuto();
 
+  // Init nouveaux modules
+  Defis.genererDefis();
+
   const stats = ExerciseGIF.statsCache();
   console.log(`[GIF] Cache: ${stats.cached}/${stats.total}`);
   if (stats.cached < stats.total) {
@@ -200,6 +210,7 @@ function lancerApp() {
 
   naviguer(action === 'start-session' ? 'training' : page);
   setTimeout(() => Gamification.verifierTrophees(), 2000);
+  setTimeout(() => Defis.mettreAJourProgression(), 3000);
 }
 
 // ─── HEADER ───────────────────────────────────────────────────
@@ -225,6 +236,7 @@ function initNav() {
 
 function naviguer(page) {
   AppState.pageCourante = page;
+  window._pageActive    = page;
 
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.page === page);
@@ -237,17 +249,21 @@ function naviguer(page) {
   document.getElementById('page-content')?.scrollTo(0, 0);
 
   switch(page) {
-    case 'home':     renderAccueil();  break;
-    case 'training': renderTraining(); break;
-    case 'live':     renderLive();     break;
-    case 'stats': Stats.render(null, 'dashboard'); break;
-    case 'nutrition': Nutrition.render(); break;    
-    case 'profile':  renderProfil();   break;
-    default:         renderAccueil();
+    case 'home':      renderAccueil();              break;
+    case 'training':  renderTraining();             break;
+    case 'live':      renderLive();                 break;
+    case 'nutrition': Nutrition.render();           break;
+    case 'stats':     Stats.render(null,'dashboard'); break;
+    case 'profile':   renderProfil();              break;
+    case 'express':   renderExpress();             break;
+    case 'defis':     renderPageDefis();           break;
+    case 'share':     renderPageShare();           break;
+    case 'predict':   renderPagePredict();         break;
+    default:          renderAccueil();
   }
 }
 
-// ─── THÈME ÉTENDU ─────────────────────────────────────────────
+// ─── THÈME ────────────────────────────────────────────────────
 function initTheme() {
   appliquerTheme(Utils.storage.get('ft_theme', 'dark'));
 }
@@ -258,16 +274,13 @@ function toggleTheme() {
   const idx    = themes.indexOf(actuel);
   const nouveau = themes[(idx + 1) % themes.length];
   appliquerTheme(nouveau);
-  Utils.storage.set('ft_theme', nouveau);
 }
 
 function appliquerTheme(theme) {
-  // Appliquer sur html + body
   document.documentElement.setAttribute('data-theme', theme);
   document.body.setAttribute('data-theme', theme);
   Utils.storage.set('ft_theme', theme);
 
-  // Mettre à jour les boutons thème (si visibles)
   document.querySelectorAll('.theme-btn').forEach(btn => {
     const isActif = btn.dataset.theme === theme;
     btn.style.border     = `2px solid ${isActif
@@ -305,7 +318,7 @@ function initInstallPrompt() {
 }
 
 // ════════════════════════════════════════════════════════════
-// PAGE ACCUEIL
+// PAGE ACCUEIL — Dashboard amélioré
 // ════════════════════════════════════════════════════════════
 function renderAccueil() {
   const container = document.getElementById('page-content');
@@ -319,61 +332,211 @@ function renderAccueil() {
   const coach     = Coach.getMessageDuJour();
   const seanceDJ  = Tracker.getSeancesParSemaine();
   const objectif  = Utils.storage.get('ft_objectif_seances_semaine', 4);
+  const heatmap   = Tracker.getHeatmapData(7);
+  const analyse   = Predict.getAnalyseGlobale();
+  const defis     = Defis.mettreAJourProgression() || [];
+  const defisOk   = defis.filter(d => d.complete).length;
+  const playlist  = Share.getPlaylistDuJour();
+  const volume    = Tracker.getVolumeSemaine();
+  const comp      = Stats.getComparaisonSemaines();
 
   container.innerHTML = `
-    <!-- Hero -->
-    <div class="card card-indigo mb-md"
-         style="position:relative;overflow:hidden">
-      <div style="position:absolute;top:-30px;right:-30px;
-                  width:120px;height:120px;
-                  background:rgba(255,255,255,0.05);
-                  border-radius:50%"></div>
-      <div style="font-size:.8rem;opacity:.8;margin-bottom:4px">
-        ${Utils.salutation()} 👋
+
+    <!-- Hero Dashboard -->
+    <div class="dashboard-hero mb-md">
+      <div class="dashboard-greeting">
+        ${Utils.salutation()}, ${profil.nom || 'Athlète'} ${profil.avatar || '💪'}
       </div>
-      <div style="font-size:1.8rem;font-weight:800;
-                  margin-bottom:var(--space-md)">
-        ${profil.nom || 'Athlète'}
+      <div class="dashboard-sub">
+        ${infos.label} · Cycle ${infos.cycle}
+        · ${infos.phase.emoji} ${infos.phase.nom}
       </div>
-      ${seance ? `
-        <div style="background:rgba(255,255,255,0.12);
-                    border-radius:var(--radius-md);
-                    padding:var(--space-md);cursor:pointer"
-             onclick="naviguer('training')">
-          <div style="font-size:.65rem;font-weight:700;
-                      letter-spacing:.08em;text-transform:uppercase;
-                      opacity:.7;margin-bottom:4px">
-            ${seance.dansJours === 0
-              ? 'Séance du jour'
-              : `Dans ${seance.dansJours} jour${seance.dansJours>1?'s':''}`}
+
+      <!-- Score forme inline -->
+      <div class="dashboard-score">
+        <div class="score-ring">
+          <svg width="72" height="72" viewBox="0 0 72 72">
+            <circle class="ring-bg" cx="36" cy="36" r="30"
+                    stroke-dasharray="${2*Math.PI*30}"
+                    fill="none" stroke="rgba(255,255,255,0.1)"
+                    stroke-width="6"/>
+            <circle cx="36" cy="36" r="30"
+                    fill="none"
+                    stroke="${score.score>=80
+                      ? 'var(--fd-mint)'
+                      : score.score>=60
+                        ? 'var(--fd-lemon)'
+                        : 'var(--fd-coral)'}"
+                    stroke-width="6"
+                    stroke-linecap="round"
+                    stroke-dasharray="${2*Math.PI*30}"
+                    stroke-dashoffset="${2*Math.PI*30*(1-score.score/100)}"
+                    transform="rotate(-90 36 36)"
+                    style="transition:stroke-dashoffset 1s ease"/>
+          </svg>
+          <div class="score-ring-text">${score.score}</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.95rem">
+            ${score.niveau}
           </div>
-          <div style="font-size:1rem;font-weight:700">
-            ${seance.emoji} ${seance.nom}
+          <div style="font-size:.72rem;opacity:.7;margin-top:2px">
+            ${analyse.fatigue.recommandation.message}
           </div>
-          <div style="font-size:.75rem;opacity:.7;margin-top:2px">
-            ${infos.label} · ~${seance.duree_estimee}min
+          <div style="font-size:.72rem;opacity:.6;margin-top:4px">
+            Streak ${streak.count}🔥 · Record ${streak.max}
           </div>
         </div>
-        <div style="margin-top:var(--space-md)">
-          <div class="flex justify-between"
-               style="font-size:.7rem;opacity:.7;margin-bottom:4px">
-            <span>Cycle ${infos.cycle} · ${infos.phase.nom}</span>
-            <span>${infos.progression}%</span>
-          </div>
+      </div>
+
+      <!-- Mini heatmap 7 jours -->
+      <div style="margin-top:var(--space-md)">
+        <div style="font-size:.65rem;opacity:.6;
+                    margin-bottom:6px;
+                    text-transform:uppercase;
+                    letter-spacing:.06em">
+          Cette semaine
+        </div>
+        <div class="mini-heatmap">
+          ${['L','M','M','J','V','S','D'].map((j, i) => {
+            const date = Utils.ajouterJours(
+              Utils.debutSemaine(Utils.aujourd_hui()), i
+            );
+            const etat = heatmap[date] || 'none';
+            const isToday = date === Utils.aujourd_hui();
+            return `
+              <div style="text-align:center">
+                <div style="font-size:.6rem;opacity:.5;
+                            margin-bottom:3px">${j}</div>
+                <div class="mini-heatmap-cell ${etat} ${isToday?'today':''}">
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions rapides -->
+    <div class="home-quick-actions mb-md">
+      ${[
+        { icon:'⚡', label:'Express',    action:"naviguer('express')" },
+        { icon:'📊', label:'Stats',      action:"naviguer('stats')"   },
+        { icon:'🎯', label:'Défis',      action:"naviguer('defis')"   },
+        { icon:'🔮', label:'Predict',    action:"naviguer('predict')" },
+        { icon:'📸', label:'Partager',   action:"naviguer('share')"   },
+        { icon:'🎵', label:'Musique',    action:`ouvrirPlaylist()`    }
+      ].map(a => `
+        <button class="quick-action-btn"
+                onclick="${a.action}">
+          <span class="quick-action-icon">${a.icon}</span>
+          <span class="quick-action-label">${a.label}</span>
+        </button>`).join('')}
+    </div>
+
+    <!-- Widgets stats -->
+    <div class="widget-grid mb-md">
+      <div class="widget-card ${seanceDJ >= objectif ? 'highlight' : ''}">
+        <div class="widget-icon">📅</div>
+        <div class="widget-value">${seanceDJ}/${objectif}</div>
+        <div class="widget-label">Séances</div>
+        <div class="widget-trend ${seanceDJ >= objectif ? 'up' : 'flat'}">
+          ${seanceDJ >= objectif ? '✅ Objectif !' : `${objectif-seanceDJ} restante${objectif-seanceDJ>1?'s':''}`}
+        </div>
+      </div>
+      <div class="widget-card">
+        <div class="widget-icon">🏋️</div>
+        <div class="widget-value">${Utils.formatVolume(volume)}</div>
+        <div class="widget-label">Volume</div>
+        <div class="widget-trend ${comp.delta >= 0 ? 'up' : 'down'}">
+          ${comp.delta >= 0 ? '+' : ''}${comp.delta}% vs sem. préc.
+        </div>
+      </div>
+      <div class="widget-card">
+        <div class="widget-icon">🏆</div>
+        <div class="widget-value">
+          ${Object.keys(Tracker.getAllPRs()).length}
+        </div>
+        <div class="widget-label">Records</div>
+        <div class="widget-trend flat">PRs totaux</div>
+      </div>
+      <div class="widget-card">
+        <div class="widget-icon">🎯</div>
+        <div class="widget-value">${defisOk}/${defis.length}</div>
+        <div class="widget-label">Défis</div>
+        <div class="widget-trend ${defisOk === defis.length ? 'up' : 'flat'}">
+          ${defisOk === defis.length && defis.length > 0
+            ? '🏆 Complet !'
+            : `${defis.length - defisOk} en cours`}
+        </div>
+      </div>
+    </div>
+
+    <!-- Séance du jour -->
+    ${seance ? `
+      <div class="next-seance-card mb-md"
+           onclick="ouvrirSeance('${seance.id}')">
+        <div style="font-size:.65rem;font-weight:700;
+                    letter-spacing:.08em;text-transform:uppercase;
+                    color:var(--fd-indigo);margin-bottom:6px">
+          ${seance.dansJours === 0
+            ? '⚡ Séance du jour'
+            : `📅 Dans ${seance.dansJours} jour${seance.dansJours>1?'s':''}`}
+        </div>
+        <div style="font-size:1.1rem;font-weight:700">
+          ${seance.emoji} ${seance.nom}
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted);
+                    margin-top:4px">
+          ${seance.exercices?.length || 0} exercices
+          · ~${seance.duree_estimee}min
+          · ${infos.phase.emoji} ${infos.phase.nom}
+        </div>
+        <div style="margin-top:var(--space-sm)">
           <div class="progress-bar">
             <div class="progress-fill"
                  style="width:${infos.progression}%"></div>
           </div>
+          <div style="font-size:.65rem;color:var(--text-muted);
+                      margin-top:3px;text-align:right">
+            ${infos.progression}% du cycle
+          </div>
         </div>
-      ` : `
-        <div style="font-size:.9rem;opacity:.8">
-          🎉 Programme terminé ! Un nouveau cycle commence.
-        </div>`}
-    </div>
+      </div>` : `
+      <div class="card mb-md" style="text-align:center">
+        <div style="font-size:1.5rem;margin-bottom:4px">🎉</div>
+        <div style="font-size:.88rem;color:var(--text-muted)">
+          Programme complété ! Un nouveau cycle commence.
+        </div>
+      </div>`}
+
+    <!-- Opportunité PR -->
+    ${analyse.opportunitePR ? (() => {
+      const p  = analyse.opportunitePR;
+      const ex = window.EXERCICES?.[p.exerciceRef] || {};
+      return `
+        <div class="card mb-md"
+             style="border-color:var(--fd-lemon);
+                    background:rgba(249,239,119,0.06)"
+             onclick="naviguer('predict')">
+          <div class="flex items-center gap-md">
+            <div style="font-size:2rem">🎯</div>
+            <div>
+              <div style="font-weight:700;font-size:.88rem;
+                          color:var(--fd-lemon)">
+                Opportunité PR aujourd'hui !
+              </div>
+              <div style="font-size:.78rem;color:var(--text-muted)">
+                ${ex.emoji || '💪'} ${ex.nom || p.exerciceRef}
+                → Cible ${p.rm1Predit}kg 1RM
+              </div>
+            </div>
+          </div>
+        </div>`;
+    })() : ''}
 
     <!-- Humeur -->
     <div class="card mb-md">
-      <div class="card-label">😊 Humeur du jour</div>
+      <div class="card-label">😊 ${t('live.humeur')}</div>
       <div class="humeur-grid mt-md">
         ${['🔥','😊','😐','😒','😤'].map(h => `
           <button class="humeur-btn
@@ -384,127 +547,9 @@ function renderAccueil() {
       </div>
     </div>
 
-    <!-- Stats -->
-    <div class="stats-grid mb-md">
-      <div class="stat-card">
-        <span class="stat-value">${Tracker.getTotalSeances()}</span>
-        <span class="stat-label">Séances</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${streak.count}🔥</span>
-        <span class="stat-label">Streak</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">S${infos.semaine}</span>
-        <span class="stat-label">Semaine</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${infos.progression}%</span>
-        <span class="stat-label">Cycle</span>
-      </div>
-    </div>
-
-    <!-- Objectif semaine -->
-    <div class="card mb-md">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="card-label">🎯 Objectif semaine</div>
-          <div style="font-size:1.4rem;font-weight:800;
-                      color:var(--fd-indigo);margin-top:4px">
-            ${seanceDJ}/${objectif} séances
-          </div>
-          <div style="font-size:.78rem;color:var(--text-muted)">
-            ${objectif - seanceDJ > 0
-              ? `${objectif-seanceDJ} restante${objectif-seanceDJ>1?'s':''}`
-              : '✅ Objectif atteint !'}
-          </div>
-        </div>
-        <div style="position:relative;width:80px;height:80px">
-          <canvas id="anneau-semaine" width="80" height="80"></canvas>
-          <div style="position:absolute;inset:0;display:flex;
-                      align-items:center;justify-content:center;
-                      font-size:1.1rem;font-weight:800;
-                      color:var(--fd-indigo)">
-            ${Math.round((seanceDJ/Math.max(objectif,1))*100)}%
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Score Forme -->
-    <div class="score-forme-card mb-md">
-      <div class="flex justify-between items-center mb-md">
-        <div class="card-label">⚡ Score Forme</div>
-        <span class="chip chip-${
-          score.score>=80 ? 'mint' :
-          score.score>=60 ? 'lemon' : 'coral'
-        }">${score.niveau}</span>
-      </div>
-      <div class="score-forme-content">
-        <div class="score-circle">
-          <svg width="80" height="80" viewBox="0 0 80 80">
-            <circle class="ring-bg" cx="40" cy="40" r="34"/>
-            <circle class="ring-fill" cx="40" cy="40" r="34"
-              stroke-dasharray="${2*Math.PI*34}"
-              stroke-dashoffset="${2*Math.PI*34*(1-score.score/100)}"
-              style="transition:stroke-dashoffset 1s ease;
-                     transform:rotate(-90deg);
-                     transform-origin:center"/>
-          </svg>
-          <div class="score-number">
-            ${score.score}<span class="score-sub">/100</span>
-          </div>
-        </div>
-        <div class="score-details">
-          ${[
-            { label:'💤 Récup',     val:score.recup       },
-            { label:'📅 Assiduité', val:score.assiduite   },
-            { label:'📈 Progres.',  val:score.progression }
-          ].map(r => `
-            <div class="score-row">
-              <span class="score-row-label">${r.label}</span>
-              <span class="score-row-value">${r.val}%</span>
-            </div>`).join('')}
-          <div class="progress-bar mt-md">
-            <div class="progress-fill"
-                 style="width:${score.score}%"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Coach -->
-    <div class="coach-card mb-md">
-      <div class="coach-header">
-        <span class="coach-icon">${coach.emoji}</span>
-        <span class="coach-label">Coach du jour</span>
-      </div>
-      <p class="coach-message">${coach.message}</p>
-    </div>
-
-    <!-- Défi semaine -->
-    <div class="card mb-md">
-      <div class="flex justify-between items-center">
-        <div class="card-label">🎯 Défi semaine</div>
-        <span class="chip chip-indigo">${seanceDJ}/${objectif}</span>
-      </div>
-      <p style="font-size:.9rem;color:var(--text-primary);
-                margin:var(--space-sm) 0">
-        Réalise ${objectif} séances cette semaine !
-      </p>
-      <div class="progress-bar">
-        <div class="progress-fill"
-             style="width:${Math.min(100,
-               (seanceDJ/Math.max(objectif,1))*100)}%;
-                    background:${seanceDJ>=objectif
-                      ? 'var(--fd-mint)' : 'var(--fd-indigo)'}">
-        </div>
-      </div>
-    </div>
-
     <!-- Fatigue -->
     <div class="card mb-md">
-      <div class="card-label">🌡️ Niveau de fatigue</div>
+      <div class="card-label">🌡️ ${t('live.fatigue')}</div>
       <div class="flex gap-sm mt-md">
         ${[
           { val:0, label:'Frais',  color:'var(--fd-mint)'       },
@@ -527,6 +572,82 @@ function renderAccueil() {
           </button>`).join('')}
       </div>
     </div>
+
+    <!-- Apple Music du jour -->
+    <div class="apple-music-card mb-md"
+         onclick="ouvrirPlaylist()"
+         style="cursor:pointer">
+      <div style="display:flex;align-items:center;
+                  gap:var(--space-md)">
+        <div style="font-size:2rem">${playlist.emoji}</div>
+        <div style="flex:1">
+          <div style="font-size:.65rem;color:#ff3b30;
+                      font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:.06em">
+            🎵 Apple Music
+          </div>
+          <div style="font-weight:700;font-size:.9rem">
+            ${playlist.nom}
+          </div>
+          <div style="font-size:.72rem;color:var(--text-muted)">
+            ${playlist.genre} · ${playlist.description}
+          </div>
+        </div>
+        <div style="color:#ff3b30;font-weight:700">→</div>
+      </div>
+    </div>
+
+    <!-- Conseil Coach -->
+    <div class="coach-tip-card mb-md">
+      <div class="flex items-center gap-md mb-sm">
+        <div class="coach-tip-avatar">🤖</div>
+        <div style="font-size:.75rem;font-weight:700;
+                    color:var(--fd-lavender)">
+          ${t('coach.titre')}
+        </div>
+      </div>
+      <p style="font-size:.85rem;color:var(--text-secondary);
+                line-height:1.5">
+        ${coach.message}
+      </p>
+    </div>
+
+    <!-- Défis du jour (aperçu) -->
+    ${defis.length > 0 ? `
+      <div class="card mb-md"
+           onclick="naviguer('defis')"
+           style="cursor:pointer">
+        <div class="flex justify-between items-center">
+          <div class="card-label">🏆 ${t('defis.titre')}</div>
+          <span class="chip chip-lemon">
+            ${defisOk}/${defis.length} ${t('defis.completes', {n:''})}
+          </span>
+        </div>
+        <div class="progress-bar mt-md">
+          <div class="progress-fill"
+               style="width:${Math.round((defisOk/Math.max(defis.length,1))*100)}%;
+                      background:var(--fd-lemon)">
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--space-sm);
+                    margin-top:var(--space-md);flex-wrap:wrap">
+          ${defis.slice(0,3).map(d => `
+            <div style="font-size:.72rem;padding:4px 8px;
+                        background:${d.complete
+                          ? 'rgba(139,240,187,0.15)'
+                          : 'var(--bg-input)'};
+                        border:1px solid ${d.complete
+                          ? 'var(--fd-mint)'
+                          : 'var(--border-color)'};
+                        border-radius:99px;
+                        color:${d.complete
+                          ? 'var(--fd-mint)'
+                          : 'var(--text-muted)'}">
+              ${d.complete ? '✅' : d.emoji} ${d.titre.split(' ').slice(0,3).join(' ')}...
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
 
     <!-- Warm-up -->
     <div class="card mb-md"
@@ -567,6 +688,593 @@ function selectionnerFatigue(niveau) {
   Tracker.sauvegarderFatigue(niveau);
   Utils.vibrerBeep();
   renderAccueil();
+}
+
+function ouvrirPlaylist() {
+  const playlist = Share.getPlaylistDuJour();
+  window.open(playlist.url, '_blank');
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE EXPRESS — Séance 30 minutes
+// ════════════════════════════════════════════════════════════
+function renderExpress() {
+  const container  = document.getElementById('page-content');
+  const seance     = Programme.getSeanceduJour();
+  const fatigue    = Predict.analyserFatigue();
+
+  // Sélectionner 5 exercices express selon fatigue
+  const exercices = _selectionnerExercicesExpress(seance, fatigue);
+
+  container.innerHTML = `
+
+    <!-- Header -->
+    <div class="express-header">
+      <div class="flex justify-between items-center">
+        <button class="btn-icon"
+                onclick="naviguer('home')">←</button>
+        <div style="text-align:center">
+          <div style="font-weight:700">⚡ Séance Express</div>
+          <div style="font-size:.72rem;color:var(--text-muted)">
+            ~30 minutes · ${exercices.length} exercices
+          </div>
+        </div>
+        <div style="font-size:.82rem;font-weight:700;
+                    color:var(--fd-lemon)"
+             id="express-chrono">30:00</div>
+      </div>
+
+      <!-- Steps -->
+      <div class="express-steps mt-md">
+        ${exercices.map((_, i) => `
+          <div class="express-step" id="step-${i}"></div>`).join('')}
+      </div>
+    </div>
+
+    <!-- État forme -->
+    <div class="card mb-md"
+         style="background:${fatigue.recommandation.couleur}11;
+                border-color:${fatigue.recommandation.couleur}44">
+      <div class="flex items-center gap-md">
+        <div style="font-size:1.5rem">
+          ${fatigue.recommandation.emoji}
+        </div>
+        <div>
+          <div style="font-size:.82rem;font-weight:700;
+                      color:${fatigue.recommandation.couleur}">
+            ${fatigue.recommandation.message}
+          </div>
+          <div style="font-size:.7rem;color:var(--text-muted)">
+            Score forme : ${fatigue.score}/100
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Liste exercices -->
+    ${exercices.map((exo, i) => {
+      const ex  = window.EXERCICES?.[exo.ref] || {};
+      const pr  = Tracker.getPR(exo.ref);
+      const reco = Predict.recommanderCharge(exo.ref);
+      const chargeReco = reco?.charge || (pr?.poids || '?');
+
+      return `
+        <div class="express-exo-card" id="express-exo-${i}">
+          <div class="flex items-center gap-md">
+            <div style="width:44px;height:44px;
+                        border-radius:50%;
+                        background:var(--bg-input);
+                        display:flex;align-items:center;
+                        justify-content:center;
+                        font-size:1.3rem;flex-shrink:0">
+              ${ex.emoji || '💪'}
+            </div>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:.92rem">
+                ${i+1}. ${ex.nom || exo.ref}
+              </div>
+              <div style="font-size:.72rem;
+                          color:var(--fd-mint)">
+                ${ex.muscle || ''}
+              </div>
+              <div style="font-size:.72rem;
+                          color:var(--text-muted);
+                          margin-top:2px">
+                ${exo.series} × ${exo.reps}
+                · Repos ${exo.repos}s
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:1rem;font-weight:800;
+                          color:var(--fd-indigo)">
+                ${chargeReco}kg
+              </div>
+              <div style="font-size:.62rem;
+                          color:var(--text-muted)">
+                recommandé
+              </div>
+              ${pr ? `
+                <div style="font-size:.6rem;
+                            color:var(--fd-lemon)">
+                  PR: ${pr.poids}kg
+                </div>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }).join('')}
+
+    <!-- Bouton démarrer -->
+    <button class="btn-primary"
+            onclick="demarrerExpress(${JSON.stringify(exercices).replace(/"/g,"'")})"
+            style="position:sticky;
+                   bottom:calc(var(--nav-height) + var(--space-md));
+                   width:100%;margin-top:var(--space-md);
+                   box-shadow:0 8px 32px rgba(75,75,249,0.4)">
+      ⚡ Démarrer la séance express
+    </button>
+  `;
+}
+
+function _selectionnerExercicesExpress(seance, fatigue) {
+  // Si séance du jour dispo → utiliser ses exercices
+  if (seance?.exercices?.length >= 4) {
+    const intensiteAjust = fatigue.score < 50 ? 0.8 : 1;
+    return seance.exercices.slice(0, 5).map(ex => ({
+      ...ex,
+      repos: Math.round((ex.repos || 90) * intensiteAjust)
+    }));
+  }
+
+  // Sinon → Full Body express
+  const expressDefaut = [
+    { ref:'bench_press',     series:3, reps:'10',  repos:60 },
+    { ref:'lat_pulldown',    series:3, reps:'12',  repos:60 },
+    { ref:'squat',           series:3, reps:'10',  repos:75 },
+    { ref:'dev_militaire',   series:3, reps:'10',  repos:60 },
+    { ref:'planche',         series:3, reps:'45s', repos:45 }
+  ];
+
+  return expressDefaut;
+}
+
+function demarrerExpress(exercices) {
+  if (typeof exercices === 'string') {
+    try { exercices = JSON.parse(exercices.replace(/'/g,'"')); }
+    catch(e) { return; }
+  }
+
+  AppState.expressActif  = true;
+  AppState.expressIndex  = 0;
+  AppState.expressSerieN = 1;
+  AppState.expressDebut  = Date.now();
+
+  // Démarrer le chrono global
+  chronoSeance.demarrer(elapsed => {
+    const el    = document.getElementById('express-chrono');
+    const reste = Math.max(0, 30*60 - elapsed);
+    if (el) el.textContent = Utils.formatDureeMin(reste);
+    if (reste <= 0 && AppState.expressActif) {
+      terminerExpress(exercices, elapsed);
+    }
+  });
+
+  Tracker.demarrerSeance('express_' + Utils.aujourd_hui());
+  renderExpressExercice(exercices);
+}
+
+function renderExpressExercice(exercices) {
+  const container = document.getElementById('page-content');
+  const idx       = AppState.expressIndex;
+  const exo       = exercices[idx];
+  const ex        = window.EXERCICES?.[exo?.ref] || {};
+  const pr        = Tracker.getPR(exo?.ref);
+  const derniere  = Tracker.getDernierePerf('express_' + Utils.aujourd_hui(), exo?.ref);
+  const elapsed   = Math.floor((Date.now() - AppState.expressDebut) / 1000);
+  const reste     = Math.max(0, 30*60 - elapsed);
+
+  container.innerHTML = `
+
+    <!-- Header express -->
+    <div class="express-header">
+      <div class="flex justify-between items-center">
+        <button class="btn-secondary btn-sm"
+                onclick="arreterExpress(${JSON.stringify(exercices).replace(/"/g,"'")})">
+          ✕
+        </button>
+        <div style="text-align:center">
+          <div style="font-weight:700">
+            ${idx+1}/${exercices.length} · ${ex.emoji || '💪'} ${ex.nom || exo?.ref}
+          </div>
+          <div style="font-size:.72rem;color:var(--text-muted)">
+            Série ${AppState.expressSerieN}/${exo?.series || 3}
+          </div>
+        </div>
+        <div style="font-size:.9rem;font-weight:800;
+                    color:${reste < 300
+                      ? 'var(--fd-coral)'
+                      : 'var(--fd-lemon)'}"
+             id="express-chrono">
+          ${Utils.formatDureeMin(reste)}
+        </div>
+      </div>
+
+      <!-- Steps -->
+      <div class="express-steps mt-sm">
+        ${exercices.map((_, i) => `
+          <div class="express-step
+               ${i < idx ? 'done' : i === idx ? 'active' : ''}">
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Exercice actuel -->
+    <div style="padding:var(--space-md)">
+
+      <!-- Info exercice -->
+      <div class="card mb-md"
+           style="text-align:center">
+        <div style="font-size:4rem;margin-bottom:8px">
+          ${ex.emoji || '💪'}
+        </div>
+        <div style="font-weight:700;font-size:1.2rem">
+          ${ex.nom || exo?.ref}
+        </div>
+        <div style="font-size:.78rem;color:var(--fd-mint);
+                    margin-top:4px">
+          ${ex.muscle || ''}
+          · ${exo?.series} × ${exo?.reps}
+        </div>
+        ${pr ? `
+          <div style="font-size:.72rem;color:var(--fd-lemon);
+                      margin-top:4px">
+            🏆 PR: ${pr.poids}kg × ${pr.reps}
+          </div>` : ''}
+        ${derniere ? `
+          <div style="font-size:.7rem;color:var(--text-muted);
+                      margin-top:2px">
+            Dernière fois: ${derniere.poids}kg × ${derniere.reps}
+          </div>` : ''}
+      </div>
+
+      <!-- Série indicators -->
+      <div style="display:flex;justify-content:center;
+                  gap:var(--space-sm);margin-bottom:var(--space-md)">
+        ${Array.from({length: exo?.series || 3}, (_, i) => `
+          <div style="width:36px;height:36px;border-radius:50%;
+                      border:2px solid ${i+1 < AppState.expressSerieN
+                        ? 'var(--fd-mint)'
+                        : i+1 === AppState.expressSerieN
+                          ? 'var(--fd-indigo)'
+                          : 'var(--border-color)'};
+                      background:${i+1 < AppState.expressSerieN
+                        ? 'var(--fd-mint)'
+                        : i+1 === AppState.expressSerieN
+                          ? 'rgba(75,75,249,0.2)'
+                          : 'transparent'};
+                      display:flex;align-items:center;
+                      justify-content:center;
+                      font-size:.8rem;font-weight:700;
+                      color:${i+1 <= AppState.expressSerieN
+                        ? 'white' : 'var(--text-muted)'}">
+            ${i+1 < AppState.expressSerieN ? '✓' : i+1}
+          </div>`).join('')}
+      </div>
+
+      <!-- Inputs poids + reps -->
+      <div class="express-set-input">
+        <div class="express-input-group">
+          <div class="express-input-label">Poids (kg)</div>
+          <input class="express-input-val"
+                 id="exp-poids" type="number"
+                 value="${derniere?.poids || pr?.poids || ''}"
+                 placeholder="0" step="2.5" />
+          <div class="express-controls">
+            <button class="express-adjust-btn"
+                    onclick="ajusterExpressVal('exp-poids',-2.5)">
+              -
+            </button>
+            <button class="express-adjust-btn"
+                    onclick="ajusterExpressVal('exp-poids',2.5)">
+              +
+            </button>
+          </div>
+        </div>
+        <div class="express-input-group">
+          <div class="express-input-label">Reps</div>
+          <input class="express-input-val"
+                 id="exp-reps" type="number"
+                 value="${derniere?.reps || ''}"
+                 placeholder="0" />
+          <div class="express-controls">
+            <button class="express-adjust-btn"
+                    onclick="ajusterExpressVal('exp-reps',-1)">
+              -
+            </button>
+            <button class="express-adjust-btn"
+                    onclick="ajusterExpressVal('exp-reps',1)">
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RPE rapide -->
+      <div style="margin:var(--space-md) 0">
+        <div style="font-size:.72rem;color:var(--text-muted);
+                    margin-bottom:var(--space-sm)">
+          Effort ressenti (RPE)
+        </div>
+        <div style="display:flex;gap:4px">
+          ${[6,7,8,9,10].map(v => `
+            <button id="rpe-exp-${v}"
+                    onclick="selectionnerRPEExpress(${v})"
+                    style="flex:1;padding:var(--space-sm);
+                           border-radius:var(--radius-sm);
+                           border:1px solid var(--border-color);
+                           background:var(--bg-input);
+                           color:var(--text-muted);
+                           font-size:.82rem;font-weight:600;
+                           cursor:pointer;transition:all .15s">
+              ${v}
+            </button>`).join('')}
+        </div>
+      </div>
+
+      <!-- Bouton valider -->
+      <button class="express-btn-next"
+              onclick="validerSerieExpress(${JSON.stringify(exercices).replace(/"/g,"'")})">
+        ✅ Série ${AppState.expressSerieN}/${exo?.series || 3}
+        ${idx+1 < exercices.length || AppState.expressSerieN < (exo?.series||3)
+          ? '→ Suite'
+          : '🏁 Terminer'}
+      </button>
+    </div>
+  `;
+
+  // Reprendre le chrono
+  chronoSeance.arreter();
+  AppState.expressDebut = Date.now() - elapsed * 1000;
+  chronoSeance.demarrer(el => {
+    const chronoEl = document.getElementById('express-chrono');
+    const r = Math.max(0, 30*60 - el);
+    if (chronoEl) chronoEl.textContent = Utils.formatDureeMin(r);
+  });
+}
+
+let _rpeExpress = null;
+
+function selectionnerRPEExpress(val) {
+  _rpeExpress = val;
+  [6,7,8,9,10].forEach(v => {
+    const btn = document.getElementById(`rpe-exp-${v}`);
+    if (!btn) return;
+    btn.style.background = v === val
+      ? 'var(--fd-indigo)'
+      : 'var(--bg-input)';
+    btn.style.color = v === val
+      ? 'white'
+      : 'var(--text-muted)';
+    btn.style.borderColor = v === val
+      ? 'var(--fd-indigo)'
+      : 'var(--border-color)';
+  });
+}
+
+function ajusterExpressVal(id, delta) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  const val = parseFloat(input.value) || 0;
+  input.value = Math.max(0, val + delta);
+}
+
+function validerSerieExpress(exercices) {
+  if (typeof exercices === 'string') {
+    try { exercices = JSON.parse(exercices.replace(/'/g,'"')); }
+    catch(e) { return; }
+  }
+
+  const poids = parseFloat(document.getElementById('exp-poids')?.value);
+  const reps  = parseInt(document.getElementById('exp-reps')?.value);
+
+  if (!poids || !reps) {
+    Utils.toast('Entre le poids et les reps !', 'error');
+    document.getElementById('exp-poids')?.classList.add('shake');
+    setTimeout(() =>
+      document.getElementById('exp-poids')?.classList.remove('shake'), 400
+    );
+    return;
+  }
+
+  const exo    = exercices[AppState.expressIndex];
+  const seanceId = 'express_' + Utils.aujourd_hui();
+
+  const result = Tracker.sauvegarderSerie(
+    seanceId, exo.ref,
+    AppState.expressSerieN,
+    reps, poids, _rpeExpress
+  );
+
+  _rpeExpress = null;
+  Utils.vibrerSuccess();
+
+  if (result.isPR) {
+    timerRepos.jouerSon('pr');
+    Utils.toast(`🏆 NOUVEAU PR ! ${poids}kg × ${reps}`, 'pr', 3000);
+    Gamification.recompenser('PR_BATTU');
+  }
+
+  // Série suivante ou exercice suivant
+  if (AppState.expressSerieN < (exo.series || 3)) {
+    AppState.expressSerieN++;
+
+    // Timer repos rapide (60s max en express)
+    const reposExpress = Math.min(exo.repos || 60, 60);
+    _lancerReposExpress(reposExpress, () => {
+      renderExpressExercice(exercices);
+    });
+
+  } else if (AppState.expressIndex + 1 < exercices.length) {
+    AppState.expressIndex++;
+    AppState.expressSerieN = 1;
+
+    _lancerReposExpress(45, () => {
+      renderExpressExercice(exercices);
+    });
+
+  } else {
+    const duree = chronoSeance.arreter();
+    terminerExpress(exercices, duree);
+  }
+}
+
+function _lancerReposExpress(secondes, callback) {
+  const container = document.getElementById('page-content');
+
+  // Overlay repos rapide
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:200;
+    background:rgba(9,9,45,0.95);
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:var(--space-lg)`;
+
+  overlay.innerHTML = `
+    <div style="font-size:.9rem;color:var(--text-muted);
+                text-transform:uppercase;letter-spacing:.1em">
+      💤 Repos
+    </div>
+    <div style="font-size:5rem;font-weight:800;
+                color:var(--fd-lemon);
+                font-variant-numeric:tabular-nums"
+         id="repos-express-display">
+      ${Utils.formatDureeMin(secondes)}
+    </div>
+    <button onclick="document.getElementById('overlay-repos-express').remove();
+                     (${callback.toString()})();"
+            style="padding:var(--space-md) var(--space-xl);
+                   background:var(--fd-indigo);
+                   border:none;border-radius:var(--radius-full);
+                   color:white;font-weight:700;cursor:pointer">
+      ⏭ Passer
+    </button>`;
+
+  overlay.id = 'overlay-repos-express';
+  document.body.appendChild(overlay);
+
+  timerRepos.demarrer(secondes,
+    (r) => {
+      const el = document.getElementById('repos-express-display');
+      if (el) el.textContent = Utils.formatDureeMin(r);
+    },
+    () => {
+      overlay.remove();
+      callback();
+    }
+  );
+}
+
+function terminerExpress(exercices, duree) {
+  AppState.expressActif = false;
+  chronoSeance.arreter();
+  timerRepos.arreter();
+
+  Tracker.terminerSeance('express_' + Utils.aujourd_hui());
+  Gamification.recompenser('SEANCE_COMPLETE');
+  Defis.mettreAJourProgression();
+  Utils.confetti(3000);
+  Utils.vibrerFin();
+
+  const container = document.getElementById('page-content');
+  const volume    = Tracker.getVolumeSemaine();
+
+  container.innerHTML = `
+    <div class="express-result">
+      <div class="express-result-icon">⚡</div>
+      <div class="express-result-titre">
+        Séance Express terminée !
+      </div>
+      <p style="color:var(--text-muted);margin-bottom:var(--space-lg)">
+        Bien joué ${Tracker.getProfil().nom || ''} ! 🔥
+      </p>
+
+      <div class="express-result-stats">
+        <div class="express-result-stat">
+          <div class="express-result-val">
+            ${Utils.formatDuree(duree)}
+          </div>
+          <div class="express-result-lbl">Durée</div>
+        </div>
+        <div class="express-result-stat">
+          <div class="express-result-val">
+            ${exercices.length}
+          </div>
+          <div class="express-result-lbl">Exercices</div>
+        </div>
+        <div class="express-result-stat">
+          <div class="express-result-val">
+            ${Utils.formatVolume(Tracker.getVolumeSemaine())}
+          </div>
+          <div class="express-result-lbl">Vol. sem.</div>
+        </div>
+      </div>
+
+      <div style="margin:var(--space-lg) 0">
+        <button class="btn-primary mb-md"
+                style="width:100%"
+                onclick="naviguer('stats')">
+          📊 Voir mes stats
+        </button>
+        <button class="btn-secondary"
+                style="width:100%"
+                onclick="naviguer('home')">
+          🏠 Accueil
+        </button>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => Gamification.verifierTrophees(), 1000);
+}
+
+async function arreterExpress(exercices) {
+  const ok = await Utils.confirmer(
+    'Arrêter la séance express ?',
+    'Ta progression sera sauvegardée.'
+  );
+  if (!ok) return;
+  AppState.expressActif = false;
+  chronoSeance.arreter();
+  timerRepos.arreter();
+  Tracker.terminerSeance('express_' + Utils.aujourd_hui());
+  naviguer('home');
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE DÉFIS
+// ════════════════════════════════════════════════════════════
+function renderPageDefis() {
+  const container = document.getElementById('page-content');
+  container.innerHTML = `<div id="defis-wrapper"></div>`;
+  Defis.render(document.getElementById('defis-wrapper'));
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE SHARE + APPLE MUSIC
+// ════════════════════════════════════════════════════════════
+function renderPageShare() {
+  const container = document.getElementById('page-content');
+  container.innerHTML = `<div id="share-wrapper"></div>`;
+  Share.render(document.getElementById('share-wrapper'));
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE PREDICT
+// ════════════════════════════════════════════════════════════
+function renderPagePredict() {
+  const container = document.getElementById('page-content');
+  container.innerHTML = `<div id="predict-wrapper"></div>`;
+  Predict.render(document.getElementById('predict-wrapper'));
 }
 
 // ════════════════════════════════════════════════════════════
@@ -629,7 +1337,6 @@ function renderPlanning(el, offset = 0) {
               onclick="renderTraining('planning',${offset+1})">►</button>
     </div>
 
-    <!-- Bouton éditer planning -->
     <button class="btn-secondary mb-md"
             style="width:100%;font-size:.82rem"
             onclick="renderProfil('programme')">
@@ -689,7 +1396,7 @@ function renderListeExercices(el) {
     <div id="ex-list">
       ${Object.entries(groupes).map(([muscle, exos]) => `
         <div class="section-title">
-          ${exos[0]?.emoji||'💪'} ${muscle}
+          ${exos?.emoji||'💪'} ${muscle}
         </div>
         ${exos.map(ex => {
           const uid = `list_gif_${ex.ref}`;
@@ -753,8 +1460,8 @@ function filtrerExercices(query) {
 }
 
 function afficherDetailExercice(ref) {
-  const ex    = EXERCICES[ref];
-  const pr    = Tracker.getPR(ref);
+  const ex  = EXERCICES[ref];
+  const pr  = Tracker.getPR(ref);
   if (!ex) return;
 
   const gifUID  = `modal_gif_${ref}_${Date.now()}`;
@@ -777,11 +1484,6 @@ function afficherDetailExercice(ref) {
       <span style="margin-left:var(--space-sm)">
         ${'⭐'.repeat(ex.difficulte)}${'☆'.repeat(4-ex.difficulte)}
       </span>
-      ${ex.custom ? `
-        <span class="chip chip-lemon"
-              style="margin-left:var(--space-sm)">
-          ✏️ Custom
-        </span>` : ''}
     </div>
     <div class="card mb-md">
       <div class="card-label">📍 Équipement</div>
@@ -877,16 +1579,18 @@ function renderTimerStandalone(el) {
       </div>
       <div class="timer-controls mb-md">
         <button class="timer-adjust-btn"
-                onclick="timerRepos.ajuster(-30);
-                         updateTimerUI()">-30s</button>
+                onclick="timerRepos.ajuster(-30);updateTimerUI()">
+          -30s
+        </button>
         <button class="btn-primary" id="btn-timer-start"
                 onclick="toggleTimer()"
                 style="flex:1;max-width:160px">
           ▶ Démarrer
         </button>
         <button class="timer-adjust-btn"
-                onclick="timerRepos.ajuster(30);
-                         updateTimerUI()">+30s</button>
+                onclick="timerRepos.ajuster(30);updateTimerUI()">
+          +30s
+        </button>
       </div>
       <div class="flex gap-md justify-center">
         <label class="toggle-row"
@@ -1137,6 +1841,7 @@ function ouvrirSeance(seanceId) {
       ${seance.exercicesDetails.map((item, i) => {
         const ex  = item.details;
         const pr  = Tracker.getPR(item.ref);
+        const pred = Predict.predireProchainPR(item.ref);
         const uid = `preview_gif_${item.ref}_${i}`;
         return `
           <div style="display:flex;gap:var(--space-md);
@@ -1167,6 +1872,11 @@ function ouvrirSeance(seanceId) {
                 <div style="font-size:.7rem;color:var(--fd-lemon);
                             margin-top:2px">
                   🏆 Record: ${pr.poids}kg × ${pr.reps}
+                </div>` : ''}
+              ${pred ? `
+                <div style="font-size:.68rem;color:var(--fd-mint);
+                            margin-top:2px">
+                  🔮 PR prédit: ${pred.rm1Predit}kg dans ~${pred.joursEstimes}j
                 </div>` : ''}
             </div>
           </div>`;
@@ -1219,6 +1929,11 @@ function renderSelecteurSeance(container) {
       <h2 style="font-size:1.3rem;font-weight:700">
         Quelle séance aujourd'hui ?
       </h2>
+      <button class="btn-secondary mt-md"
+              onclick="naviguer('express')"
+              style="font-size:.82rem">
+        ⚡ Séance Express 30min →
+      </button>
     </div>
 
     ${prochaine ? `
@@ -1284,6 +1999,7 @@ function renderExerciceActuel(container) {
   const item     = seance.exercicesDetails[AppState.exerciceIndex];
   const ex       = item?.details;
   const derniere = Tracker.getDernierePerf(seance.id, item?.ref);
+  const pred     = Predict.recommanderCharge(item?.ref);
   const gifUID   = `live_gif_${item?.ref}_${Date.now()}`;
 
   container.innerHTML = `
@@ -1325,6 +2041,12 @@ function renderExerciceActuel(container) {
           ${item?.series} séries × ${item?.reps} reps
           · Repos ${item?.repos}s
         </div>
+        ${pred ? `
+          <div style="font-size:.72rem;color:var(--fd-lemon);
+                      margin-top:4px">
+            ⚡ Charge recommandée: <strong>${pred.charge}kg</strong>
+            (${pred.intensite}% · ${pred.fatigue.emoji})
+          </div>` : ''}
         ${derniere ? `
           <div style="font-size:.72rem;color:var(--fd-lemon);margin-top:4px">
             📊 Dernière fois: ${derniere.poids}kg × ${derniere.reps} reps
@@ -1354,8 +2076,9 @@ function renderExerciceActuel(container) {
               Poids (kg)
             </div>
             <input class="input" id="inp-poids" type="number"
-                   placeholder="${derniere?.poids||'0'}"
-                   value="${derniere?.poids||''}" step="2.5" />
+                   placeholder="${pred?.charge || derniere?.poids||'0'}"
+                   value="${pred?.charge || derniere?.poids||''}"
+                   step="2.5" />
           </div>
           <div style="flex:1">
             <div class="input-label" style="text-align:center">
@@ -1458,6 +2181,7 @@ function validerSerie() {
     Utils.toast(`🏆 NOUVEAU PR ! ${poids}kg × ${reps}`, 'pr', 4000);
     Notifications.notifierPR(item.ref, poids, reps);
     Gamification.recompenser('PR_BATTU');
+    Defis.mettreAJourProgression();
   }
 
   if (AppState.serieActuelle < item.series) {
@@ -1540,6 +2264,7 @@ function terminerSeance() {
 
   Gamification.recompenser('SEANCE_COMPLETE');
   Notifications.verifierSemaineParf();
+  Defis.mettreAJourProgression();
   Utils.confetti(4000);
   Utils.vibrerFin();
 
@@ -1577,7 +2302,7 @@ function terminerSeance() {
         <div class="pr-alert mb-md">
           <div class="pr-alert-title">
             🏆 ${prs.length} nouveau${prs.length>1?'x':''}
-            record${prs.length>1?'s':''} !
+            record${prs.length>1?'s':''}!
           </div>
           ${prs.map(p => `
             <div class="pr-alert-item">
@@ -1588,6 +2313,14 @@ function terminerSeance() {
               </span>
             </div>`).join('')}
         </div>` : ''}
+
+      <!-- Partage -->
+      <button class="btn-secondary mb-md"
+              onclick="Share.partager('semaine')"
+              style="width:100%;font-size:.85rem">
+        📸 Partager mes stats
+      </button>
+
       <button class="btn-primary mb-md"
               onclick="ajouterJournalPostSeance('${seance.id}')">
         📔 Ajouter une note
@@ -1636,7 +2369,8 @@ function sauvegarderNoteJournal(seanceId) {
 function renderProfil(tab = 'moi') {
   const container = document.getElementById('page-content');
   const tabs = [
-    'moi','stats','journal','objectifs','blessure',
+    'moi','stats','defis','predict','share',
+    'journal','objectifs','blessure',
     'coach','custom','programme','outils'
   ];
 
@@ -1648,6 +2382,9 @@ function renderProfil(tab = 'moi') {
           ${{
             moi:        '👤 Moi',
             stats:      '📊 Stats',
+            defis:      '🏆 Défis',
+            predict:    '🔮 Predict',
+            share:      '📸 Share',
             journal:    '📔 Journal',
             objectifs:  '🎯 Objectifs',
             blessure:   '🩹 Blessure',
@@ -1663,7 +2400,10 @@ function renderProfil(tab = 'moi') {
   const content = document.getElementById('profil-content');
   switch(tab) {
     case 'moi':        renderProfilMoi(content);            break;
-    case 'stats':      Stats.render(content, 'dashboard');  break;
+    case 'stats':      Stats.render(content,'dashboard');   break;
+    case 'defis':      Defis.render(content);               break;
+    case 'predict':    Predict.render(content);             break;
+    case 'share':      Share.render(content);               break;
     case 'journal':    renderJournal(content);              break;
     case 'objectifs':  renderObjectifs(content);            break;
     case 'blessure':   renderBlessure(content);             break;
@@ -1694,27 +2434,22 @@ function renderProfilMoi(el) {
         <div style="display:flex;flex-wrap:wrap;gap:6px;
                     justify-content:center">
           ${avatars.map(a => `
-  <button onclick="changerAvatar('${a}')"
-          data-avatar="${a}"
-          class="avatar-option ${
-            (profil.avatar || '💪').trim() === a.trim()
-              ? 'avatar-selected'
-              : ''
-          }"
-          style="font-size:1.4rem;padding:4px 8px;
-                 border-radius:var(--radius-sm);
-                 border:2px solid ${
-                   (profil.avatar || '💪').trim() === a.trim()
-                     ? 'var(--fd-lemon)'
-                     : 'transparent'};
-                 background:${
-                   (profil.avatar || '💪').trim() === a.trim()
-                     ? 'rgba(249,239,119,0.1)'
-                     : 'transparent'};
-                 cursor:pointer;
-                 transition:all .2s ease">
-    ${a}
-  </button>`).join('')}
+            <button onclick="changerAvatar('${a}')"
+                    data-avatar="${a}"
+                    class="avatar-option ${
+                      (profil.avatar||'💪').trim()===a.trim()
+                        ?'avatar-selected':''}"
+                    style="font-size:1.4rem;padding:4px 8px;
+                           border-radius:var(--radius-sm);
+                           border:2px solid ${
+                             (profil.avatar||'💪').trim()===a.trim()
+                               ?'var(--fd-lemon)':'transparent'};
+                           background:${
+                             (profil.avatar||'💪').trim()===a.trim()
+                               ?'rgba(249,239,119,0.1)':'transparent'};
+                           cursor:pointer;transition:all .2s ease">
+              ${a}
+            </button>`).join('')}
         </div>
       </div>
       <div class="profil-name">${profil.nom||'Athlète'}</div>
@@ -1764,17 +2499,17 @@ function renderProfilMoi(el) {
                   gap:var(--space-sm);margin-top:var(--space-md)">
         ${[
           { id:'m-poids',    label:'Poids (kg)',
-            val: mesures.poids   ||profil.poids   ||'' },
+            val:mesures.poids   ||profil.poids   ||'' },
           { id:'m-taille',   label:'Taille (cm)',
-            val: mesures.taille  ||profil.taille  ||'' },
+            val:mesures.taille  ||profil.taille  ||'' },
           { id:'m-bras',     label:'Bras (cm)',
-            val: mesures.bras    ||''                   },
+            val:mesures.bras    ||''                   },
           { id:'m-poitrine', label:'Poitrine (cm)',
-            val: mesures.poitrine||''                   },
+            val:mesures.poitrine||''                   },
           { id:'m-taille2',  label:'Tour taille (cm)',
-            val: mesures.taille2 ||''                   },
+            val:mesures.taille2 ||''                   },
           { id:'m-hanches',  label:'Hanches (cm)',
-            val: mesures.hanches ||''                   }
+            val:mesures.hanches ||''                   }
         ].map(m => `
           <div>
             <div class="input-label">${m.label}</div>
@@ -1802,17 +2537,12 @@ function renderProfilMoi(el) {
 }
 
 function changerAvatar(avatar) {
-  // Sauvegarder
   Tracker.sauvegarderProfil({ avatar });
-
-  // Retirer la sélection de TOUS les boutons
   document.querySelectorAll('.avatar-option').forEach(btn => {
     btn.style.border      = '2px solid transparent';
     btn.style.background  = 'transparent';
     btn.classList.remove('avatar-selected');
   });
-
-  // Appliquer sur le bouton cliqué UNIQUEMENT
   const btnActif = document.querySelector(
     `.avatar-option[data-avatar="${avatar}"]`
   );
@@ -1821,12 +2551,7 @@ function changerAvatar(avatar) {
     btnActif.style.background = 'rgba(249,239,119,0.1)';
     btnActif.classList.add('avatar-selected');
   }
-
-  // Mettre à jour l'avatar affiché en grand
-  const grand = document.querySelector('.profil-card .avatar-grand');
-  if (grand) grand.textContent = avatar;
-
-  Utils.toast(`Avatar mis à jour !`, 'success');
+  Utils.toast('Avatar mis à jour !', 'success');
   Utils.vibrerBeep();
 }
 
@@ -1917,6 +2642,7 @@ function sauvegarderJournal() {
   if (!texte) return;
   Tracker.ajouterEntreeJournal(texte);
   Gamification.ajouterXP(25, 'journal');
+  Defis.mettreAJourProgression();
   Utils.toast('Note ajoutée !', 'success');
   document.getElementById('modal-info')?.classList.add('hidden');
   renderProfil('journal');
@@ -1952,7 +2678,8 @@ function renderObjectifs(el) {
         </p>
       </div>` :
       objectifs.map(o => {
-        const pct = Tracker.calculerProgressionObjectif(o);
+        const pct  = Tracker.calculerProgressionObjectif(o);
+        const pred = Predict.predireObjectif(o);
         return `
           <div class="objectif-card">
             <div class="objectif-header">
@@ -1964,7 +2691,7 @@ function renderObjectifs(el) {
             <div class="progress-bar mb-md">
               <div class="progress-fill"
                    style="width:${pct}%;background:${
-                     pct>=100 ? 'var(--fd-mint)' : 'var(--fd-indigo)'}">
+                     pct>=100?'var(--fd-mint)':'var(--fd-indigo)'}">
               </div>
             </div>
             <div class="objectif-progress">
@@ -1978,6 +2705,13 @@ function renderObjectifs(el) {
               ${o.echeance
                 ? `<span>📅 ${o.echeance}</span>` : ''}
             </div>
+            ${pred ? `
+              <div style="font-size:.72rem;color:var(--fd-mint);
+                          margin-top:var(--space-sm)">
+                🔮 Estimé atteint :
+                ${Utils.formatDateCourt(pred.dateEstimee)}
+                (~${pred.semainesEstimees} semaines)
+              </div>` : ''}
             <div style="margin-top:var(--space-sm)">
               <button class="btn-secondary btn-sm"
                       onclick="mettreAJourObjectif('${o.id}')">
@@ -2066,6 +2800,7 @@ function mettreAJourObjectif(id) {
     Tracker.mettreAJourObjectif(id, { complete: true });
     Utils.confetti(2000);
     Utils.toast('🎉 Objectif atteint !', 'success', 4000);
+    Gamification.recompenser('DEFI_SEMAINE');
   }
   renderProfil('objectifs');
 }
@@ -2117,7 +2852,7 @@ function renderBlessure(el) {
             <div>
               <div style="font-weight:600">${b.zone}</div>
               <div style="font-size:.78rem;color:var(--fd-coral)">
-                ${b.severite==='severe' ? '🔴' :
+                ${b.severite==='severe'  ? '🔴' :
                   b.severite==='moderee' ? '🟠' : '🟡'}
                 ${b.severite}
                 · depuis ${Utils.formatDateCourt(b.date)}
@@ -2164,7 +2899,7 @@ async function guerirBlessure(id) {
 }
 
 // ════════════════════════════════════════════════════════════
-// EXERCICES CUSTOM (Feature 6)
+// EXERCICES CUSTOM
 // ════════════════════════════════════════════════════════════
 function getExercicesCustom() {
   return Utils.storage.get('ft_exercices_custom', []);
@@ -2203,7 +2938,6 @@ function renderExercicesCustom(el) {
             onclick="ouvrirFormExercice()">
       ➕ Créer un exercice
     </button>
-
     ${custom.length === 0 ? `
       <div class="card"
            style="text-align:center;padding:var(--space-xl)">
@@ -2245,13 +2979,6 @@ function renderExercicesCustom(el) {
               </button>
             </div>
           </div>
-          ${ex.description ? `
-            <p style="font-size:.78rem;color:var(--text-muted);
-                      margin-top:var(--space-sm);
-                      border-top:1px solid var(--border-color);
-                      padding-top:var(--space-sm)">
-              ${ex.description}
-            </p>` : ''}
         </div>`).join('')}
   `;
 }
@@ -2294,7 +3021,7 @@ function ouvrirFormExercice(ref = null) {
         <select class="input" id="ex-muscle">
           ${muscles.map(m => `
             <option value="${m}"
-              ${existant?.muscle === m ? 'selected' : ''}>${m}</option>
+              ${existant?.muscle===m?'selected':''}>${m}</option>
           `).join('')}
         </select>
       </div>
@@ -2316,12 +3043,12 @@ function ouvrirFormExercice(ref = null) {
     <div class="input-label">Description</div>
     <textarea class="input mb-md" id="ex-desc" rows="3"
               placeholder="Décris l'exercice..."
-              style="resize:none">${existant?.description || ''}</textarea>
+              style="resize:none">${existant?.description||''}</textarea>
     <div class="input-label">Conseils (un par ligne)</div>
     <textarea class="input mb-md" id="ex-conseils" rows="3"
               style="resize:none">${(existant?.conseils||[]).join('\n')}</textarea>
     <button class="btn-primary w-full"
-            onclick="sauvegarderFormExercice('${ref || ''}')">
+            onclick="sauvegarderFormExercice('${ref||''}')">
       💾 ${existant ? 'Modifier' : 'Créer'}
     </button>
   `;
@@ -2395,7 +3122,7 @@ async function supprimerExerciceCustom(ref) {
 }
 
 // ════════════════════════════════════════════════════════════
-// PROGRAMME CUSTOM (Feature 7)
+// PROGRAMME CUSTOM
 // ════════════════════════════════════════════════════════════
 function renderProgrammeCustom(el) {
   const planning  = Programme.getPlanningActuel();
@@ -2405,8 +3132,6 @@ function renderProgrammeCustom(el) {
   const joursNoms = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 
   el.innerHTML = `
-
-    <!-- En-tête -->
     <div class="card mb-md"
          style="background:linear-gradient(135deg,
                 rgba(75,75,249,0.2) 0%,
@@ -2429,38 +3154,30 @@ function renderProgrammeCustom(el) {
       </div>
     </div>
 
-    <!-- Planning 7 jours -->
     <div class="card mb-md">
-      <div class="card-label mb-md">
-        📅 Modifier le planning
-      </div>
-      ${planning.map((p, idx) => {
-        const seance = p.seanceId
-          ? toutes.find(s => s.id === p.seanceId)
-          : null;
-        return `
-          <div class="flex items-center gap-md"
-               style="padding:var(--space-sm) 0;
-                      border-bottom:1px solid var(--border-color)">
-            <div style="width:36px;font-size:.78rem;font-weight:700;
-                        color:var(--fd-indigo)">
-              ${joursNoms[idx].slice(0,3).toUpperCase()}
-            </div>
-            <div style="flex:1">
-              <select class="input"
-                      id="planning-jour-${idx}"
-                      style="font-size:.8rem;padding:6px 8px">
-                <option value="">😴 Repos</option>
-                ${toutes.map(s => `
-                  <option value="${s.id}"
-                    ${p.seanceId === s.id ? 'selected' : ''}>
-                    ${s.emoji} ${s.nom}
-                    ${s.custom ? ' ✏️' : ''}
-                  </option>`).join('')}
-              </select>
-            </div>
-          </div>`;
-      }).join('')}
+      <div class="card-label mb-md">📅 Modifier le planning</div>
+      ${planning.map((p, idx) => `
+        <div class="flex items-center gap-md"
+             style="padding:var(--space-sm) 0;
+                    border-bottom:1px solid var(--border-color)">
+          <div style="width:36px;font-size:.78rem;font-weight:700;
+                      color:var(--fd-indigo)">
+            ${joursNoms[idx].slice(0,3).toUpperCase()}
+          </div>
+          <div style="flex:1">
+            <select class="input"
+                    id="planning-jour-${idx}"
+                    style="font-size:.8rem;padding:6px 8px">
+              <option value="">😴 Repos</option>
+              ${toutes.map(s => `
+                <option value="${s.id}"
+                  ${p.seanceId===s.id?'selected':''}>
+                  ${s.emoji} ${s.nom}
+                  ${s.custom?' ✏️':''}
+                </option>`).join('')}
+            </select>
+          </div>
+        </div>`).join('')}
 
       <button class="btn-primary mt-md w-full"
               onclick="sauvegarderPlanningCustom()">
@@ -2468,7 +3185,6 @@ function renderProgrammeCustom(el) {
       </button>
     </div>
 
-    <!-- Séances custom -->
     <div class="card mb-md">
       <div class="flex justify-between items-center mb-md">
         <div class="card-label">💪 Mes séances</div>
@@ -2478,7 +3194,6 @@ function renderProgrammeCustom(el) {
         </button>
       </div>
 
-      <!-- Séances de base (duplication) -->
       <div style="font-size:.72rem;font-weight:700;
                   text-transform:uppercase;letter-spacing:.06em;
                   color:var(--text-muted);margin-bottom:var(--space-sm)">
@@ -2493,8 +3208,7 @@ function renderProgrammeCustom(el) {
               ${s.emoji} ${s.nom}
             </div>
             <div style="font-size:.72rem;color:var(--text-muted)">
-              ${s.exercices.length} exercices
-              · ${s.duree_estimee}min
+              ${s.exercices.length} exercices · ${s.duree_estimee}min
             </div>
           </div>
           <button class="btn-secondary btn-sm"
@@ -2503,7 +3217,6 @@ function renderProgrammeCustom(el) {
           </button>
         </div>`).join('')}
 
-      <!-- Séances custom -->
       ${Object.keys(customs).length > 0 ? `
         <div style="font-size:.72rem;font-weight:700;
                     text-transform:uppercase;letter-spacing:.06em;
@@ -2521,8 +3234,7 @@ function renderProgrammeCustom(el) {
                 ${s.emoji} ${s.nom}
               </div>
               <div style="font-size:.72rem;color:var(--text-muted)">
-                ${s.exercices.length} exercices
-                · ${s.duree_estimee}min
+                ${s.exercices.length} exercices · ${s.duree_estimee}min
               </div>
             </div>
             <div style="display:flex;gap:4px">
@@ -2542,21 +3254,16 @@ function renderProgrammeCustom(el) {
   `;
 }
 
-// ─── Sauvegarder planning ──────────────────────────────────────
 function sauvegarderPlanningCustom() {
-  const joursNoms = [
-    'LUN','MAR','MER','JEU','VEN','SAM','DIM'
-  ];
+  const joursNoms = ['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
   const nouveau = joursNoms.map((label, idx) => ({
     jour:     idx,
     label,
     seanceId: document.getElementById(`planning-jour-${idx}`)?.value || null
   }));
-
   Programme.sauvegarderPlanning(nouveau);
   Utils.toast('✅ Planning sauvegardé !', 'success');
   Utils.vibrerBeep();
-
   const el = document.getElementById('profil-content');
   if (el) renderProgrammeCustom(el);
 }
@@ -2574,8 +3281,7 @@ async function resetPlanningCustom() {
 }
 
 async function dupliquerSeance(id) {
-  const nouvelId = Programme.dupliquerSeanceBase(id);
-  if (!nouvelId) return;
+  Programme.dupliquerSeanceBase(id);
   Utils.toast('Séance dupliquée ! Tu peux la modifier.', 'success');
   const el = document.getElementById('profil-content');
   if (el) renderProgrammeCustom(el);
@@ -2593,20 +3299,17 @@ async function supprimerSeanceCustom(id) {
   if (el) renderProgrammeCustom(el);
 }
 
-// ─── Formulaire séance ────────────────────────────────────────
 function ouvrirFormSeance(id = null) {
   const customs  = Programme.getSeancesCustom();
   const existant = id ? customs[id] : null;
   const modal    = document.getElementById('modal-info');
   const content  = document.getElementById('modal-info-content');
-
   const toutesExos = Object.entries(EXERCICES);
 
   content.innerHTML = `
     <h3 style="margin-bottom:var(--space-md)">
       ${existant ? '✏️ Modifier' : '➕ Créer'} une séance
     </h3>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;
                 gap:var(--space-sm);margin-bottom:var(--space-sm)">
       <div>
@@ -2622,37 +3325,27 @@ function ouvrirFormSeance(id = null) {
                value="${existant?.emoji || '💪'}" />
       </div>
     </div>
-
     <div class="input-label">Durée estimée (min)</div>
     <input class="input mb-md" id="s-duree"
            type="number" placeholder="60"
            value="${existant?.duree_estimee || 60}" />
-
-    <!-- Exercices de la séance -->
-    <div class="card-label mb-sm">
-      🏋️ Exercices de la séance
-    </div>
+    <div class="card-label mb-sm">🏋️ Exercices</div>
     <div id="seance-exercices-list">
       ${(existant?.exercices || []).map((ex, i) =>
         _renderLigneExerciceForm(ex, i, toutesExos)
       ).join('')}
     </div>
-
     <button class="btn-secondary mt-sm mb-md w-full"
             onclick="ajouterLigneExercice()">
       ➕ Ajouter un exercice
     </button>
-
     <button class="btn-primary w-full"
             onclick="sauvegarderFormSeance('${id || ''}')">
       💾 ${existant ? 'Modifier' : 'Créer'}
     </button>
   `;
 
-  // Init compteur lignes
-  window._seanceLigneCount =
-    existant?.exercices?.length || 0;
-
+  window._seanceLigneCount = existant?.exercices?.length || 0;
   modal.classList.remove('hidden');
   document.getElementById('modal-info-close').onclick =
     () => modal.classList.add('hidden');
@@ -2671,21 +3364,21 @@ function _renderLigneExerciceForm(ex = null, idx, toutesExos) {
               style="font-size:.75rem;padding:6px 4px">
         ${toutesExos.map(([ref, e]) => `
           <option value="${ref}"
-            ${ex?.ref === ref ? 'selected' : ''}>
+            ${ex?.ref===ref?'selected':''}>
             ${e.emoji} ${e.nom}
           </option>`).join('')}
       </select>
       <input class="input" id="exo-series-${idx}"
              type="number" placeholder="Sér."
-             value="${ex?.series || 3}"
+             value="${ex?.series||3}"
              style="font-size:.75rem;padding:6px 4px;text-align:center"/>
       <input class="input" id="exo-reps-${idx}"
              type="text" placeholder="Reps"
-             value="${ex?.reps || '10'}"
-             style="font-size:.75px;padding:6px 4px;text-align:center"/>
+             value="${ex?.reps||'10'}"
+             style="font-size:.75rem;padding:6px 4px;text-align:center"/>
       <input class="input" id="exo-repos-${idx}"
              type="number" placeholder="Repos"
-             value="${ex?.repos || 90}"
+             value="${ex?.repos||90}"
              style="font-size:.75rem;padding:6px 4px;text-align:center"/>
       <button onclick="supprimerLigneExercice(${idx})"
               style="background:none;border:none;
@@ -2700,10 +3393,8 @@ function ajouterLigneExercice() {
   const toutesExos = Object.entries(EXERCICES);
   const idx = window._seanceLigneCount || 0;
   window._seanceLigneCount = idx + 1;
-
   const liste = document.getElementById('seance-exercices-list');
   if (!liste) return;
-
   const div = document.createElement('div');
   div.innerHTML = _renderLigneExerciceForm(null, idx, toutesExos);
   liste.appendChild(div.firstElementChild);
@@ -2723,10 +3414,9 @@ function sauvegarderFormSeance(idExistant = '') {
     return;
   }
 
-  // Collecter les exercices
   const exercices = [];
   const lignes = document.querySelectorAll('.seance-exo-ligne');
-  lignes.forEach((ligne, i) => {
+  lignes.forEach(ligne => {
     const id = ligne.id.replace('exo-ligne-', '');
     const ref    = document.getElementById(`exo-ref-${id}`)?.value;
     const series = parseInt(document.getElementById(`exo-series-${id}`)?.value) || 3;
@@ -2760,9 +3450,31 @@ function sauvegarderFormSeance(idExistant = '') {
 // ════════════════════════════════════════════════════════════
 function renderOutils(el) {
   const config = Notifications.getConfig();
+  const langue = i18n.getLangue();
 
   el.innerHTML = `
 
+    <!-- Langue -->
+    <div class="card mb-md">
+      <div class="card-label">🌍 ${t('commun.ok') === 'OK' ? 'Language' : 'Langue'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;
+                  gap:var(--space-md);margin-top:var(--space-md)">
+        <button onclick="i18n.setLangue('fr')"
+                class="langue-btn ${langue==='fr'?'active':''}">
+          <span class="langue-flag">🇫🇷</span>
+          <span class="langue-nom">Français</span>
+          ${langue==='fr'?'<span class="langue-actif">✅ Actif</span>':''}
+        </button>
+        <button onclick="i18n.setLangue('en')"
+                class="langue-btn ${langue==='en'?'active':''}">
+          <span class="langue-flag">🇬🇧</span>
+          <span class="langue-nom">English</span>
+          ${langue==='en'?'<span class="langue-actif">✅ Active</span>':''}
+        </button>
+      </div>
+    </div>
+
+    <!-- Données -->
     <div class="card mb-md">
       <div class="card-label">💾 Données</div>
       <input type="file" id="file-import" accept=".json"
@@ -2791,19 +3503,19 @@ function renderOutils(el) {
                 style="grid-column:span 2">
           📄 Rapport PDF
         </button>
+        <button class="btn-secondary"
+                onclick="naviguer('share')"
+                style="grid-column:span 2">
+          📸 Partager mes stats
+        </button>
       </div>
-
       <div style="margin-top:var(--space-md);padding:var(--space-sm);
                   background:var(--bg-input);
                   border-radius:var(--radius-sm)">
         <div style="font-size:.78rem;color:var(--text-secondary);
                     display:flex;justify-content:space-between;
                     align-items:center">
-          <span>🎞️ GIFs en cache:
-            <strong>
-              ${ExerciseGIF.statsCache().cached}/${ExerciseGIF.statsCache().total}
-            </strong>
-          </span>
+          <span>🎞️ GIFs: ${ExerciseGIF.statsCache().cached}/${ExerciseGIF.statsCache().total}</span>
           <button onclick="rechargerGIFs()"
                   style="background:none;border:none;
                          color:var(--fd-indigo);font-size:.78rem;
@@ -2811,8 +3523,7 @@ function renderOutils(el) {
             🔄 Recharger
           </button>
         </div>
-        <div class="progress-bar"
-             style="margin-top:var(--space-xs)">
+        <div class="progress-bar" style="margin-top:var(--space-xs)">
           <div class="progress-fill"
                style="width:${ExerciseGIF.statsCache().pct}%"></div>
         </div>
@@ -2840,13 +3551,12 @@ function renderOutils(el) {
             <span class="toggle-label">${n.label}</span>
             <label class="toggle">
               <input type="checkbox"
-                     ${config[n.id] ? 'checked' : ''}
+                     ${config[n.id]?'checked':''}
                      onchange="Notifications.sauvegarderConfig(
                        {'${n.id}':this.checked})">
               <span class="toggle-slider"></span>
             </label>
           </div>`).join('')}
-
         <div style="margin-top:var(--space-md)">
           <div class="input-label">Heure rappel</div>
           <input class="input" type="time"
@@ -2883,42 +3593,38 @@ function renderOutils(el) {
     <!-- Paramètres -->
     <div class="card mb-md">
       <div class="card-label">⚙️ Paramètres</div>
-
       <div style="margin-bottom:var(--space-md)">
         <div class="input-label">Thème</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);
                     gap:var(--space-xs);margin-top:var(--space-xs)">
           ${[
-  { val:'dark',     label:'🌙 Dark',    emoji:'🌙' },
-  { val:'light',    label:'☀️ Light',   emoji:'☀️' },
-  { val:'indigo',   label:'💜 Indigo',  emoji:'💜' },
-  { val:'midnight', label:'⭐ Midnight',emoji:'⭐' }
-].map(t => {
-  const actuel = document.documentElement
-    .getAttribute('data-theme') || 'dark';
-  const isActif = actuel === t.val;
-  return `
-    <button class="theme-btn"
-            data-theme="${t.val}"
-            onclick="appliquerTheme('${t.val}')"
-            style="padding:var(--space-sm) 4px;
-                   border-radius:var(--radius-sm);
-                   border:2px solid ${
-                     isActif
-                       ? 'var(--fd-indigo)'
-                       : 'var(--border-color)'};
-                   background:${
-                     isActif
-                       ? 'var(--fd-indigo-dim)'
-                       : 'var(--bg-card)'};
-                   font-size:.7rem;font-weight:600;
-                   cursor:pointer;transition:all .2s">
-      ${t.label}
-    </button>`;
-}).join('')}
+            { val:'dark',     label:'🌙 Dark'    },
+            { val:'light',    label:'☀️ Light'   },
+            { val:'indigo',   label:'💜 Indigo'  },
+            { val:'midnight', label:'⭐ Midnight' }
+          ].map(t => {
+            const actuel = document.documentElement
+              .getAttribute('data-theme') || 'dark';
+            const isActif = actuel === t.val;
+            return `
+              <button class="theme-btn"
+                      data-theme="${t.val}"
+                      onclick="appliquerTheme('${t.val}')"
+                      style="padding:var(--space-sm) 4px;
+                             border-radius:var(--radius-sm);
+                             border:2px solid ${isActif
+                               ? 'var(--fd-indigo)'
+                               : 'var(--border-color)'};
+                             background:${isActif
+                               ? 'var(--fd-indigo-dim)'
+                               : 'var(--bg-card)'};
+                             font-size:.7rem;font-weight:600;
+                             cursor:pointer;transition:all .2s">
+                ${t.label}
+              </button>`;
+          }).join('')}
         </div>
       </div>
-
       <div style="margin-bottom:var(--space-md)">
         <div class="input-label">Objectif séances/semaine</div>
         <select class="input"
@@ -2926,26 +3632,22 @@ function renderOutils(el) {
                   'ft_objectif_seances_semaine',parseInt(this.value))">
           ${[3,4,5].map(n => `
             <option value="${n}"
-              ${Utils.storage.get(
-                'ft_objectif_seances_semaine',4) === n
-                ? 'selected' : ''}>
+              ${Utils.storage.get('ft_objectif_seances_semaine',4)===n
+                ?'selected':''}>
               ${n} séances
             </option>`).join('')}
         </select>
       </div>
-
       <div>
         <div class="input-label">Unités de poids</div>
         <select class="input"
                 onchange="Utils.storage.set('ft_unite_poids',this.value)">
           <option value="kg"
-            ${Utils.storage.get('ft_unite_poids','kg') === 'kg'
-              ? 'selected' : ''}>
+            ${Utils.storage.get('ft_unite_poids','kg')==='kg'?'selected':''}>
             ⚖️ Kilogrammes (kg)
           </option>
           <option value="lbs"
-            ${Utils.storage.get('ft_unite_poids','kg') === 'lbs'
-              ? 'selected' : ''}>
+            ${Utils.storage.get('ft_unite_poids','kg')==='lbs'?'selected':''}>
             🇺🇸 Livres (lbs)
           </option>
         </select>
@@ -2983,8 +3685,8 @@ function importerFichier() {
 }
 
 async function handleImport(input) {
-  if (!input.files[0]) return;
-  await Utils.importerJSON(input.files[0]);
+  if (!input.files) return;
+  await Utils.importerJSON(input.files);
   window.location.reload();
 }
 
@@ -3038,3 +3740,5 @@ async function genererQRSync() {
     document.getElementById('qr-canvas')
   );
 }
+
+console.log('✅ App.js v2.0 chargé — FitTracker Pro complet !');
