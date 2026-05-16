@@ -1,6 +1,8 @@
 /* ============================================================
-   FitTracker Pro — App.js v1.2
-   Router SPA + Init + Pages complètes + Feature 6
+   FitTracker Pro — App.js v1.3
+   Router SPA + Init + Pages complètes
+   + Feature 6 : Personnalisation
+   + Feature 7 : Programme personnalisé
    ============================================================ */
 
 // ─── ÉTAT GLOBAL ──────────────────────────────────────────────
@@ -197,7 +199,6 @@ function lancerApp() {
   const action = params.get('action');
 
   naviguer(action === 'start-session' ? 'training' : page);
-
   setTimeout(() => Gamification.verifierTrophees(), 2000);
 }
 
@@ -255,9 +256,9 @@ function initTheme() {
 }
 
 function toggleTheme() {
-  const themes  = ['dark', 'light', 'indigo', 'midnight'];
-  const actuel  = document.documentElement.getAttribute('data-theme');
-  const idx     = themes.indexOf(actuel);
+  const themes = ['dark', 'light', 'indigo', 'midnight'];
+  const actuel = document.documentElement.getAttribute('data-theme');
+  const idx    = themes.indexOf(actuel);
   const nouveau = themes[(idx + 1) % themes.length];
   appliquerTheme(nouveau);
   Utils.storage.set('ft_theme', nouveau);
@@ -506,10 +507,10 @@ function renderAccueil() {
       <div class="card-label">🌡️ Niveau de fatigue</div>
       <div class="flex gap-sm mt-md">
         ${[
-          { val:0, label:'Frais',  color:'var(--fd-mint)'          },
-          { val:1, label:'OK',     color:'var(--fd-lemon)'         },
-          { val:2, label:'Modéré', color:'var(--fd-coral)'         },
-          { val:3, label:'Épuisé', color:'rgba(255,141,150,.6)'    }
+          { val:0, label:'Frais',  color:'var(--fd-mint)'       },
+          { val:1, label:'OK',     color:'var(--fd-lemon)'      },
+          { val:2, label:'Modéré', color:'var(--fd-coral)'      },
+          { val:3, label:'Épuisé', color:'rgba(255,141,150,.6)' }
         ].map(f => `
           <button onclick="selectionnerFatigue(${f.val})"
                   style="flex:1;padding:var(--space-sm) 4px;
@@ -607,26 +608,34 @@ function renderPlanning(el, offset = 0) {
   const semaines = Programme.getSeancesSemaine(offset);
   const infos    = Programme.getInfosProgramme();
   const semNum   = infos.semaine + offset;
+  const isCustom = Programme.estPlanningCustom();
 
   el.innerHTML = `
     <div class="flex items-center justify-between mb-md">
       <button class="btn-icon"
-              onclick="renderTraining('planning',${offset-1})">
-        ◄
-      </button>
+              onclick="renderTraining('planning',${offset-1})">◄</button>
       <div style="text-align:center">
         <div style="font-weight:700;font-size:1rem">
           SEMAINE ${semNum}
         </div>
         <div style="font-size:.72rem;color:var(--text-muted)">
           ${infos.phase.emoji} ${infos.phase.nom}
+          ${isCustom
+            ? '<span style="color:var(--fd-lemon)"> · ✏️ Custom</span>'
+            : ''}
         </div>
       </div>
       <button class="btn-icon"
-              onclick="renderTraining('planning',${offset+1})">
-        ►
-      </button>
+              onclick="renderTraining('planning',${offset+1})">►</button>
     </div>
+
+    <!-- Bouton éditer planning -->
+    <button class="btn-secondary mb-md"
+            style="width:100%;font-size:.82rem"
+            onclick="renderProfil('programme')">
+      ⚙️ Personnaliser le programme
+    </button>
+
     <div class="card">
       ${semaines.map(jour => `
         <div class="seance-card">
@@ -639,6 +648,9 @@ function renderPlanning(el, offset = 0) {
             ${jour.seance ? `
               <div class="seance-name">
                 ${jour.seance.emoji} ${jour.seance.nom}
+                ${jour.seance.custom
+                  ? '<span style="font-size:.6rem;color:var(--fd-lemon)"> ✏️</span>'
+                  : ''}
               </div>
               <div class="seance-meta">
                 ${jour.seance.exercices.length} exercices
@@ -799,27 +811,21 @@ function afficherDetailExercice(ref) {
         <div class="flex justify-between mt-md">
           <div class="text-center">
             <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-lemon)">
-              ${pr.rm1}kg
-            </div>
+                        color:var(--fd-lemon)">${pr.rm1}kg</div>
             <div style="font-size:.7rem;color:var(--text-muted)">
               1RM estimé
             </div>
           </div>
           <div class="text-center">
             <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-indigo)">
-              ${pr.poids}kg
-            </div>
+                        color:var(--fd-indigo)">${pr.poids}kg</div>
             <div style="font-size:.7rem;color:var(--text-muted)">
               Meilleur poids
             </div>
           </div>
           <div class="text-center">
             <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-mint)">
-              ${pr.reps}
-            </div>
+                        color:var(--fd-mint)">${pr.reps}</div>
             <div style="font-size:.7rem;color:var(--text-muted)">
               Meilleur reps
             </div>
@@ -994,15 +1000,15 @@ function renderPhases(el) {
           <div class="progress-fill"
                style="width:${infos.progression}%"></div>
         </div>
-        <div style="font-size:.72rem;color:var(--text-muted);
-                    margin-top:4px">
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
           ${infos.progression}% du cycle complété
         </div>
       </div>
     </div>
     ${phases.map(p => `
-      <div class="card mb-md" style="${p.num === infos.phase.numero
-        ? `border-color:${p.color};background:${p.color}15` : ''}">
+      <div class="card mb-md"
+           style="${p.num === infos.phase.numero
+             ? `border-color:${p.color};background:${p.color}15` : ''}">
         <div class="flex items-center gap-md">
           <div style="width:44px;height:44px;border-radius:50%;
                       background:${p.color}22;
@@ -1081,9 +1087,7 @@ function renderRecup(el) {
                     border-bottom:1px solid var(--border-color)">
           <span style="font-size:1.3rem">${c.emoji}</span>
           <div>
-            <div style="font-weight:600;font-size:.88rem">
-              ${c.titre}
-            </div>
+            <div style="font-weight:600;font-size:.88rem">${c.titre}</div>
             <div style="font-size:.78rem;color:var(--text-muted);
                         margin-top:2px">${c.desc}</div>
           </div>
@@ -1240,7 +1244,12 @@ function renderSelecteurSeance(container) {
           ${s.emoji}
         </span>
         <div class="seance-info">
-          <div class="seance-name">${s.nom}</div>
+          <div class="seance-name">
+            ${s.nom}
+            ${s.custom
+              ? '<span style="font-size:.6rem;color:var(--fd-lemon)"> ✏️</span>'
+              : ''}
+          </div>
           <div class="seance-meta">
             ${s.exercices.length} exercices
             · ~${s.duree_estimee}min
@@ -1278,7 +1287,6 @@ function renderExerciceActuel(container) {
   const gifUID   = `live_gif_${item?.ref}_${Date.now()}`;
 
   container.innerHTML = `
-    <!-- Header -->
     <div class="flex items-center justify-between mb-md">
       <button class="btn-secondary btn-sm"
               onclick="confirmerAbandon()">✕ Arrêter</button>
@@ -1295,9 +1303,7 @@ function renderExerciceActuel(container) {
       </button>
     </div>
 
-    <!-- Exercice card -->
     <div class="exercice-card mb-md">
-
       <div id="${gifUID}"
            style="width:100%;height:220px;display:flex;
                   align-items:center;justify-content:center;
@@ -1320,8 +1326,7 @@ function renderExerciceActuel(container) {
           · Repos ${item?.repos}s
         </div>
         ${derniere ? `
-          <div style="font-size:.72rem;color:var(--fd-lemon);
-                      margin-top:4px">
+          <div style="font-size:.72rem;color:var(--fd-lemon);margin-top:4px">
             📊 Dernière fois: ${derniere.poids}kg × ${derniere.reps} reps
           </div>` : ''}
       </div>
@@ -1380,14 +1385,11 @@ function renderExerciceActuel(container) {
       </div>
     </div>
 
-    <!-- Zone repos -->
     <div id="zone-repos" class="hidden">
-      <div class="card" style="text-align:center;
-                                padding:var(--space-xl)">
+      <div class="card" style="text-align:center;padding:var(--space-xl)">
         <div class="timer-title">💤 Repos</div>
         <div class="countdown-ring"
-             style="width:160px;height:160px;
-                    margin:var(--space-md) auto">
+             style="width:160px;height:160px;margin:var(--space-md) auto">
           <svg width="160" height="160" viewBox="0 0 160 160">
             <circle class="ring-bg" cx="80" cy="80" r="70"
                     stroke-dasharray="${2*Math.PI*70}"/>
@@ -1461,9 +1463,7 @@ function validerSerie() {
   if (AppState.serieActuelle < item.series) {
     AppState.serieActuelle++;
     lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(
-        document.getElementById('page-content')
-      );
+      renderExerciceActuel(document.getElementById('page-content'));
     });
   } else if (
     AppState.exerciceIndex + 1 < seance.exercicesDetails.length
@@ -1471,9 +1471,7 @@ function validerSerie() {
     AppState.exerciceIndex++;
     AppState.serieActuelle = 1;
     lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(
-        document.getElementById('page-content')
-      );
+      renderExerciceActuel(document.getElementById('page-content'));
     });
   } else {
     terminerSeance();
@@ -1639,7 +1637,7 @@ function renderProfil(tab = 'moi') {
   const container = document.getElementById('page-content');
   const tabs = [
     'moi','journal','objectifs','blessure',
-    'coach','custom','outils'
+    'coach','custom','programme','outils'
   ];
 
   container.innerHTML = `
@@ -1648,13 +1646,14 @@ function renderProfil(tab = 'moi') {
         <button class="tab-btn ${tab===t?'active':''}"
                 onclick="renderProfil('${t}')">
           ${{
-            moi:       '👤 Moi',
-            journal:   '📔 Journal',
-            objectifs: '🎯 Objectifs',
-            blessure:  '🩹 Blessure',
-            coach:     '🤖 Coach',
-            custom:    '🏋️ Mes Exos',
-            outils:    '🔧 Outils'
+            moi:        '👤 Moi',
+            journal:    '📔 Journal',
+            objectifs:  '🎯 Objectifs',
+            blessure:   '🩹 Blessure',
+            coach:      '🤖 Coach',
+            custom:     '🏋️ Mes Exos',
+            programme:  '🗓️ Programme',
+            outils:     '🔧 Outils'
           }[t]}
         </button>`).join('')}
     </div>
@@ -1662,27 +1661,29 @@ function renderProfil(tab = 'moi') {
 
   const content = document.getElementById('profil-content');
   switch(tab) {
-    case 'moi':       renderProfilMoi(content);           break;
-    case 'journal':   renderJournal(content);             break;
-    case 'objectifs': renderObjectifs(content);           break;
-    case 'blessure':  renderBlessure(content);            break;
-    case 'coach':     Coach.renderCoachTab(content);      break;
-    case 'custom':    renderExercicesCustom(content);     break;
-    case 'outils':    renderOutils(content);              break;
+    case 'moi':        renderProfilMoi(content);            break;
+    case 'journal':    renderJournal(content);              break;
+    case 'objectifs':  renderObjectifs(content);            break;
+    case 'blessure':   renderBlessure(content);             break;
+    case 'coach':      Coach.renderCoachTab(content);       break;
+    case 'custom':     renderExercicesCustom(content);      break;
+    case 'programme':  renderProgrammeCustom(content);      break;
+    case 'outils':     renderOutils(content);               break;
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// PROFIL — MOI
+// ════════════════════════════════════════════════════════════
 function renderProfilMoi(el) {
   const profil  = Tracker.getProfil();
   const mesures = Tracker.getDerniereMesure() || {};
   const xp      = Gamification.getXP();
   const streak  = Tracker.getStreak();
-
   const avatars = ['💪','🏋️','🔥','⚡','🦁','🐺','🦅','👑','🚀','💎'];
 
   el.innerHTML = `
     <div class="profil-card mb-md">
-      <!-- Sélecteur avatar -->
       <div style="margin-bottom:var(--space-md)">
         <div style="font-size:3rem;text-align:center;
                     margin-bottom:var(--space-sm)">
@@ -1707,7 +1708,6 @@ function renderProfilMoi(el) {
             </button>`).join('')}
         </div>
       </div>
-
       <div class="profil-name">${profil.nom||'Athlète'}</div>
       <div class="profil-level">
         ${xp.niveau.emoji} Niveau ${xp.niveau.numero}
@@ -1770,8 +1770,7 @@ function renderProfilMoi(el) {
           <div>
             <div class="input-label">${m.label}</div>
             <input class="input" id="${m.id}" type="number"
-                   placeholder="${m.label}"
-                   value="${m.val}" />
+                   placeholder="${m.label}" value="${m.val}" />
           </div>`).join('')}
       </div>
       <button class="btn-primary mt-md"
@@ -1821,6 +1820,9 @@ function sauvegarderProfil() {
   Utils.toast('Profil mis à jour !', 'success');
 }
 
+// ════════════════════════════════════════════════════════════
+// JOURNAL
+// ════════════════════════════════════════════════════════════
 function renderJournal(el) {
   const journal = Tracker.getJournal();
   el.innerHTML = `
@@ -1864,9 +1866,7 @@ function ajouterEntreeJournal() {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">
-      📔 Nouvelle note
-    </h3>
+    <h3 style="margin-bottom:var(--space-md)">📔 Nouvelle note</h3>
     <textarea class="input" id="new-journal" rows="5"
               placeholder="Tes pensées, sensations, objectifs..."
               style="resize:vertical;min-height:140px"></textarea>
@@ -1901,6 +1901,9 @@ async function supprimerJournal(id) {
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// OBJECTIFS
+// ════════════════════════════════════════════════════════════
 function renderObjectifs(el) {
   const objectifs = Tracker.getObjectifs();
   el.innerHTML = `
@@ -1935,7 +1938,9 @@ function renderObjectifs(el) {
             <div class="objectif-progress">
               <span>
                 Actuel:
-                <strong>${o.valeurActuelle||'?'} ${o.unite||''}</strong>
+                <strong>
+                  ${o.valeurActuelle||'?'} ${o.unite||''}
+                </strong>
               </span>
               <span>→ ${o.valeurCible} ${o.unite||''}</span>
               ${o.echeance
@@ -1955,9 +1960,7 @@ function ajouterObjectif() {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">
-      🎯 Nouvel objectif
-    </h3>
+    <h3 style="margin-bottom:var(--space-md)">🎯 Nouvel objectif</h3>
     <div class="input-label">Objectif</div>
     <input class="input mb-md" id="obj-nom"
            placeholder="ex: Bench Press 100kg"/>
@@ -2035,6 +2038,9 @@ function mettreAJourObjectif(id) {
   renderProfil('objectifs');
 }
 
+// ════════════════════════════════════════════════════════════
+// BLESSURE
+// ════════════════════════════════════════════════════════════
 function renderBlessure(el) {
   const blessures = Tracker.getBlessures().filter(b => b.active);
   const zones = [
@@ -2126,7 +2132,7 @@ async function guerirBlessure(id) {
 }
 
 // ════════════════════════════════════════════════════════════
-// EXERCICES PERSONNALISÉS (Feature 6)
+// EXERCICES CUSTOM (Feature 6)
 // ════════════════════════════════════════════════════════════
 function getExercicesCustom() {
   return Utils.storage.get('ft_exercices_custom', []);
@@ -2177,12 +2183,10 @@ function renderExercicesCustom(el) {
           Crée tes propres mouvements !
         </p>
       </div>` :
-
       custom.map(ex => `
         <div class="card mb-md">
           <div class="flex items-center gap-md">
-            <div style="font-size:2rem;width:48px;
-                        text-align:center">
+            <div style="font-size:2rem;width:48px;text-align:center">
               ${ex.emoji || '💪'}
             </div>
             <div style="flex:1">
@@ -2236,10 +2240,8 @@ function ouvrirFormExercice(ref = null) {
     <h3 style="margin-bottom:var(--space-md)">
       ${existant ? '✏️ Modifier' : '➕ Créer'} un exercice
     </h3>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;
-                gap:var(--space-sm);
-                margin-bottom:var(--space-sm)">
+                gap:var(--space-sm);margin-bottom:var(--space-sm)">
       <div>
         <div class="input-label">Nom *</div>
         <input class="input" id="ex-nom"
@@ -2253,18 +2255,15 @@ function ouvrirFormExercice(ref = null) {
                value="${existant?.emoji || '💪'}" />
       </div>
     </div>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;
-                gap:var(--space-sm);
-                margin-bottom:var(--space-sm)">
+                gap:var(--space-sm);margin-bottom:var(--space-sm)">
       <div>
-        <div class="input-label">Muscle principal *</div>
+        <div class="input-label">Muscle *</div>
         <select class="input" id="ex-muscle">
           ${muscles.map(m => `
             <option value="${m}"
-              ${existant?.muscle === m ? 'selected' : ''}>
-              ${m}
-            </option>`).join('')}
+              ${existant?.muscle === m ? 'selected' : ''}>${m}</option>
+          `).join('')}
         </select>
       </div>
       <div>
@@ -2272,28 +2271,23 @@ function ouvrirFormExercice(ref = null) {
         <select class="input" id="ex-diff">
           ${[1,2,3,4].map(d => `
             <option value="${d}"
-              ${(existant?.difficulte||2) === d ? 'selected' : ''}>
+              ${(existant?.difficulte||2)===d?'selected':''}>
               ${'⭐'.repeat(d)} (${d}/4)
             </option>`).join('')}
         </select>
       </div>
     </div>
-
     <div class="input-label">Équipement</div>
     <input class="input mb-md" id="ex-equip"
            placeholder="ex: Barre + rack"
            value="${existant?.equipement || ''}" />
-
     <div class="input-label">Description</div>
     <textarea class="input mb-md" id="ex-desc" rows="3"
               placeholder="Décris l'exercice..."
               style="resize:none">${existant?.description || ''}</textarea>
-
     <div class="input-label">Conseils (un par ligne)</div>
     <textarea class="input mb-md" id="ex-conseils" rows="3"
-              placeholder="Garde le dos droit&#10;Descends lentement"
               style="resize:none">${(existant?.conseils||[]).join('\n')}</textarea>
-
     <button class="btn-primary w-full"
             onclick="sauvegarderFormExercice('${ref || ''}')">
       💾 ${existant ? 'Modifier' : 'Créer'}
@@ -2329,25 +2323,17 @@ function sauvegarderFormExercice(refExistant = '') {
     if (idx >= 0) {
       custom[idx] = {
         ...custom[idx], nom, emoji, muscle,
-        difficulte:  diff,
-        equipement:  equip,
-        description: desc,
-        conseils
+        difficulte: diff, equipement: equip,
+        description: desc, conseils
       };
     }
   } else {
     const ref = 'custom_' +
-      nom.toLowerCase()
-         .replace(/\s+/g, '_')
-         .replace(/[^a-z0-9_]/g, '')
+      nom.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')
       + '_' + Date.now();
-
     custom.push({
-      ref, nom, emoji, muscle,
-      difficulte:   diff,
-      equipement:   equip,
-      description:  desc,
-      conseils,
+      ref, nom, emoji, muscle, difficulte: diff,
+      equipement: equip, description: desc, conseils,
       dateCreation: Utils.aujourd_hui()
     });
   }
@@ -2377,6 +2363,367 @@ async function supprimerExerciceCustom(ref) {
 }
 
 // ════════════════════════════════════════════════════════════
+// PROGRAMME CUSTOM (Feature 7)
+// ════════════════════════════════════════════════════════════
+function renderProgrammeCustom(el) {
+  const planning  = Programme.getPlanningActuel();
+  const toutes    = Programme.getAllSeances();
+  const isCustom  = Programme.estPlanningCustom();
+  const customs   = Programme.getSeancesCustom();
+  const joursNoms = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+  el.innerHTML = `
+
+    <!-- En-tête -->
+    <div class="card mb-md"
+         style="background:linear-gradient(135deg,
+                rgba(75,75,249,0.2) 0%,
+                rgba(191,161,255,0.1) 100%)">
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="card-label">🗓️ Planning hebdomadaire</div>
+          <div style="font-size:.75rem;color:var(--text-muted);
+                      margin-top:4px">
+            ${isCustom
+              ? '✏️ Planning personnalisé actif'
+              : '📋 Planning par défaut'}
+          </div>
+        </div>
+        ${isCustom ? `
+          <button class="btn-secondary btn-sm"
+                  onclick="resetPlanningCustom()">
+            ↺ Réinitialiser
+          </button>` : ''}
+      </div>
+    </div>
+
+    <!-- Planning 7 jours -->
+    <div class="card mb-md">
+      <div class="card-label mb-md">
+        📅 Modifier le planning
+      </div>
+      ${planning.map((p, idx) => {
+        const seance = p.seanceId
+          ? toutes.find(s => s.id === p.seanceId)
+          : null;
+        return `
+          <div class="flex items-center gap-md"
+               style="padding:var(--space-sm) 0;
+                      border-bottom:1px solid var(--border-color)">
+            <div style="width:36px;font-size:.78rem;font-weight:700;
+                        color:var(--fd-indigo)">
+              ${joursNoms[idx].slice(0,3).toUpperCase()}
+            </div>
+            <div style="flex:1">
+              <select class="input"
+                      id="planning-jour-${idx}"
+                      style="font-size:.8rem;padding:6px 8px">
+                <option value="">😴 Repos</option>
+                ${toutes.map(s => `
+                  <option value="${s.id}"
+                    ${p.seanceId === s.id ? 'selected' : ''}>
+                    ${s.emoji} ${s.nom}
+                    ${s.custom ? ' ✏️' : ''}
+                  </option>`).join('')}
+              </select>
+            </div>
+          </div>`;
+      }).join('')}
+
+      <button class="btn-primary mt-md w-full"
+              onclick="sauvegarderPlanningCustom()">
+        💾 Sauvegarder le planning
+      </button>
+    </div>
+
+    <!-- Séances custom -->
+    <div class="card mb-md">
+      <div class="flex justify-between items-center mb-md">
+        <div class="card-label">💪 Mes séances</div>
+        <button class="btn-secondary btn-sm"
+                onclick="ouvrirFormSeance()">
+          ➕ Créer
+        </button>
+      </div>
+
+      <!-- Séances de base (duplication) -->
+      <div style="font-size:.72rem;font-weight:700;
+                  text-transform:uppercase;letter-spacing:.06em;
+                  color:var(--text-muted);margin-bottom:var(--space-sm)">
+        Séances de base
+      </div>
+      ${Object.values(SEANCES_BASE).map(s => `
+        <div class="flex items-center justify-between"
+             style="padding:var(--space-sm) 0;
+                    border-bottom:1px solid var(--border-color)">
+          <div>
+            <div style="font-size:.88rem;font-weight:600">
+              ${s.emoji} ${s.nom}
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted)">
+              ${s.exercices.length} exercices
+              · ${s.duree_estimee}min
+            </div>
+          </div>
+          <button class="btn-secondary btn-sm"
+                  onclick="dupliquerSeance('${s.id}')">
+            📋 Dupliquer
+          </button>
+        </div>`).join('')}
+
+      <!-- Séances custom -->
+      ${Object.keys(customs).length > 0 ? `
+        <div style="font-size:.72rem;font-weight:700;
+                    text-transform:uppercase;letter-spacing:.06em;
+                    color:var(--fd-lemon);
+                    margin-top:var(--space-md);
+                    margin-bottom:var(--space-sm)">
+          Mes séances ✏️
+        </div>
+        ${Object.values(customs).map(s => `
+          <div class="flex items-center justify-between"
+               style="padding:var(--space-sm) 0;
+                      border-bottom:1px solid var(--border-color)">
+            <div>
+              <div style="font-size:.88rem;font-weight:600">
+                ${s.emoji} ${s.nom}
+              </div>
+              <div style="font-size:.72rem;color:var(--text-muted)">
+                ${s.exercices.length} exercices
+                · ${s.duree_estimee}min
+              </div>
+            </div>
+            <div style="display:flex;gap:4px">
+              <button class="btn-secondary btn-sm"
+                      onclick="ouvrirFormSeance('${s.id}')">
+                ✏️
+              </button>
+              <button class="btn-secondary btn-sm"
+                      onclick="supprimerSeanceCustom('${s.id}')"
+                      style="color:var(--fd-coral)">
+                🗑️
+              </button>
+            </div>
+          </div>`).join('')}
+      ` : ''}
+    </div>
+  `;
+}
+
+// ─── Sauvegarder planning ──────────────────────────────────────
+function sauvegarderPlanningCustom() {
+  const joursNoms = [
+    'LUN','MAR','MER','JEU','VEN','SAM','DIM'
+  ];
+  const nouveau = joursNoms.map((label, idx) => ({
+    jour:     idx,
+    label,
+    seanceId: document.getElementById(`planning-jour-${idx}`)?.value || null
+  }));
+
+  Programme.sauvegarderPlanning(nouveau);
+  Utils.toast('✅ Planning sauvegardé !', 'success');
+  Utils.vibrerBeep();
+
+  const el = document.getElementById('profil-content');
+  if (el) renderProgrammeCustom(el);
+}
+
+async function resetPlanningCustom() {
+  const ok = await Utils.confirmer(
+    'Réinitialiser le planning ?',
+    'Le planning par défaut sera restauré.'
+  );
+  if (!ok) return;
+  Programme.resetPlanning();
+  Utils.toast('Planning réinitialisé !', 'info');
+  const el = document.getElementById('profil-content');
+  if (el) renderProgrammeCustom(el);
+}
+
+async function dupliquerSeance(id) {
+  const nouvelId = Programme.dupliquerSeanceBase(id);
+  if (!nouvelId) return;
+  Utils.toast('Séance dupliquée ! Tu peux la modifier.', 'success');
+  const el = document.getElementById('profil-content');
+  if (el) renderProgrammeCustom(el);
+}
+
+async function supprimerSeanceCustom(id) {
+  const ok = await Utils.confirmer(
+    'Supprimer cette séance ?',
+    'Elle sera retirée du planning si nécessaire.'
+  );
+  if (!ok) return;
+  Programme.supprimerSeanceCustom(id);
+  Utils.toast('Séance supprimée.', 'info');
+  const el = document.getElementById('profil-content');
+  if (el) renderProgrammeCustom(el);
+}
+
+// ─── Formulaire séance ────────────────────────────────────────
+function ouvrirFormSeance(id = null) {
+  const customs  = Programme.getSeancesCustom();
+  const existant = id ? customs[id] : null;
+  const modal    = document.getElementById('modal-info');
+  const content  = document.getElementById('modal-info-content');
+
+  const toutesExos = Object.entries(EXERCICES);
+
+  content.innerHTML = `
+    <h3 style="margin-bottom:var(--space-md)">
+      ${existant ? '✏️ Modifier' : '➕ Créer'} une séance
+    </h3>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;
+                gap:var(--space-sm);margin-bottom:var(--space-sm)">
+      <div>
+        <div class="input-label">Nom *</div>
+        <input class="input" id="s-nom"
+               placeholder="ex: Push Day"
+               value="${existant?.nom || ''}" />
+      </div>
+      <div>
+        <div class="input-label">Émoji</div>
+        <input class="input" id="s-emoji"
+               placeholder="💪" maxlength="2"
+               value="${existant?.emoji || '💪'}" />
+      </div>
+    </div>
+
+    <div class="input-label">Durée estimée (min)</div>
+    <input class="input mb-md" id="s-duree"
+           type="number" placeholder="60"
+           value="${existant?.duree_estimee || 60}" />
+
+    <!-- Exercices de la séance -->
+    <div class="card-label mb-sm">
+      🏋️ Exercices de la séance
+    </div>
+    <div id="seance-exercices-list">
+      ${(existant?.exercices || []).map((ex, i) =>
+        _renderLigneExerciceForm(ex, i, toutesExos)
+      ).join('')}
+    </div>
+
+    <button class="btn-secondary mt-sm mb-md w-full"
+            onclick="ajouterLigneExercice()">
+      ➕ Ajouter un exercice
+    </button>
+
+    <button class="btn-primary w-full"
+            onclick="sauvegarderFormSeance('${id || ''}')">
+      💾 ${existant ? 'Modifier' : 'Créer'}
+    </button>
+  `;
+
+  // Init compteur lignes
+  window._seanceLigneCount =
+    existant?.exercices?.length || 0;
+
+  modal.classList.remove('hidden');
+  document.getElementById('modal-info-close').onclick =
+    () => modal.classList.add('hidden');
+  modal.querySelector('.modal-overlay').onclick =
+    () => modal.classList.add('hidden');
+}
+
+function _renderLigneExerciceForm(ex = null, idx, toutesExos) {
+  return `
+    <div class="seance-exo-ligne"
+         id="exo-ligne-${idx}"
+         style="display:grid;
+                grid-template-columns:1fr 60px 60px 60px 32px;
+                gap:4px;margin-bottom:4px;align-items:center">
+      <select class="input" id="exo-ref-${idx}"
+              style="font-size:.75rem;padding:6px 4px">
+        ${toutesExos.map(([ref, e]) => `
+          <option value="${ref}"
+            ${ex?.ref === ref ? 'selected' : ''}>
+            ${e.emoji} ${e.nom}
+          </option>`).join('')}
+      </select>
+      <input class="input" id="exo-series-${idx}"
+             type="number" placeholder="Sér."
+             value="${ex?.series || 3}"
+             style="font-size:.75rem;padding:6px 4px;text-align:center"/>
+      <input class="input" id="exo-reps-${idx}"
+             type="text" placeholder="Reps"
+             value="${ex?.reps || '10'}"
+             style="font-size:.75px;padding:6px 4px;text-align:center"/>
+      <input class="input" id="exo-repos-${idx}"
+             type="number" placeholder="Repos"
+             value="${ex?.repos || 90}"
+             style="font-size:.75rem;padding:6px 4px;text-align:center"/>
+      <button onclick="supprimerLigneExercice(${idx})"
+              style="background:none;border:none;
+                     color:var(--fd-coral);font-size:1rem;
+                     cursor:pointer;padding:4px">
+        ✕
+      </button>
+    </div>`;
+}
+
+function ajouterLigneExercice() {
+  const toutesExos = Object.entries(EXERCICES);
+  const idx = window._seanceLigneCount || 0;
+  window._seanceLigneCount = idx + 1;
+
+  const liste = document.getElementById('seance-exercices-list');
+  if (!liste) return;
+
+  const div = document.createElement('div');
+  div.innerHTML = _renderLigneExerciceForm(null, idx, toutesExos);
+  liste.appendChild(div.firstElementChild);
+}
+
+function supprimerLigneExercice(idx) {
+  document.getElementById(`exo-ligne-${idx}`)?.remove();
+}
+
+function sauvegarderFormSeance(idExistant = '') {
+  const nom   = document.getElementById('s-nom')?.value?.trim();
+  const emoji = document.getElementById('s-emoji')?.value?.trim() || '💪';
+  const duree = parseInt(document.getElementById('s-duree')?.value) || 60;
+
+  if (!nom) {
+    Utils.toast('Entre un nom pour la séance !', 'error');
+    return;
+  }
+
+  // Collecter les exercices
+  const exercices = [];
+  const lignes = document.querySelectorAll('.seance-exo-ligne');
+  lignes.forEach((ligne, i) => {
+    const id = ligne.id.replace('exo-ligne-', '');
+    const ref    = document.getElementById(`exo-ref-${id}`)?.value;
+    const series = parseInt(document.getElementById(`exo-series-${id}`)?.value) || 3;
+    const reps   = document.getElementById(`exo-reps-${id}`)?.value || '10';
+    const repos  = parseInt(document.getElementById(`exo-repos-${id}`)?.value) || 90;
+    if (ref) exercices.push({ ref, series, reps, repos });
+  });
+
+  if (exercices.length === 0) {
+    Utils.toast('Ajoute au moins un exercice !', 'error');
+    return;
+  }
+
+  const data = { nom, emoji, duree_estimee: duree, exercices };
+
+  if (idExistant) {
+    Programme.modifierSeanceCustom(idExistant, data);
+    Utils.toast('✅ Séance modifiée !', 'success');
+  } else {
+    Programme.creerSeanceCustom(data);
+    Utils.toast('✅ Séance créée !', 'success');
+  }
+
+  document.getElementById('modal-info')?.classList.add('hidden');
+  const el = document.getElementById('profil-content');
+  if (el) renderProgrammeCustom(el);
+}
+
+// ════════════════════════════════════════════════════════════
 // OUTILS
 // ════════════════════════════════════════════════════════════
 function renderOutils(el) {
@@ -2384,7 +2731,6 @@ function renderOutils(el) {
 
   el.innerHTML = `
 
-    <!-- Données -->
     <div class="card mb-md">
       <div class="card-label">💾 Données</div>
       <input type="file" id="file-import" accept=".json"
@@ -2482,15 +2828,15 @@ function renderOutils(el) {
                   onchange="Notifications.sauvegarderConfig(
                     {ton:this.value})">
             <option value="motivant"
-              ${config.ton==='motivant' ? 'selected' : ''}>
+              ${config.ton==='motivant'?'selected':''}>
               💪 Motivant
             </option>
             <option value="doux"
-              ${config.ton==='doux' ? 'selected' : ''}>
+              ${config.ton==='doux'?'selected':''}>
               🌸 Doux
             </option>
             <option value="severe"
-              ${config.ton==='severe' ? 'selected' : ''}>
+              ${config.ton==='severe'?'selected':''}>
               🔥 Sévère
             </option>
           </select>
@@ -2506,16 +2852,15 @@ function renderOutils(el) {
     <div class="card mb-md">
       <div class="card-label">⚙️ Paramètres</div>
 
-      <!-- Thème -->
       <div style="margin-bottom:var(--space-md)">
         <div class="input-label">Thème</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);
                     gap:var(--space-xs);margin-top:var(--space-xs)">
           ${[
-            { val:'dark',     label:'🌙 Dark',     color:'#09092d' },
-            { val:'light',    label:'☀️ Light',    color:'#f3f3f7' },
-            { val:'indigo',   label:'💜 Indigo',   color:'#4b4bf9' },
-            { val:'midnight', label:'⭐ Midnight', color:'#0d0d3d' }
+            { val:'dark',     label:'🌙 Dark'     },
+            { val:'light',    label:'☀️ Light'    },
+            { val:'indigo',   label:'💜 Indigo'   },
+            { val:'midnight', label:'⭐ Midnight' }
           ].map(t => `
             <button onclick="appliquerTheme('${t.val}');
                              Utils.storage.set('ft_theme','${t.val}')"
@@ -2536,11 +2881,11 @@ function renderOutils(el) {
         </div>
       </div>
 
-      <!-- Objectif séances -->
       <div style="margin-bottom:var(--space-md)">
         <div class="input-label">Objectif séances/semaine</div>
-        <select class="input" onchange="Utils.storage.set(
-          'ft_objectif_seances_semaine',parseInt(this.value))">
+        <select class="input"
+                onchange="Utils.storage.set(
+                  'ft_objectif_seances_semaine',parseInt(this.value))">
           ${[3,4,5].map(n => `
             <option value="${n}"
               ${Utils.storage.get(
@@ -2551,11 +2896,10 @@ function renderOutils(el) {
         </select>
       </div>
 
-      <!-- Unités -->
       <div>
         <div class="input-label">Unités de poids</div>
-        <select class="input" onchange="Utils.storage.set(
-          'ft_unite_poids',this.value)">
+        <select class="input"
+                onchange="Utils.storage.set('ft_unite_poids',this.value)">
           <option value="kg"
             ${Utils.storage.get('ft_unite_poids','kg') === 'kg'
               ? 'selected' : ''}>
