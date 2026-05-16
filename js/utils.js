@@ -614,7 +614,7 @@ const Utils = {
 
         <div class="footer">
           Généré par FitTracker Pro ·
-          ${new Date().toLocaleString('fr-FR')} · Powered by EverGPT
+          ${new Date().toLocaleString('fr-FR')} · SNARLING
         </div>
       </body>
       </html>
