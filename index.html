@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <!-- ═══════════════════════════════════════
+       FitTracker Pro — Basic-Fit
+       Version 1.0.0
+  ═══════════════════════════════════════ -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Ton coach de salle personnel — Programme long terme Basic-Fit" />
+
+  <!-- PWA Meta -->
+  <meta name="theme-color" content="#4b4bf9" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FitTracker" />
+
+  <!-- Icons Apple -->
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="./assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/icons/icon-192.png" />
+
+  <!-- Manifest -->
+  <link rel="manifest" href="./manifest.json" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
+
+  <title>FitTracker Pro</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+
+  <!-- ═══ SPLASH SCREEN ═══════════════════════════════════ -->
+  <div id="splash-screen" class="splash">
+    <div class="splash-content">
+      <div class="splash-icon">🏋️</div>
+      <h1 class="splash-title">FitTracker Pro</h1>
+      <p class="splash-sub">Basic-Fit · Programme Long Terme</p>
+      <div class="splash-loader">
+        <div class="splash-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ONBOARDING (premier lancement) ══════════════════ -->
+  <div id="onboarding" class="onboarding hidden">
+    <!-- Géré par app.js -->
+  </div>
+
+  <!-- ═══ APP PRINCIPALE ══════════════════════════════════ -->
+  <div id="app-wrapper" class="app-wrapper hidden">
+
+    <!-- Header -->
+    <header id="app-header" class="app-header">
+      <div class="header-left">
+        <span class="header-icon">🏋️</span>
+        <div class="header-text">
+          <span class="header-title">Training 4M</span>
+          <span class="header-sub" id="header-phase">Semaine 1 · Phase Reprise</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn-icon" id="btn-theme" title="Changer le thème" aria-label="Thème">
+          🌙
+        </button>
+        <button class="btn-icon" id="btn-profile-quick" title="Profil" aria-label="Profil">
+          💪
+        </button>
+      </div>
+    </header>
+
+    <!-- Contenu principal — SPA Router -->
+    <main id="page-content" class="page-content" role="main">
+      <!-- Injecté dynamiquement par app.js -->
+    </main>
+
+    <!-- ═══ BOTTOM NAVIGATION ════════════════════════════ -->
+    <nav id="bottom-nav" class="bottom-nav" role="navigation" aria-label="Navigation principale">
+      <button class="nav-item active" data-page="home" aria-label="Accueil">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Accueil</span>
+      </button>
+      <button class="nav-item" data-page="training" aria-label="Training">
+        <span class="nav-icon">🏋️</span>
+        <span class="nav-label">Training</span>
+      </button>
+
+      <!-- Bouton central Live -->
+      <div class="nav-center-wrapper">
+        <button class="nav-center-btn" data-page="live" aria-label="Lancer séance">
+          <span class="nav-center-icon">⚡</span>
+        </button>
+      </div>
+
+      <button class="nav-item" data-page="stats" aria-label="Statistiques">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Stats</span>
+      </button>
+      <button class="nav-item" data-page="profile" aria-label="Profil">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Profil</span>
+      </button>
+    </nav>
+
+  </div><!-- /app-wrapper -->
+
+  <!-- ═══ MODALS GLOBALES ══════════════════════════════════ -->
+
+  <!-- Modal Confirmation -->
+  <div id="modal-confirm" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-box">
+      <h3 id="modal-confirm-title">Confirmer ?</h3>
+      <p id="modal-confirm-msg"></p>
+      <div class="modal-actions">
+        <button id="modal-confirm-cancel" class="btn-secondary">Annuler</button>
+        <button id="modal-confirm-ok" class="btn-primary">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Info / Coach -->
+  <div id="modal-info" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay"></div>
+    <div class="modal-box">
+      <button class="modal-close" id="modal-info-close">✕</button>
+      <div id="modal-info-content"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confetti-canvas" class="confetti-canvas" aria-hidden="true"></canvas>
+
+  <!-- ═══ UPDATE PWA BANNER ═════════════════════════════════ -->
+  <div id="update-banner" class="update-banner hidden">
+    <span>🆕 Nouvelle version disponible !</span>
+    <button id="btn-update">Mettre à jour</button>
+  </div>
+
+  <!-- ═══ INSTALL PROMPT ════════════════════════════════════ -->
+  <div id="install-prompt" class="install-prompt hidden">
+    <div class="install-content">
+      <span class="install-icon">📱</span>
+      <div class="install-text">
+        <strong>Installer FitTracker</strong>
+        <small>Accès rapide depuis ton écran d'accueil</small>
+      </div>
+      <button id="btn-install" class="btn-install">Installer</button>
+      <button id="btn-install-dismiss" class="btn-dismiss">✕</button>
+    </div>
+  </div>
+
+  <!-- ═══ SCRIPTS ══════════════════════════════════════════ -->
+  <script src="./js/utils.js"></script>
+  <script src="./js/programme.js"></script>
+  <script src="./js/tracker.js"></script>
+  <script src="./js/timer.js"></script>
+  <script src="./js/stats.js"></script>
+  <script src="./js/gamification.js"></script>
+  <script src="./js/coach.js"></script>
+  <script src="./js/notifications.js"></script>
+  <script src="./js/app.js"></script>
+
+  <!-- Powered by EverGPT -->
+  <small class="evergpt-tag" aria-hidden="true">Powered by EverGPT</small>
+
+</body>
+</html>
