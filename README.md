@@ -223,5 +223,5 @@ MIT License — Libre d'utilisation et de modification.
 
 <div align="center">
   <strong>Built with 💪 by Othmane</strong><br>
-  <sub>Powered by EverGPT</sub>
+  <sub>SNARLING</sub>
 </div>
