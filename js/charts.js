@@ -86,7 +86,7 @@ const Charts = {
     if (!ctx) return;
 
     const data    = Tracker.getVolumeParSemaine(12); // 12 dernières semaines
-    const labels  = data.map(d => d.semaine);
+    const labels  = data.map(d => d.label);
     const volumes = data.map(d => d.volume);
     const moyenne = volumes.reduce((a,b) => a+b, 0) / (volumes.length || 1);
 
@@ -148,7 +148,7 @@ const Charts = {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
 
-    const historique = Tracker.getHistoriqueExercice(exerciceRef, 20);
+    const historique = Tracker.getProgressionExercice(exerciceRef, 12);
     if (!historique?.length) {
       ctx.parentElement.innerHTML = `
         <div style="text-align:center;padding:var(--space-xl);
@@ -158,9 +158,9 @@ const Charts = {
       return;
     }
 
-    const labels  = historique.map(h => h.date);
-    const charges = historique.map(h => h.chargeMax);
-    const rm1s    = historique.map(h => h.rm1Estime);
+    const labels     = historique.map(h => h.label);
+    const charges    = historique.map(h => h.poids);
+    const rm1s       = historique.map(h => h.rm1);
 
     const config = this._baseConfig();
 
