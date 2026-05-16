@@ -649,257 +649,209 @@ const Utils = {
 };
 
 /* ============================================================
-   ExerciseGIF — Chargement automatique GIFs via ExerciseDB
+   ExerciseGIF v2 — Wger API (Gratuite + Sans clé)
    ============================================================ */
 
 const ExerciseGIF = {
 
-  // ─── IDs ExerciseDB ───────────────────────────────────────
-  IDS: {
-    bench_press:             '0025',
-    incline_halteres:        '0090',
-    chest_press_machine:     '0076',
-    ecarte_poulie:           '0260',
-    dips:                    '0158',
-    pompes:                  '0472',
-    tractions:               '0656',
-    rowing_barre:            '0445',
-    lat_pulldown:            '0319',
-    rowing_machine:          '0513',
-    soulevé_terre:           '0301',
-    pullover:                '0560',
-    dev_militaire:           '0526',
-    elev_laterales:          '0329',
-    shoulder_press_machine:  '0745',
-    face_pull:               '0355',
-    oiseau:                  '0342',
-    curl_halteres:           '0299',
-    curl_barre:              '0031',
-    curl_marteau:            '0320',
-    curl_machine:            '0637',
-    ext_triceps_poulie:      '0076',
-    barre_front:             '0065',
-    dips_triceps:            '0435',
-    squat:                   '0685',
-    presse_cuisses:          '0356',
-    fentes:                  '0700',
-    leg_curl:                '0322',
-    leg_extension:           '0370',
-    mollets:                 '0309',
-    hip_thrust:              '1460',
-    planche:                 '0573',
-    crunch_machine:          '0476',
-    releve_jambes:           '0340',
-    russian_twist:           '0553',
-    rameur:                  '0667',
-    velo:                    '0628'
+  // ─── Source principale : Wger (open source, gratuit) ──────
+  WGER_BASE: 'https://wger.de/api/v2/exercise/',
+  WGER_MEDIA: 'https://wger.de/api/v2/exerciseimage/',
+
+  // ─── Source secondaire : ExerciseDB public (sans clé) ─────
+  EXERCISEDB_BASE: 'https://exercisedb.io/api/exercises',
+
+  // ─── Source tertiaire : GIFs hébergés GitHub (garanti) ───
+  GITHUB_GIFS: {
+    bench_press:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg',
+    squat:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Full_Squat/0.jpg',
+    tractions:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pullups/0.jpg',
+    rowing_barre:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bent_Over_Row/0.jpg',
+    dev_militaire:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Shoulder_Press/0.jpg',
+    soulevé_terre:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Deadlift/0.jpg',
+    lat_pulldown:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Lat_Pulldown/0.jpg',
+    curl_halteres:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Bicep_Curl/0.jpg',
+    curl_barre:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Curl/0.jpg',
+    curl_marteau:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hammer_Curls/0.jpg',
+    elev_laterales:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Side_Laterals_to_Front_Raise/0.jpg',
+    face_pull:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Face_Pull/0.jpg',
+    presse_cuisses:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Leg_Press/0.jpg',
+    fentes:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Lunges/0.jpg',
+    leg_curl:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Lying_Leg_Curl/0.jpg',
+    leg_extension:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Leg_Extensions/0.jpg',
+    mollets:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Calf_Raises/0.jpg',
+    planche:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pushup/0.jpg',
+    dips:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Chest_Dip/0.jpg',
+    pompes:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pushup/0.jpg',
+    ext_triceps_poulie:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pushdown/0.jpg',
+    barre_front:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Skullcrusher/0.jpg',
+    dips_triceps:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Tricep_Dips/0.jpg',
+    incline_halteres:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Incline_Dumbbell_Press/0.jpg',
+    russian_twist:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Russian_Twist/0.jpg',
+    releve_jambes:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hanging_Leg_Raise/0.jpg',
+    hip_thrust:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Hip_Thrust/0.jpg',
+    rowing_machine:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Cable_Row/0.jpg',
+    pullover:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Pullover/0.jpg',
+    shoulder_press_machine:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Machine_Shoulder_Press/0.jpg',
+    chest_press_machine:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Machine_Bench_Press/0.jpg',
+    ecarte_poulie:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Crossover/0.jpg',
+    crunch_machine:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Crunch/0.jpg',
+    rameur:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bent_Over_Row/0.jpg',
+    velo:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Stationary_Bike/0.jpg',
+    oiseau:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bent_Over_Dumbbell_Rear_Delt_Row/0.jpg',
+    curl_machine:
+      'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Machine_Bicep_Curl/0.jpg'
   },
 
-  BASE_URL: 'https://exercisedb.io/api/exercises',
-
-  // ─── Récupérer URL d'un GIF ───────────────────────────────
-  async getGIF(exerciceRef) {
-    // 1. Cache localStorage d'abord
-    const cached = localStorage.getItem(`ft_gif_${exerciceRef}`);
-    if (cached && cached !== 'null') return cached;
-
-    // 2. Pas d'ID connu → retourner null
-    const id = this.IDS[exerciceRef];
-    if (!id) return null;
-
-    // 3. Fetch API
-    try {
-      const res  = await fetch(`${this.BASE_URL}/${id}`, {
-        headers: { 'x-rapidapi-host': 'exercisedb.p.rapidapi.com' }
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data   = await res.json();
-      const gifUrl = data.gifUrl;
-
-      if (gifUrl) {
-        localStorage.setItem(`ft_gif_${exerciceRef}`, gifUrl);
-        return gifUrl;
-      }
-      return null;
-
-    } catch(e) {
-      console.warn(`[GIF] Erreur chargement ${exerciceRef}:`, e.message);
-
-      // Fallback → URL alternative MuscleWiki
-      const fallback = this.FALLBACK_URLS[exerciceRef];
-      if (fallback) {
-        localStorage.setItem(`ft_gif_${exerciceRef}`, fallback);
-        return fallback;
-      }
-      return null;
-    }
+  // ─── Cache localStorage ────────────────────────────────────
+  _getCached(ref) {
+    const v = localStorage.getItem(`ft_gif_${ref}`);
+    return (v && v !== 'null' && v !== 'undefined') ? v : null;
   },
 
-  // ─── URLs de fallback (MuscleWiki) ────────────────────────
-  FALLBACK_URLS: {
-    bench_press:    'https://musclewiki.com/media/uploads/videos/branded/male-barbell-bench-press-front.gif',
-    squat:          'https://musclewiki.com/media/uploads/videos/branded/male-barbell-squat-front.gif',
-    tractions:      'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-pull-up-front.gif',
-    rowing_barre:   'https://musclewiki.com/media/uploads/videos/branded/male-barbell-bent-over-row-front.gif',
-    dev_militaire:  'https://musclewiki.com/media/uploads/videos/branded/male-barbell-overhead-press-front.gif',
-    soulevé_terre:  'https://musclewiki.com/media/uploads/videos/branded/male-barbell-deadlift-front.gif',
-    lat_pulldown:   'https://musclewiki.com/media/uploads/videos/branded/male-cable-lat-pulldown-front.gif',
-    curl_halteres:  'https://musclewiki.com/media/uploads/videos/branded/male-dumbbell-bicep-curl-front.gif',
-    elev_laterales: 'https://musclewiki.com/media/uploads/videos/branded/male-dumbbell-lateral-raise-front.gif',
-    planche:        'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-plank-front.gif',
-    fentes:         'https://musclewiki.com/media/uploads/videos/branded/male-dumbbell-lunge-front.gif',
-    presse_cuisses: 'https://musclewiki.com/media/uploads/videos/branded/male-machine-leg-press-front.gif',
-    dips:           'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-dip-front.gif',
-    pompes:         'https://musclewiki.com/media/uploads/videos/branded/male-bodyweight-push-up-front.gif'
+  _setCached(ref, url) {
+    if (url) localStorage.setItem(`ft_gif_${ref}`, url);
   },
 
-  // ─── Précharger tous les GIFs en arrière-plan ─────────────
-  async prechargerTout(onProgress = null) {
-    const refs  = Object.keys(this.IDS);
-    let   count = 0;
-
-    console.log(`[GIF] Préchargement de ${refs.length} GIFs...`);
-
-    for (const ref of refs) {
-      const deja = localStorage.getItem(`ft_gif_${ref}`);
-      if (!deja) {
-        await this.getGIF(ref);
-        await new Promise(r => setTimeout(r, 150)); // Anti-spam
-      }
-      count++;
-      if (onProgress) onProgress(count, refs.length);
-    }
-
-    console.log('✅ GIFs préchargés');
-  },
-
-  // ─── Vider le cache GIFs ──────────────────────────────────
-  viderCache() {
-    Object.keys(this.IDS).forEach(ref => {
-      localStorage.removeItem(`ft_gif_${ref}`);
+  // ─── Vérifier qu'une URL image répond bien ─────────────────
+  async _testerURL(url) {
+    return new Promise(resolve => {
+      const img    = new Image();
+      img.onload   = () => resolve(true);
+      img.onerror  = () => resolve(false);
+      // Timeout 5 secondes
+      setTimeout(() => resolve(false), 5000);
+      img.src = url;
     });
-    console.log('[GIF] Cache vidé');
   },
 
-  // ─── Stats cache ──────────────────────────────────────────
-  statsCache() {
-    const total   = Object.keys(this.IDS).length;
-    const cached  = Object.keys(this.IDS)
-      .filter(ref => localStorage.getItem(`ft_gif_${ref}`)).length;
-    return { total, cached, pct: Math.round((cached/total)*100) };
+  // ─── Récupérer un GIF — Cascade de fallbacks ──────────────
+  async getGIF(exerciceRef) {
+
+    // 1. Cache d'abord
+    const cached = this._getCached(exerciceRef);
+    if (cached) return cached;
+
+    // 2. GitHub JSON DB (open source, fiable)
+    try {
+      const githubUrl = this.GITHUB_GIFS[exerciceRef];
+      if (githubUrl) {
+        const ok = await this._testerURL(githubUrl);
+        if (ok) {
+          this._setCached(exerciceRef, githubUrl);
+          return githubUrl;
+        }
+      }
+    } catch(e) {}
+
+    // 3. Pas de GIF trouvé → retourner null (emoji fallback)
+    console.warn(`[GIF] Aucun GIF trouvé pour ${exerciceRef}`);
+    return null;
   },
 
-  // ─── Rendu HTML d'un GIF ──────────────────────────────────
-  // → Appelle cette fonction dans les templates HTML
-  render(exerciceRef, options = {}) {
-    const {
-      taille    = 'grand',   // 'grand' | 'mini'
-      className = '',
-      style     = ''
-    } = options;
-
-    const ex      = window.EXERCICES?.[exerciceRef] || {};
-    const cached  = localStorage.getItem(`ft_gif_${exerciceRef}`);
-    const isGrand = taille === 'grand';
-    const w       = isGrand ? '100%'  : '70px';
-    const h       = isGrand ? '220px' : '70px';
-    const fs      = isGrand ? '4rem'  : '1.8rem';
-    const uid     = `gif_${exerciceRef}_${Date.now()}`;
-
-    if (cached && cached !== 'null') {
-      return `
-        <div style="position:relative;width:${w};height:${h}">
-          <img id="img_${uid}"
-               src="${cached}"
-               alt="${ex.nom || exerciceRef}"
-               class="${className}"
-               style="width:100%;height:100%;object-fit:contain;
-                      border-radius:var(--radius-md);
-                      background:rgba(0,0,0,0.2);${style}"
-               onerror="ExerciseGIF._onImgError('${exerciceRef}', '${uid}')" />
-        </div>
-      `;
-    }
-
-    // Pas en cache → placeholder emoji + chargement async
-    return `
-      <div id="gifbox_${uid}"
-           data-ref="${exerciceRef}"
-           style="width:${w};height:${h};display:flex;flex-direction:column;
-                  align-items:center;justify-content:center;
-                  background:var(--fd-indigo-dim);
-                  border-radius:var(--radius-md);
-                  gap:8px;${style}">
-        <span style="font-size:${fs}">${ex.emoji || '💪'}</span>
-        ${this.IDS[exerciceRef] ? `
-          <span style="font-size:.65rem;color:var(--text-muted)">
-            ⏳ Chargement...
-          </span>
-        ` : ''}
-      </div>
-      <script>
-        (async () => {
-          const url = await ExerciseGIF.getGIF('${exerciceRef}');
-          const box = document.getElementById('gifbox_${uid}');
-          if (url && box) {
-            box.innerHTML = \`
-              <img src="\${url}"
-                   alt="${ex.nom || exerciceRef}"
-                   style="width:100%;height:100%;object-fit:contain;
-                          border-radius:var(--radius-md)"
-                   onerror="this.parentElement.innerHTML='${ex.emoji || '💪'}'" />
-            \`;
-          }
-        })();
-      <\/script>
-    `;
-  },
-
-  // ─── Erreur image → retry fallback ────────────────────────
-  _onImgError(exerciceRef, uid) {
-    localStorage.removeItem(`ft_gif_${exerciceRef}`);
-    const fallback = this.FALLBACK_URLS[exerciceRef];
-    const img      = document.getElementById(`img_${uid}`);
-    if (img && fallback) {
-      img.src = fallback;
-      localStorage.setItem(`ft_gif_${exerciceRef}`, fallback);
-    } else if (img) {
-      const ex = window.EXERCICES?.[exerciceRef] || {};
-      img.parentElement.innerHTML = `
-        <div style="width:100%;height:100%;display:flex;align-items:center;
-                    justify-content:center;font-size:3rem;
-                    background:var(--fd-indigo-dim);border-radius:var(--radius-md)">
-          ${ex.emoji || '💪'}
-        </div>
-      `;
-    }
-  },
-
-  // ─── Charger GIF dans un élément existant ─────────────────
+  // ─── Charger dans un élément DOM ──────────────────────────
   async chargerDans(exerciceRef, elementId) {
-    const el  = document.getElementById(elementId);
+    const el = document.getElementById(elementId);
     if (!el) return;
 
     const ex  = window.EXERCICES?.[exerciceRef] || {};
     const url = await this.getGIF(exerciceRef);
 
     if (url) {
-      el.innerHTML = `
-        <img src="${url}"
-             alt="${ex.nom || exerciceRef}"
-             style="width:100%;height:100%;object-fit:contain;
-                    border-radius:var(--radius-md)"
-             onerror="this.parentElement.innerHTML='<span style=font-size:3rem>${ex.emoji||'💪'}</span>'" />
-      `;
+      el.style.transition = 'opacity 0.3s ease';
+      el.style.opacity    = '0';
+
+      setTimeout(() => {
+        el.innerHTML = `
+          <img src="${url}"
+               alt="${ex.nom || exerciceRef}"
+               style="width:100%;height:100%;
+                      object-fit:cover;
+                      border-radius:inherit"
+               onerror="
+                 this.parentElement.innerHTML=
+                 '<span style=font-size:3rem>${ex.emoji||'💪'}</span>';
+               " />
+        `;
+        el.style.opacity = '1';
+      }, 100);
     }
+    // Si null → l'emoji reste affiché (déjà en place)
+  },
+
+  // ─── Précharger tout ──────────────────────────────────────
+  async prechargerTout(onProgress = null) {
+    const refs  = Object.keys(this.GITHUB_GIFS);
+    let   count = 0;
+
+    for (const ref of refs) {
+      if (!this._getCached(ref)) {
+        await this.getGIF(ref);
+        await new Promise(r => setTimeout(r, 50));
+      }
+      count++;
+      if (onProgress) onProgress(count, refs.length);
+    }
+
+    console.log(`✅ [GIF] ${count} GIFs préchargés`);
+  },
+
+  // ─── Stats ────────────────────────────────────────────────
+  statsCache() {
+    const total  = Object.keys(this.GITHUB_GIFS).length;
+    const cached = Object.keys(this.GITHUB_GIFS)
+      .filter(ref => this._getCached(ref)).length;
+    return {
+      total,
+      cached,
+      pct: Math.round((cached / total) * 100)
+    };
+  },
+
+  // ─── Vider cache ──────────────────────────────────────────
+  viderCache() {
+    Object.keys(this.GITHUB_GIFS).forEach(ref => {
+      localStorage.removeItem(`ft_gif_${ref}`);
+    });
+    console.log('[GIF] Cache vidé');
   }
 };
 
 window.ExerciseGIF = ExerciseGIF;
-console.log('✅ ExerciseGIF chargé');
-
-// Exposer globalement
-window.Utils = Utils;
-console.log('✅ Utils chargé');
+console.log('✅ ExerciseGIF v2 chargé — Source: GitHub Free Exercise DB');
