@@ -261,17 +261,18 @@ function toggleTheme() {
 }
 
 function appliquerTheme(theme) {
-  // Appliquer sur <html> ET <body>
+  // Appliquer sur html + body
   document.documentElement.setAttribute('data-theme', theme);
   document.body.setAttribute('data-theme', theme);
   Utils.storage.set('ft_theme', theme);
 
-  // Mettre à jour les boutons
+  // Mettre à jour les boutons thème (si visibles)
   document.querySelectorAll('.theme-btn').forEach(btn => {
-    btn.classList.toggle(
-      'active',
-      btn.dataset.theme === theme
-    );
+    const isActif = btn.dataset.theme === theme;
+    btn.style.border     = `2px solid ${isActif
+      ? 'var(--fd-indigo)' : 'var(--border-color)'}`;
+    btn.style.background = isActif
+      ? 'var(--fd-indigo-dim)' : 'var(--bg-card)';
   });
 }
 
@@ -2885,27 +2886,33 @@ function renderOutils(el) {
         <div style="display:grid;grid-template-columns:repeat(4,1fr);
                     gap:var(--space-xs);margin-top:var(--space-xs)">
           ${[
-            { val:'dark',     label:'🌙 Dark'     },
-            { val:'light',    label:'☀️ Light'    },
-            { val:'indigo',   label:'💜 Indigo'   },
-            { val:'midnight', label:'⭐ Midnight' }
-          ].map(t => `
-            <button onclick="appliquerTheme('${t.val}');
-                             Utils.storage.set('ft_theme','${t.val}')"
-                    style="padding:var(--space-sm) 4px;
-                           border-radius:var(--radius-sm);
-                           border:2px solid ${
-                             AppState.thème === t.val
-                               ? 'var(--fd-indigo)'
-                               : 'var(--border-color)'};
-                           background:${
-                             AppState.thème === t.val
-                               ? 'var(--fd-indigo-dim)'
-                               : 'var(--bg-card)'};
-                           font-size:.7rem;font-weight:600;
-                           cursor:pointer;transition:all .2s">
-              ${t.label}
-            </button>`).join('')}
+  { val:'dark',     label:'🌙 Dark',    emoji:'🌙' },
+  { val:'light',    label:'☀️ Light',   emoji:'☀️' },
+  { val:'indigo',   label:'💜 Indigo',  emoji:'💜' },
+  { val:'midnight', label:'⭐ Midnight',emoji:'⭐' }
+].map(t => {
+  const actuel = document.documentElement
+    .getAttribute('data-theme') || 'dark';
+  const isActif = actuel === t.val;
+  return `
+    <button class="theme-btn"
+            data-theme="${t.val}"
+            onclick="appliquerTheme('${t.val}')"
+            style="padding:var(--space-sm) 4px;
+                   border-radius:var(--radius-sm);
+                   border:2px solid ${
+                     isActif
+                       ? 'var(--fd-indigo)'
+                       : 'var(--border-color)'};
+                   background:${
+                     isActif
+                       ? 'var(--fd-indigo-dim)'
+                       : 'var(--bg-card)'};
+                   font-size:.7rem;font-weight:600;
+                   cursor:pointer;transition:all .2s">
+      ${t.label}
+    </button>`;
+}).join('')}
         </div>
       </div>
 
