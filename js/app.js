@@ -29,15 +29,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { await afficherSplash();    } catch(e) {}
   try { i18n.init();               } catch(e) {}
 
-  // ── Si Firebase est chargé → attendre l'auth
+  // ── Attendre que Firebase soit prêt (max 5 secondes)
+  let attente = 0;
+  while (!window.Auth && attente < 50) {
+    await new Promise(r => setTimeout(r, 100));
+    attente++;
+  }
+
+  // ── Firebase chargé → laisser onAuthStateChanged gérer
   if (window.Auth) {
-    // onAuthStateChanged dans firebase.js gère la suite
     window._appEnAttente = true;
-    console.log('🔐 En attente auth Firebase...');
+    console.log('🔐 Firebase prêt — attente auth...');
+
+    // Timeout sécurité — si auth prend trop longtemps
+    setTimeout(() => {
+      if (window._appEnAttente) {
+        console.warn('⚠️ Auth timeout — lancement sans auth');
+        window._appEnAttente = false;
+        const profil = Tracker.getProfil();
+        if (!profil.nom || profil.nom === 'Athlète') {
+          afficherOnboarding();
+        } else {
+          lancerApp();
+        }
+      }
+    }, 5000);
     return;
   }
 
   // ── Fallback sans Firebase
+  console.warn('⚠️ Firebase non disponible — mode local');
   const profil = Tracker.getProfil();
   if (!profil.nom || profil.nom === 'Athlète') {
     afficherOnboarding();
