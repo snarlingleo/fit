@@ -1,39 +1,65 @@
 {
-  "name": "PowerApp Pro — Programme Personnel",
+  "name": "PowerApp — Ton coach fitness",
   "short_name": "PowerApp",
-  "description": "Ton coach de salle personnel",
+  "description": "Ton coach fitness personnel. Séances, records, progression et gamification.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#09092d",
   "background_color": "#09092d",
-  "theme_color": "#4b4bf9",
-  "orientation": "portrait",
   "lang": "fr",
-  "categories": ["health", "fitness", "lifestyle"],
+  "dir": "ltr",
+
+  "categories": [
+    "fitness",
+    "health",
+    "sports",
+    "lifestyle"
+  ],
+
   "icons": [
     {
       "src": "./assets/icons/icon-72.png",
       "sizes": "72x72",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./assets/icons/icon-96.png",
       "sizes": "96x96",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./assets/icons/icon-128.png",
       "sizes": "128x128",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./assets/icons/icon-152.png",
       "sizes": "152x152",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icons/icon-167.png",
+      "sizes": "167x167",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./assets/icons/icon-180.png",
       "sizes": "180x180",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./assets/icons/icon-192.png",
@@ -48,20 +74,86 @@
       "purpose": "any maskable"
     }
   ],
-  "shortcuts": [
+
+  "screenshots": [
     {
-      "name": "Démarrer séance",
-      "short_name": "Séance",
-      "description": "Lance ta séance du jour",
-      "url": "./index.html?action=start",
-      "icons": [{ "src": "./assets/icons/icon-96.png", "sizes": "96x96" }]
+      "src": "./assets/screenshots/home.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "Accueil PowerApp"
     },
     {
-      "name": "Timer repos",
-      "short_name": "Timer",
-      "description": "Lance le timer de repos",
-      "url": "./index.html?action=timer",
-      "icons": [{ "src": "./assets/icons/icon-96.png", "sizes": "96x96" }]
+      "src": "./assets/screenshots/live.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "Séance Live"
+    },
+    {
+      "src": "./assets/screenshots/stats.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "Statistiques"
     }
-  ]
+  ],
+
+  "shortcuts": [
+    {
+      "name": "Démarrer une séance",
+      "short_name": "Live",
+      "description": "Lance ta séance du jour",
+      "url": "./#live",
+      "icons": [
+        {
+          "src": "./assets/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Mes statistiques",
+      "short_name": "Stats",
+      "description": "Voir ma progression",
+      "url": "./#stats",
+      "icons": [
+        {
+          "src": "./assets/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Coach IA",
+      "short_name": "Coach",
+      "description": "Parler à mon coach",
+      "url": "./#coach",
+      "icons": [
+        {
+          "src": "./assets/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+
+  "prefer_related_applications": false,
+
+  "related_applications": [],
+
+  "protocol_handlers": [],
+
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+
+  "file_handlers": [],
+
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
 }
