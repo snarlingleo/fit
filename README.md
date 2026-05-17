@@ -1,6 +1,6 @@
 # 🏋️ PowerApp Pro
 
-> **Ton coach de salle personnel — Programme long terme Basic-Fit**  
+> **Ton coach de salle personnel**  
 > PWA installable · 100% offline · Sans serveur · Gratuit
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
