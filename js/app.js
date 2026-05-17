@@ -1352,7 +1352,7 @@ function renderListeExercices(el) {
     <div id="ex-list">
       ${Object.entries(groupes).map(([muscle, exos]) => `
         <div class="section-title">
-          ${exos?.emoji||'💪'} ${muscle}
+          ${exos[0]?.emoji || '💪'} ${muscle}
         </div>
         ${exos.map(ex => {
           const uid = `list_gif_${ex.ref}`;
@@ -1367,15 +1367,15 @@ function renderListeExercices(el) {
                             display:flex;align-items:center;
                             justify-content:center;font-size:1.8rem;
                             flex-shrink:0;overflow:hidden">
-                  ${ex.emoji}
+                  ${ex.emoji || '💪'}
                 </div>
                 <div class="exercice-details">
                   <div class="exercice-name">${ex.nom}</div>
                   <div class="exercice-muscle">${ex.muscle}</div>
                   <div class="exercice-volume">${ex.equipement}</div>
                   <div style="font-size:.75rem;margin-top:4px">
-                    ${'⭐'.repeat(ex.difficulte)}
-                    ${'☆'.repeat(4-ex.difficulte)}
+                    ${'⭐'.repeat(ex.difficulte || 1)}
+                    ${'☆'.repeat(4 - (ex.difficulte || 1))}
                   </div>
                 </div>
               </div>
