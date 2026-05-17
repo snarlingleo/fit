@@ -1828,12 +1828,28 @@ a { color: var(--fd-indigo); text-decoration: none; }
     padding-top: env(safe-area-inset-top);
     height: calc(var(--header-height) + env(safe-area-inset-top));
   }
-
   .page-content {
     margin-top: calc(var(--header-height) + env(safe-area-inset-top));
   }
 }
 
+/* ─── SPLASH iOS SAFE AREA ───────────────────────────────────── */
+#splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--fd-midnight);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: env(safe-area-inset-top, 44px);
+  padding-bottom: env(safe-area-inset-bottom, 34px);
+}
+
+#splash-screen .splash-content {
+  text-align: center;
+  margin-top: env(safe-area-inset-top, 0px);
+}
 /* ═══════════════════════════════════════════════════════════
    DÉFIS
 ═══════════════════════════════════════════════════════════ */
