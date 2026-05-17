@@ -1,4 +1,4 @@
-# 🏋️ FitTracker Pro
+# 🏋️ PowerApp Pro
 
 > **Ton coach de salle personnel — Programme long terme Basic-Fit**  
 > PWA installable · 100% offline · Sans serveur · Gratuit
@@ -78,13 +78,13 @@
 # Settings → Pages → Deploy from branch → main
 ```
 L'app sera disponible sur :  
-`https://TON-USERNAME.github.io/fittracker-pro`
+`https://snarlingle.github.io/fit`
 
 ### Option 2 — Local
 ```bash
 # Clone
-git clone https://github.com/TON-USERNAME/fittracker-pro.git
-cd fittracker-pro
+git clone https://github.com/TON-USERNAME/PowerApp-pro.git
+cd PowerApp-pro
 
 # Ouvrir avec un serveur local
 # Option A : VS Code Live Server
@@ -103,7 +103,7 @@ python3 -m http.server 8000
 ## 📁 Structure
 
 ```
-fittracker-pro/
+PowerApp-pro/
 ├── index.html          # App shell SPA
 ├── style.css           # Design system complet
 ├── manifest.json       # Configuration PWA
