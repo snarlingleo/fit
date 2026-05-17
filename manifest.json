@@ -1,7 +1,7 @@
 {
-  "name": "FitTracker Pro — Basic-Fit",
-  "short_name": "FitTracker",
-  "description": "Ton coach de salle personnel — Programme long terme Basic-Fit",
+  "name": "PowerApp Pro — Programme Personnel",
+  "short_name": "PowerApp",
+  "description": "Ton coach de salle personnel",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#09092d",
