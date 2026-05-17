@@ -2391,6 +2391,9 @@ function renderProfilMoi(el) {
   const avatars = ['💪','🏋️','🔥','⚡','🦁','🐺','🦅','👑','🚀','💎'];
 
   el.innerHTML = `
+    ${typeof renderBoutonDeconnexion === 'function'
+       ? renderBoutonDeconnexion()
+       : ''} 
     <div class="profil-card mb-md">
       <div style="margin-bottom:var(--space-md)">
         <div style="font-size:3rem;text-align:center;
