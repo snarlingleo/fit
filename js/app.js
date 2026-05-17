@@ -322,23 +322,48 @@ function initInstallPrompt() {
 // ════════════════════════════════════════════════════════════
 function renderAccueil() {
   const container = document.getElementById('page-content');
-  const profil    = Tracker.getProfil();
-  const infos     = Programme.getInfosProgramme();
-  const seance    = Programme.getProchaineSeance();
-  const streak    = Tracker.getStreak();
-  const score     = Tracker.calculerScoreForme();
-  const humeur    = Tracker.getHumeur();
-  const fatigue   = Tracker.getFatigue();
-  const coach     = Coach.getMessageDuJour();
-  const seanceDJ  = Tracker.getSeancesParSemaine();
-  const objectif  = Utils.storage.get('ft_objectif_seances_semaine', 4);
-  const heatmap   = Tracker.getHeatmapData(7);
-  const analyse   = Predict.getAnalyseGlobale();
-  const defis     = Defis.mettreAJourProgression() || [];
-  const defisOk   = defis.filter(d => d.complete).length;
-  const playlist  = Share.getPlaylistDuJour();
-  const volume    = Tracker.getVolumeSemaine();
-  const comp      = Stats.getComparaisonSemaines();
+  if (!container) return;
+
+  // ── Données sécurisées
+  let profil   = {};
+  let infos    = { label:'S1', cycle:1, semaine:1, progression:0,
+                   phase:{ nom:'Reprise', emoji:'🌱', numero:1 } };
+  let seance   = null;
+  let streak   = { count:0, max:0 };
+  let score    = { score:50, niveau:'Correct' };
+  let humeur   = null;
+  let fatigue  = null;
+  let coach    = { emoji:'💪', message:'Prêt pour la séance ?' };
+  let seanceDJ = 0;
+  let objectif = 4;
+  let heatmap  = {};
+  let analyse  = {
+    fatigue: { recommandation: { message:'', emoji:'🟢', couleur:'var(--fd-mint)' } },
+    opportunitePR: null
+  };
+  let defis    = [];
+  let playlist = { emoji:'🎵', nom:'Workout', genre:'Mix', description:'', url:'#' };
+  let volume   = 0;
+  let comp     = { delta: 0 };
+
+  try { profil   = Tracker.getProfil();                   } catch(e) { console.warn('profil',e); }
+  try { infos    = Programme.getInfosProgramme();         } catch(e) { console.warn('infos',e); }
+  try { seance   = Programme.getProchaineSeance();        } catch(e) { console.warn('seance',e); }
+  try { streak   = Tracker.getStreak();                   } catch(e) {}
+  try { score    = Tracker.calculerScoreForme();          } catch(e) {}
+  try { humeur   = Tracker.getHumeur();                   } catch(e) {}
+  try { fatigue  = Tracker.getFatigue();                  } catch(e) {}
+  try { coach    = Coach.getMessageDuJour();              } catch(e) {}
+  try { seanceDJ = Tracker.getSeancesParSemaine();        } catch(e) {}
+  try { objectif = Utils.storage.get('ft_objectif_seances_semaine', 4); } catch(e) {}
+  try { heatmap  = Tracker.getHeatmapData(7);            } catch(e) {}
+  try { analyse  = Predict.getAnalyseGlobale();          } catch(e) {}
+  try { defis    = Defis.mettreAJourProgression() || []; } catch(e) {}
+  try { playlist = Share.getPlaylistDuJour();            } catch(e) {}
+  try { volume   = Tracker.getVolumeSemaine();           } catch(e) {}
+  try { comp     = Stats.getComparaisonSemaines?.() || { delta:0 }; } catch(e) {}
+
+  const defisOk = defis.filter(d => d.complete).length;
 
   container.innerHTML = `
 
@@ -349,39 +374,37 @@ function renderAccueil() {
       </div>
       <div class="dashboard-sub">
         ${infos.label} · Cycle ${infos.cycle}
-        · ${infos.phase.emoji} ${infos.phase.nom}
+        · ${infos.phase?.emoji || '🌱'} ${infos.phase?.nom || 'Reprise'}
       </div>
 
-      <!-- Score forme inline -->
       <div class="dashboard-score">
         <div class="score-ring">
           <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle class="ring-bg" cx="36" cy="36" r="30"
-                    stroke-dasharray="${2*Math.PI*30}"
-                    fill="none" stroke="rgba(255,255,255,0.1)"
+            <circle cx="36" cy="36" r="30"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.1)"
                     stroke-width="6"/>
             <circle cx="36" cy="36" r="30"
                     fill="none"
-                    stroke="${score.score>=80
+                    stroke="${score.score >= 80
                       ? 'var(--fd-mint)'
-                      : score.score>=60
+                      : score.score >= 60
                         ? 'var(--fd-lemon)'
                         : 'var(--fd-coral)'}"
                     stroke-width="6"
                     stroke-linecap="round"
                     stroke-dasharray="${2*Math.PI*30}"
-                    stroke-dashoffset="${2*Math.PI*30*(1-score.score/100)}"
-                    transform="rotate(-90 36 36)"
-                    style="transition:stroke-dashoffset 1s ease"/>
+                    stroke-dashoffset="${2*Math.PI*30*(1-(score.score||50)/100)}"
+                    transform="rotate(-90 36 36)"/>
           </svg>
-          <div class="score-ring-text">${score.score}</div>
+          <div class="score-ring-text">${score.score || 50}</div>
         </div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:.95rem">
-            ${score.niveau}
+            ${score.niveau || 'En forme'}
           </div>
           <div style="font-size:.72rem;opacity:.7;margin-top:2px">
-            ${analyse.fatigue.recommandation.message}
+            ${analyse?.fatigue?.recommandation?.message || ''}
           </div>
           <div style="font-size:.72rem;opacity:.6;margin-top:4px">
             Streak ${streak.count}🔥 · Record ${streak.max}
@@ -389,27 +412,27 @@ function renderAccueil() {
         </div>
       </div>
 
-      <!-- Mini heatmap 7 jours -->
+      <!-- Mini heatmap -->
       <div style="margin-top:var(--space-md)">
         <div style="font-size:.65rem;opacity:.6;
-                    margin-bottom:6px;
-                    text-transform:uppercase;
+                    margin-bottom:6px;text-transform:uppercase;
                     letter-spacing:.06em">
           Cette semaine
         </div>
         <div class="mini-heatmap">
           ${['L','M','M','J','V','S','D'].map((j, i) => {
-            const date = Utils.ajouterJours(
-              Utils.debutSemaine(Utils.aujourd_hui()), i
-            );
-            const etat = heatmap[date] || 'none';
-            const isToday = date === Utils.aujourd_hui();
+            let date  = '';
+            let etat  = 'none';
+            let isToday = false;
+            try {
+              date    = Utils.ajouterJours(Utils.debutSemaine(Utils.aujourd_hui()), i);
+              etat    = heatmap[date] || 'none';
+              isToday = date === Utils.aujourd_hui();
+            } catch(e) {}
             return `
               <div style="text-align:center">
-                <div style="font-size:.6rem;opacity:.5;
-                            margin-bottom:3px">${j}</div>
-                <div class="mini-heatmap-cell ${etat} ${isToday?'today':''}">
-                </div>
+                <div style="font-size:.6rem;opacity:.5;margin-bottom:3px">${j}</div>
+                <div class="mini-heatmap-cell ${etat} ${isToday?'today':''}"></div>
               </div>`;
           }).join('')}
         </div>
@@ -419,54 +442,55 @@ function renderAccueil() {
     <!-- Actions rapides -->
     <div class="home-quick-actions mb-md">
       ${[
-        { icon:'⚡', label:'Express',    action:"naviguer('express')" },
-        { icon:'📊', label:'Stats',      action:"naviguer('stats')"   },
-        { icon:'🎯', label:'Défis',      action:"naviguer('defis')"   },
-        { icon:'🔮', label:'Predict',    action:"naviguer('predict')" },
-        { icon:'📸', label:'Partager',   action:"naviguer('share')"   },
-        { icon:'🎵', label:'Musique',    action:`ouvrirPlaylist()`    }
+        { icon:'⚡', label:'Express',  action:"naviguer('express')"  },
+        { icon:'📊', label:'Stats',    action:"naviguer('stats')"    },
+        { icon:'🏆', label:'Défis',    action:"naviguer('defis')"    },
+        { icon:'🔮', label:'Predict',  action:"naviguer('predict')"  },
+        { icon:'📸', label:'Partager', action:"naviguer('share')"    },
+        { icon:'🎵', label:'Musique',  action:"ouvrirPlaylist()"     }
       ].map(a => `
-        <button class="quick-action-btn"
-                onclick="${a.action}">
+        <button class="quick-action-btn" onclick="${a.action}">
           <span class="quick-action-icon">${a.icon}</span>
           <span class="quick-action-label">${a.label}</span>
         </button>`).join('')}
     </div>
 
-    <!-- Widgets stats -->
+    <!-- Widgets -->
     <div class="widget-grid mb-md">
       <div class="widget-card ${seanceDJ >= objectif ? 'highlight' : ''}">
         <div class="widget-icon">📅</div>
         <div class="widget-value">${seanceDJ}/${objectif}</div>
         <div class="widget-label">Séances</div>
         <div class="widget-trend ${seanceDJ >= objectif ? 'up' : 'flat'}">
-          ${seanceDJ >= objectif ? '✅ Objectif !' : `${objectif-seanceDJ} restante${objectif-seanceDJ>1?'s':''}`}
+          ${seanceDJ >= objectif
+            ? '✅ Objectif !'
+            : `${objectif-seanceDJ} restante${objectif-seanceDJ>1?'s':''}`}
         </div>
       </div>
       <div class="widget-card">
         <div class="widget-icon">🏋️</div>
         <div class="widget-value">${Utils.formatVolume(volume)}</div>
         <div class="widget-label">Volume</div>
-        <div class="widget-trend ${comp.delta >= 0 ? 'up' : 'down'}">
-          ${comp.delta >= 0 ? '+' : ''}${comp.delta}% vs sem. préc.
+        <div class="widget-trend ${(comp.delta||0) >= 0 ? 'up' : 'down'}">
+          ${(comp.delta||0) >= 0 ? '+' : ''}${comp.delta||0}% vs S-1
         </div>
       </div>
       <div class="widget-card">
         <div class="widget-icon">🏆</div>
         <div class="widget-value">
-          ${Object.keys(Tracker.getAllPRs()).length}
+          ${(() => { try { return Object.keys(Tracker.getAllPRs()).length; } catch(e) { return 0; } })()}
         </div>
         <div class="widget-label">Records</div>
         <div class="widget-trend flat">PRs totaux</div>
       </div>
       <div class="widget-card">
         <div class="widget-icon">🎯</div>
-        <div class="widget-value">${defisOk}/${defis.length}</div>
+        <div class="widget-value">${defisOk}/${defis.length || 0}</div>
         <div class="widget-label">Défis</div>
-        <div class="widget-trend ${defisOk === defis.length ? 'up' : 'flat'}">
-          ${defisOk === defis.length && defis.length > 0
+        <div class="widget-trend ${defisOk > 0 && defisOk === defis.length ? 'up' : 'flat'}">
+          ${defisOk > 0 && defisOk === defis.length
             ? '🏆 Complet !'
-            : `${defis.length - defisOk} en cours`}
+            : `${(defis.length||0) - defisOk} en cours`}
         </div>
       </div>
     </div>
@@ -478,69 +502,36 @@ function renderAccueil() {
         <div style="font-size:.65rem;font-weight:700;
                     letter-spacing:.08em;text-transform:uppercase;
                     color:var(--fd-indigo);margin-bottom:6px">
-          ${seance.dansJours === 0
+          ${(seance.dansJours||0) === 0
             ? '⚡ Séance du jour'
             : `📅 Dans ${seance.dansJours} jour${seance.dansJours>1?'s':''}`}
         </div>
         <div style="font-size:1.1rem;font-weight:700">
-          ${seance.emoji} ${seance.nom}
+          ${seance.emoji || '💪'} ${seance.nom}
         </div>
-        <div style="font-size:.75rem;color:var(--text-muted);
-                    margin-top:4px">
-          ${seance.exercices?.length || 0} exercices
-          · ~${seance.duree_estimee}min
-          · ${infos.phase.emoji} ${infos.phase.nom}
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
+          ${seance.exercices?.length || 0} exercices · ~${seance.duree_estimee}min
         </div>
         <div style="margin-top:var(--space-sm)">
           <div class="progress-bar">
             <div class="progress-fill"
-                 style="width:${infos.progression}%"></div>
-          </div>
-          <div style="font-size:.65rem;color:var(--text-muted);
-                      margin-top:3px;text-align:right">
-            ${infos.progression}% du cycle
+                 style="width:${infos.progression||0}%"></div>
           </div>
         </div>
       </div>` : `
       <div class="card mb-md" style="text-align:center">
-        <div style="font-size:1.5rem;margin-bottom:4px">🎉</div>
+        <div style="font-size:1.5rem;margin-bottom:4px">😴</div>
         <div style="font-size:.88rem;color:var(--text-muted)">
-          Programme complété ! Un nouveau cycle commence.
+          Bon repos aujourd'hui !
         </div>
       </div>`}
 
-    <!-- Opportunité PR -->
-    ${analyse.opportunitePR ? (() => {
-      const p  = analyse.opportunitePR;
-      const ex = window.EXERCICES?.[p.exerciceRef] || {};
-      return `
-        <div class="card mb-md"
-             style="border-color:var(--fd-lemon);
-                    background:rgba(249,239,119,0.06)"
-             onclick="naviguer('predict')">
-          <div class="flex items-center gap-md">
-            <div style="font-size:2rem">🎯</div>
-            <div>
-              <div style="font-weight:700;font-size:.88rem;
-                          color:var(--fd-lemon)">
-                Opportunité PR aujourd'hui !
-              </div>
-              <div style="font-size:.78rem;color:var(--text-muted)">
-                ${ex.emoji || '💪'} ${ex.nom || p.exerciceRef}
-                → Cible ${p.rm1Predit}kg 1RM
-              </div>
-            </div>
-          </div>
-        </div>`;
-    })() : ''}
-
     <!-- Humeur -->
     <div class="card mb-md">
-      <div class="card-label">😊 ${t('live.humeur')}</div>
+      <div class="card-label">😊 Humeur du jour</div>
       <div class="humeur-grid mt-md">
         ${['🔥','😊','😐','😒','😤'].map(h => `
-          <button class="humeur-btn
-                  ${humeur?.humeur===h?'selected':''}"
+          <button class="humeur-btn ${humeur?.humeur===h?'selected':''}"
                   onclick="selectionnerHumeur('${h}')">
             ${h}
           </button>`).join('')}
@@ -549,7 +540,7 @@ function renderAccueil() {
 
     <!-- Fatigue -->
     <div class="card mb-md">
-      <div class="card-label">🌡️ ${t('live.fatigue')}</div>
+      <div class="card-label">🌡️ Niveau de fatigue</div>
       <div class="flex gap-sm mt-md">
         ${[
           { val:0, label:'Frais',  color:'var(--fd-mint)'       },
@@ -561,68 +552,54 @@ function renderAccueil() {
                   style="flex:1;padding:var(--space-sm) 4px;
                          border-radius:var(--radius-md);
                          border:2px solid ${fatigue?.niveau===f.val
-                           ? f.color : 'var(--border-color)'};
+                           ? f.color:'var(--border-color)'};
                          background:${fatigue?.niveau===f.val
-                           ? f.color+'22' : 'var(--bg-card)'};
+                           ? f.color+'22':'var(--bg-card)'};
                          color:${fatigue?.niveau===f.val
-                           ? f.color : 'var(--text-muted)'};
-                         font-size:.72rem;font-weight:600;
-                         transition:all .2s">
+                           ? f.color:'var(--text-muted)'};
+                         font-size:.72rem;font-weight:600;cursor:pointer">
             ${f.label}
           </button>`).join('')}
       </div>
     </div>
 
-    <!-- Apple Music du jour -->
+    <!-- Apple Music -->
     <div class="apple-music-card mb-md"
-         onclick="ouvrirPlaylist()"
-         style="cursor:pointer">
-      <div style="display:flex;align-items:center;
-                  gap:var(--space-md)">
+         onclick="ouvrirPlaylist()" style="cursor:pointer">
+      <div style="display:flex;align-items:center;gap:var(--space-md)">
         <div style="font-size:2rem">${playlist.emoji}</div>
         <div style="flex:1">
-          <div style="font-size:.65rem;color:#ff3b30;
-                      font-weight:700;
-                      text-transform:uppercase;
-                      letter-spacing:.06em">
+          <div style="font-size:.65rem;color:#ff3b30;font-weight:700;
+                      text-transform:uppercase;letter-spacing:.06em">
             🎵 Apple Music
           </div>
-          <div style="font-weight:700;font-size:.9rem">
-            ${playlist.nom}
-          </div>
-          <div style="font-size:.72rem;color:var(--text-muted)">
-            ${playlist.genre} · ${playlist.description}
-          </div>
+          <div style="font-weight:700;font-size:.9rem">${playlist.nom}</div>
+          <div style="font-size:.72rem;color:var(--text-muted)">${playlist.genre}</div>
         </div>
         <div style="color:#ff3b30;font-weight:700">→</div>
       </div>
     </div>
 
-    <!-- Conseil Coach -->
+    <!-- Coach -->
     <div class="coach-tip-card mb-md">
       <div class="flex items-center gap-md mb-sm">
         <div class="coach-tip-avatar">🤖</div>
-        <div style="font-size:.75rem;font-weight:700;
-                    color:var(--fd-lavender)">
-          ${t('coach.titre')}
+        <div style="font-size:.75rem;font-weight:700;color:var(--fd-lavender)">
+          Coach du jour
         </div>
       </div>
-      <p style="font-size:.85rem;color:var(--text-secondary);
-                line-height:1.5">
-        ${coach.message}
+      <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.5">
+        ${coach.message || ''}
       </p>
     </div>
 
-    <!-- Défis du jour (aperçu) -->
+    <!-- Défis aperçu -->
     ${defis.length > 0 ? `
-      <div class="card mb-md"
-           onclick="naviguer('defis')"
+      <div class="card mb-md" onclick="naviguer('defis')"
            style="cursor:pointer">
         <div class="flex justify-between items-center">
-          <div class="card-label">🏆 ${t('defis.titre')}</div>
-          <span class="chip chip-lemon">
-            ${defisOk}/${defis.length} ${t('defis.completes', {n:''})}
-          </span>
+          <div class="card-label">🏆 Défis semaine</div>
+          <span class="chip chip-lemon">${defisOk}/${defis.length}</span>
         </div>
         <div class="progress-bar mt-md">
           <div class="progress-fill"
@@ -630,44 +607,23 @@ function renderAccueil() {
                       background:var(--fd-lemon)">
           </div>
         </div>
-        <div style="display:flex;gap:var(--space-sm);
-                    margin-top:var(--space-md);flex-wrap:wrap">
-          ${defis.slice(0,3).map(d => `
-            <div style="font-size:.72rem;padding:4px 8px;
-                        background:${d.complete
-                          ? 'rgba(139,240,187,0.15)'
-                          : 'var(--bg-input)'};
-                        border:1px solid ${d.complete
-                          ? 'var(--fd-mint)'
-                          : 'var(--border-color)'};
-                        border-radius:99px;
-                        color:${d.complete
-                          ? 'var(--fd-mint)'
-                          : 'var(--text-muted)'}">
-              ${d.complete ? '✅' : d.emoji} ${d.titre.split(' ').slice(0,3).join(' ')}...
-            </div>`).join('')}
-        </div>
       </div>` : ''}
 
     <!-- Warm-up -->
-    <div class="card mb-md"
-         onclick="naviguer('training')"
+    <div class="card mb-md" onclick="naviguer('training')"
          style="cursor:pointer">
       <div class="flex justify-between items-center">
         <div>
           <div class="card-label">🌡️ Warm-up suggéré</div>
-          <div style="font-size:.88rem;color:var(--text-primary);
-                      margin-top:4px">
-            ${Coach.getWarmupDuJour()?.[0]?.nom || '5 min · Cardio léger'}
-          </div>
-          <div style="font-size:.72rem;color:var(--text-muted)">
-            ${Coach.getWarmupDuJour()?.length || 0} exercices
+          <div style="font-size:.88rem;color:var(--text-primary);margin-top:4px">
+            ${(() => { try { return Coach.getWarmupDuJour()?.[0]?.nom || '5 min · Cardio léger'; } catch(e) { return '5 min · Cardio léger'; } })()}
           </div>
         </div>
         <span style="color:var(--fd-indigo);font-size:1.2rem">→</span>
       </div>
     </div>
   `;
+}
 
   requestAnimationFrame(() => {
     const canvas = document.getElementById('anneau-semaine');
