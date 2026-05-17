@@ -296,14 +296,13 @@ a {
    DROPDOWN MENU
 ════════════════════════════════════════════════════════════ */
 .app-menu {
-  position:   fixed;
-  top:        var(--header-height);
-  right:      0;
-  left:       50%;
-  transform:  none;
-  z-index:    var(--z-modal);
-  max-width:  480px;
-  padding:    var(--space-sm);
+  position:  fixed;
+  top:       var(--header-height);
+  right:     max(0px, calc(50% - 240px)); /* Aligné avec le bord droit du wrapper */
+  left:      auto;
+  width:     240px;
+  z-index:   var(--z-modal);
+  padding:   var(--space-sm);
 }
 
 .app-menu-inner {
@@ -313,11 +312,6 @@ a {
   overflow:       hidden;
   box-shadow:     var(--shadow-lg);
   animation:      slideDown .2s ease;
-}
-
-@keyframes slideDown {
-  from { opacity:0; transform:translateY(-8px) }
-  to   { opacity:1; transform:translateY(0)    }
 }
 
 .menu-item {
