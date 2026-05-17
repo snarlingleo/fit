@@ -1,11 +1,12 @@
 /* ============================================================
-   FitTracker Pro — App.js v2.0
-   Router SPA + Init + Pages complètes
-   + Séance Express + Défis + Share + Predict + i18n
-   + Dashboard amélioré + Apple Music
+   FitTracker Pro — App.js v3.0
+   Router SPA + Init + Pages + Express + Live + Profil
+   + Supersets + Historique + Photos + Auth intégré
    ============================================================ */
 
-// ─── ÉTAT GLOBAL ──────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// ÉTAT GLOBAL
+// ════════════════════════════════════════════════════════════
 const AppState = {
   pageCourante:   'home',
   seanceEnCours:  null,
@@ -18,66 +19,69 @@ const AppState = {
   expressActif:   false,
   expressIndex:   0,
   expressSerieN:  1,
-  expressDebut:   null
+  expressDebut:   null,
+  supersetActif:  null
 };
 
-// ─── INITIALISATION ───────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// INITIALISATION
+// ════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('⚡ PowerApp — Démarrage');
+  console.log('⚡ PowerApp v3.0 — Démarrage');
 
   try { await initServiceWorker(); } catch(e) {}
   try { await afficherSplash();    } catch(e) {}
-  try { i18n.init();               } catch(e) {}
+  try { i18n?.init();              } catch(e) {}
 
-  // ── Attendre que Firebase soit prêt (max 5 secondes)
+  // Attendre Firebase (max 5s)
   let attente = 0;
   while (!window.Auth && attente < 50) {
     await new Promise(r => setTimeout(r, 100));
     attente++;
   }
 
-  // ── Firebase chargé → laisser onAuthStateChanged gérer
   if (window.Auth) {
     window._appEnAttente = true;
     console.log('🔐 Firebase prêt — attente auth...');
 
-    // Timeout sécurité — si auth prend trop longtemps
     setTimeout(() => {
       if (window._appEnAttente) {
-        console.warn('⚠️ Auth timeout — lancement sans auth');
+        console.warn('⚠️ Auth timeout — mode local');
         window._appEnAttente = false;
-        const profil = Tracker.getProfil();
-        if (!profil.nom || profil.nom === 'Athlète') {
-          afficherOnboarding();
-        } else {
-          lancerApp();
-        }
+        _demarrerSansAuth();
       }
     }, 5000);
     return;
   }
 
-  // ── Fallback sans Firebase
-  console.warn('⚠️ Firebase non disponible — mode local');
+  console.warn('⚠️ Firebase indisponible — mode local');
+  _demarrerSansAuth();
+});
+
+function _demarrerSansAuth() {
   const profil = Tracker.getProfil();
   if (!profil.nom || profil.nom === 'Athlète') {
     afficherOnboarding();
   } else {
     lancerApp();
   }
-});
+}
 
-// ─── SERVICE WORKER ───────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// SERVICE WORKER
+// ════════════════════════════════════════════════════════════
 async function initServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    const reg = await navigator.serviceWorker.register('./service-worker.js');
+    const reg = await navigator.serviceWorker
+      .register('./service-worker.js');
     console.log('✅ SW enregistré');
 
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
-      nw.addEventListener('statechange', () => {
-        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+      nw?.addEventListener('statechange', () => {
+        if (nw.state === 'installed'
+            && navigator.serviceWorker.controller) {
           document.getElementById('update-banner')
             ?.classList.remove('hidden');
         }
@@ -86,7 +90,7 @@ async function initServiceWorker() {
 
     document.getElementById('btn-update')
       ?.addEventListener('click', () => {
-        reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
+        reg.waiting?.postMessage({ type:'SKIP_WAITING' });
         window.location.reload();
       });
   } catch(e) {
@@ -94,7 +98,9 @@ async function initServiceWorker() {
   }
 }
 
-// ─── SPLASH ───────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// SPLASH
+// ════════════════════════════════════════════════════════════
 function afficherSplash() {
   return new Promise(resolve => {
     setTimeout(() => {
@@ -106,46 +112,91 @@ function afficherSplash() {
           splash.classList.add('hidden');
           resolve();
         }, 500);
-      } else resolve();
-    }, 2000);
+      } else {
+        resolve();
+      }
+    }, 1800);
   });
 }
 
-// ─── ONBOARDING ───────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// ONBOARDING
+// ════════════════════════════════════════════════════════════
 function afficherOnboarding() {
-  document.getElementById('onboarding').classList.remove('hidden');
-  document.getElementById('app-wrapper').classList.add('hidden');
+  document.getElementById('onboarding')
+    ?.classList.remove('hidden');
+  document.getElementById('app-wrapper')
+    ?.classList.add('hidden');
   renderOnboardingStep(0);
 }
 
 function renderOnboardingStep(step) {
   const wrapper = document.getElementById('onboarding');
-  const etapes  = [
-    { emoji:'🏋️', titre: t('onboarding.bienvenue'),
-      desc: t('onboarding.sous_titre'), action: t('onboarding.commencer') },
-    { emoji:'👤', titre: t('onboarding.etape1'), desc:'',
-      champ:{ id:'ob-nom', placeholder: t('onboarding.prenom'), type:'text' },
-      action: t('onboarding.suivant') },
-    { emoji:'⚖️', titre: t('onboarding.etape2'),
-      desc:'Pour calculer tes stats et personnaliser ton programme.',
-      champs:[
-        { id:'ob-poids',  placeholder: t('onboarding.poids'),  type:'number' },
-        { id:'ob-taille', placeholder: t('onboarding.taille'), type:'number' }
-      ], action: t('onboarding.suivant') },
-    { emoji:'🔔', titre:'Activer les rappels ?',
-      desc:'Reçois des notifications si tu sautes une séance.',
-      action:'Activer', actionAlt:'Plus tard' },
-    { emoji:'🚀', titre: t('onboarding.etape4'),
-      desc:'Ton programme commence aujourd\'hui. Allons-y !',
-      action: t('onboarding.commencer') }
+  if (!wrapper) return;
+
+  const t = (k) => {
+    try { return window.i18n?.t(k) || k; } catch(e) { return k; }
+  };
+
+  const etapes = [
+    {
+      emoji: '🏋️',
+      titre: t('onboarding.bienvenue') || 'Bienvenue sur PowerApp',
+      desc:  t('onboarding.sous_titre') || 'Ton coach fitness personnel',
+      action: t('onboarding.commencer') || 'Commencer'
+    },
+    {
+      emoji: '👤',
+      titre: t('onboarding.etape1') || 'Quel est ton prénom ?',
+      desc:  '',
+      champ: {
+        id: 'ob-nom',
+        placeholder: t('onboarding.prenom') || 'Ton prénom',
+        type: 'text'
+      },
+      action: t('onboarding.suivant') || 'Suivant'
+    },
+    {
+      emoji: '⚖️',
+      titre: t('onboarding.etape2') || 'Tes mensurations',
+      desc:  'Pour calculer tes stats et personnaliser ton programme.',
+      champs: [
+        {
+          id: 'ob-poids',
+          placeholder: t('onboarding.poids') || 'Poids (kg)',
+          type: 'number'
+        },
+        {
+          id: 'ob-taille',
+          placeholder: t('onboarding.taille') || 'Taille (cm)',
+          type: 'number'
+        }
+      ],
+      action: t('onboarding.suivant') || 'Suivant'
+    },
+    {
+      emoji:     '🔔',
+      titre:     'Activer les rappels ?',
+      desc:      'Reçois des notifications si tu sautes une séance.',
+      action:    'Activer',
+      actionAlt: 'Plus tard'
+    },
+    {
+      emoji:  '🚀',
+      titre:  t('onboarding.etape4') || 'C\'est parti !',
+      desc:   'Ton programme commence aujourd\'hui. Allons-y !',
+      action: t('onboarding.commencer') || 'Démarrer'
+    }
   ];
 
   const e = etapes[step];
+
   wrapper.innerHTML = `
     <div class="onboarding-step">
       <div class="onboarding-dots">
         ${etapes.map((_,i) => `
-          <div class="dot ${i===step?'active':''}"></div>`).join('')}
+          <div class="dot ${i===step?'active':''}"></div>
+        `).join('')}
       </div>
       <div class="onboarding-emoji">${e.emoji}</div>
       <h2>${e.titre}</h2>
@@ -160,7 +211,8 @@ function renderOnboardingStep(step) {
           ${e.champs.map(c => `
             <input class="input" id="${c.id}"
                    type="${c.type}"
-                   placeholder="${c.placeholder}" />`).join('')}
+                   placeholder="${c.placeholder}" />
+          `).join('')}
         </div>` : ''}
       <div style="margin-top:var(--space-xl)">
         <button class="btn-primary"
@@ -178,13 +230,20 @@ function renderOnboardingStep(step) {
 
 async function avancerOnboarding(step, alt = false) {
   if (step === 1) {
-    const nom = document.getElementById('ob-nom')?.value?.trim();
-    if (!nom) { Utils.toast('Entre ton prénom !', 'error'); return; }
+    const nom = document.getElementById('ob-nom')
+      ?.value?.trim();
+    if (!nom) {
+      Utils.toast('Entre ton prénom !', 'error');
+      return;
+    }
     Tracker.sauvegarderProfil({ nom });
   }
+
   if (step === 2) {
-    const poids  = parseFloat(document.getElementById('ob-poids')?.value);
-    const taille = parseFloat(document.getElementById('ob-taille')?.value);
+    const poids  = parseFloat(
+      document.getElementById('ob-poids')?.value);
+    const taille = parseFloat(
+      document.getElementById('ob-taille')?.value);
     if (!poids || !taille) {
       Utils.toast('Remplis tes mesures !', 'error');
       return;
@@ -192,75 +251,84 @@ async function avancerOnboarding(step, alt = false) {
     Tracker.sauvegarderProfil({ poids, taille });
     Tracker.ajouterMesure({ poids, taille });
   }
+
   if (step === 3 && !alt) {
-    await Notifications.init();
+    try { await Notifications.init(); } catch(e) {}
   }
+
   if (step === 4) {
-    Programme.setDateDebut(Utils.aujourd_hui());
-    Gamification.recompenser('PREMIERE_SEANCE');
-    Defis.genererDefis();
-    document.getElementById('onboarding').classList.add('hidden');
+    try {
+      Programme.setDateDebut(Utils.aujourd_hui());
+      Gamification.recompenser('PREMIERE_SEANCE');
+      Defis.genererDefis();
+    } catch(e) {}
+    document.getElementById('onboarding')
+      ?.classList.add('hidden');
     lancerApp();
     return;
   }
+
   renderOnboardingStep(step + 1);
 }
 
-// ─── LANCER L'APP ─────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// LANCER L'APP
+// ════════════════════════════════════════════════════════════
 function lancerApp() {
-  document.getElementById('app-wrapper').classList.remove('hidden');
+  document.getElementById('app-wrapper')
+    ?.classList.remove('hidden');
 
   initHeader();
   initNav();
   initInstallPrompt();
   initTheme();
   initExercicesCustom();
-  Notifications.init();
-  Utils.verifierBackupAuto();
 
-  // Init nouveaux modules
-  Defis.genererDefis();
-
-  const stats = ExerciseGIF.statsCache();
-  console.log(`[GIF] Cache: ${stats.cached}/${stats.total}`);
-  if (stats.cached < stats.total) {
-    setTimeout(() => {
-      ExerciseGIF.prechargerTout((current, total) => {
-        if (current === total) {
-          Utils.toast(`✅ ${total} GIFs chargés !`, 'success', 2000);
-        }
-      });
-    }, 3000);
-  }
+  try { Notifications.init();          } catch(e) {}
+  try { Utils.verifierBackupAuto();    } catch(e) {}
+  try { Defis.genererDefis();          } catch(e) {}
 
   const params = new URLSearchParams(window.location.search);
   const page   = params.get('page')   || 'home';
   const action = params.get('action');
 
-  naviguer(action === 'start-session' ? 'training' : page);
-  setTimeout(() => Gamification.verifierTrophees(), 2000);
-  setTimeout(() => Defis.mettreAJourProgression(), 3000);
+  naviguer(action === 'start-session' ? 'live' : page);
+
+  setTimeout(() => {
+    try { Gamification.verifierTrophees();    } catch(e) {}
+  }, 2000);
+  setTimeout(() => {
+    try { Defis.mettreAJourProgression();     } catch(e) {}
+  }, 3000);
 }
 
-// ─── HEADER ───────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// HEADER
+// ════════════════════════════════════════════════════════════
 function initHeader() {
-  const infos = Programme.getInfosProgramme();
-  const sub   = document.getElementById('header-phase');
-  if (sub) sub.textContent = infos.label;
+  try {
+    const infos = Programme.getInfosProgramme();
+    const sub   = document.getElementById('header-phase');
+    if (sub) sub.textContent = infos.label;
+  } catch(e) {}
+
   document.getElementById('btn-theme')
     ?.addEventListener('click', toggleTheme);
   document.getElementById('btn-profile-quick')
     ?.addEventListener('click', () => naviguer('profile'));
 }
 
-// ─── NAVIGATION ───────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════════
 function initNav() {
-  document.querySelectorAll('.nav-item, .nav-center-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const page = btn.dataset.page;
-      if (page) naviguer(page);
+  document.querySelectorAll('.nav-item, .nav-center-btn')
+    .forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = btn.dataset.page;
+        if (page) naviguer(page);
+      });
     });
-  });
 }
 
 function naviguer(page) {
@@ -268,41 +336,59 @@ function naviguer(page) {
   window._pageActive    = page;
 
   document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.page === page);
+    btn.classList.toggle(
+      'active', btn.dataset.page === page
+    );
   });
 
-  const infos = Programme.getInfosProgramme();
-  const sub   = document.getElementById('header-phase');
-  if (sub) sub.textContent = infos.label;
+  try {
+    const infos = Programme.getInfosProgramme();
+    const sub   = document.getElementById('header-phase');
+    if (sub) sub.textContent = infos.label;
+  } catch(e) {}
 
   document.getElementById('page-content')?.scrollTo(0, 0);
 
   switch(page) {
-    case 'home':      renderAccueil();              break;
-    case 'training':  renderTraining();             break;
-    case 'live':      renderLive();                 break;
-    case 'nutrition': Nutrition.render();           break;
-    case 'stats':     Stats.render(null,'dashboard'); break;
-    case 'profile':   renderProfil();              break;
-    case 'express':   renderExpress();             break;
-    case 'defis':     renderPageDefis();           break;
-    case 'share':     renderPageShare();           break;
-    case 'predict':   renderPagePredict();         break;
+    case 'home':      renderAccueil();                break;
+    case 'training':  renderTraining();               break;
+    case 'live':      renderLive();                   break;
+    case 'nutrition': try { Nutrition.render(); } catch(e) { _renderPageVide('🥗', 'Nutrition'); } break;
+    case 'stats':     try { Stats.render(null, 'dashboard'); } catch(e) {} break;
+    case 'profile':   renderProfil();                 break;
+    case 'express':   renderExpress();                break;
+    case 'defis':     renderPageDefis();              break;
+    case 'share':     renderPageShare();              break;
+    case 'predict':   renderPagePredict();            break;
     default:          renderAccueil();
   }
 }
 
-// ─── THÈME ────────────────────────────────────────────────────
+function _renderPageVide(emoji, titre) {
+  const c = document.getElementById('page-content');
+  if (!c) return;
+  c.innerHTML = `
+    <div style="text-align:center;padding:var(--space-2xl)">
+      <div style="font-size:3rem;margin-bottom:var(--space-md)">
+        ${emoji}
+      </div>
+      <p style="color:var(--text-muted)">${titre} — bientôt disponible</p>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// THÈME
+// ════════════════════════════════════════════════════════════
 function initTheme() {
   appliquerTheme(Utils.storage.get('ft_theme', 'dark'));
 }
 
 function toggleTheme() {
-  const themes = ['dark', 'light', 'indigo', 'midnight'];
-  const actuel = document.documentElement.getAttribute('data-theme');
+  const themes = ['dark','light','indigo','midnight'];
+  const actuel = document.documentElement
+    .getAttribute('data-theme') || 'dark';
   const idx    = themes.indexOf(actuel);
-  const nouveau = themes[(idx + 1) % themes.length];
-  appliquerTheme(nouveau);
+  appliquerTheme(themes[(idx + 1) % themes.length]);
 }
 
 function appliquerTheme(theme) {
@@ -319,7 +405,9 @@ function appliquerTheme(theme) {
   });
 }
 
-// ─── INSTALL PROMPT ───────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// INSTALL PROMPT
+// ════════════════════════════════════════════════════════════
 function initInstallPrompt() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
@@ -347,74 +435,87 @@ function initInstallPrompt() {
 }
 
 // ════════════════════════════════════════════════════════════
-// PAGE ACCUEIL — Dashboard amélioré
+// PAGE ACCUEIL
 // ════════════════════════════════════════════════════════════
 function renderAccueil() {
   const container = document.getElementById('page-content');
   if (!container) return;
 
-  // ── Données sécurisées
   let profil   = {};
-  let infos    = { label:'S1', cycle:1, semaine:1, progression:0,
-                   phase:{ nom:'Reprise', emoji:'🌱', numero:1 } };
+  let infos    = {
+    label:'S1', cycle:1, semaine:1, progression:0,
+    phase:{ nom:'Reprise', emoji:'🌱', numero:1 }
+  };
   let seance   = null;
   let streak   = { count:0, max:0 };
-  let score    = { score:50, niveau:'Correct' };
+  let score    = { score:50, niveau:'En forme' };
   let humeur   = null;
   let fatigue  = null;
-  let coach    = { emoji:'💪', message:'Prêt pour la séance ?' };
+  let coach    = { message:'Prêt pour la séance ?' };
   let seanceDJ = 0;
   let objectif = 4;
   let heatmap  = {};
   let analyse  = {
-    fatigue: { recommandation: { message:'', emoji:'🟢', couleur:'var(--fd-mint)' } },
-    opportunitePR: null
+    fatigue: {
+      recommandation: {
+        message:'', emoji:'🟢',
+        couleur:'var(--fd-mint)'
+      }
+    }
   };
   let defis    = [];
-  let playlist = { emoji:'🎵', nom:'Workout', genre:'Mix', description:'', url:'#' };
+  let playlist = {
+    emoji:'🎵', nom:'Workout',
+    genre:'Mix', url:'#'
+  };
   let volume   = 0;
-  let comp     = { delta: 0 };
+  let comp     = { delta:0 };
 
-  try { profil   = Tracker.getProfil();                   } catch(e) { console.warn('profil',e); }
-  try { infos    = Programme.getInfosProgramme();         } catch(e) { console.warn('infos',e); }
-  try { seance   = Programme.getProchaineSeance();        } catch(e) { console.warn('seance',e); }
-  try { streak   = Tracker.getStreak();                   } catch(e) {}
-  try { score    = Tracker.calculerScoreForme();          } catch(e) {}
-  try { humeur   = Tracker.getHumeur();                   } catch(e) {}
-  try { fatigue  = Tracker.getFatigue();                  } catch(e) {}
-  try { coach    = Coach.getMessageDuJour();              } catch(e) {}
-  try { seanceDJ = Tracker.getSeancesParSemaine();        } catch(e) {}
-  try { objectif = Utils.storage.get('ft_objectif_seances_semaine', 4); } catch(e) {}
-  try { heatmap  = Tracker.getHeatmapData(7);            } catch(e) {}
-  try { analyse  = Predict.getAnalyseGlobale();          } catch(e) {}
-  try { defis    = Defis.mettreAJourProgression() || []; } catch(e) {}
-  try { playlist = Share.getPlaylistDuJour();            } catch(e) {}
-  try { volume   = Tracker.getVolumeSemaine();           } catch(e) {}
-  try { comp     = Stats.getComparaisonSemaines?.() || { delta:0 }; } catch(e) {}
+  try { profil   = Tracker.getProfil();                 } catch(e) {}
+  try { infos    = Programme.getInfosProgramme();       } catch(e) {}
+  try { seance   = Programme.getProchaineSeance();      } catch(e) {}
+  try { streak   = Tracker.getStreak();                 } catch(e) {}
+  try { score    = Tracker.calculerScoreForme();        } catch(e) {}
+  try { humeur   = Tracker.getHumeur();                 } catch(e) {}
+  try { fatigue  = Tracker.getFatigue();                } catch(e) {}
+  try { coach    = Coach.getMessageDuJour();            } catch(e) {}
+  try { seanceDJ = Tracker.getSeancesParSemaine();      } catch(e) {}
+  try { objectif = Utils.storage.get(
+          'ft_objectif_seances_semaine', 4);            } catch(e) {}
+  try { heatmap  = Tracker.getHeatmapData(7);          } catch(e) {}
+  try { analyse  = Predict.getAnalyseGlobale();        } catch(e) {}
+  try { defis    = Defis.mettreAJourProgression()||[];  } catch(e) {}
+  try { playlist = Share.getPlaylistDuJour();          } catch(e) {}
+  try { volume   = Tracker.getVolumeSemaine();         } catch(e) {}
+  try { comp     = Tracker.getComparaisonSemaines
+          ?.() || { delta:0 };                          } catch(e) {}
 
   const defisOk = defis.filter(d => d.complete).length;
+  const totalPRs = (() => {
+    try { return Object.keys(Tracker.getAllPRs()).length; }
+    catch(e) { return 0; }
+  })();
 
   container.innerHTML = `
 
-    <!-- Hero Dashboard -->
+    <!-- Hero -->
     <div class="dashboard-hero mb-md">
       <div class="dashboard-greeting">
-        ${Utils.salutation()}, ${profil.nom || 'Athlète'} ${profil.avatar || '💪'}
+        ${Utils.salutation()},
+        ${profil.nom || 'Athlète'} ${profil.avatar || '💪'}
       </div>
       <div class="dashboard-sub">
         ${infos.label} · Cycle ${infos.cycle}
-        · ${infos.phase?.emoji || '🌱'} ${infos.phase?.nom || 'Reprise'}
+        · ${infos.phase?.emoji||'🌱'} ${infos.phase?.nom||'Reprise'}
       </div>
 
       <div class="dashboard-score">
         <div class="score-ring">
           <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle cx="36" cy="36" r="30"
-                    fill="none"
+            <circle cx="36" cy="36" r="30" fill="none"
                     stroke="rgba(255,255,255,0.1)"
                     stroke-width="6"/>
-            <circle cx="36" cy="36" r="30"
-                    fill="none"
+            <circle cx="36" cy="36" r="30" fill="none"
                     stroke="${score.score >= 80
                       ? 'var(--fd-mint)'
                       : score.score >= 60
@@ -426,7 +527,7 @@ function renderAccueil() {
                     stroke-dashoffset="${2*Math.PI*30*(1-(score.score||50)/100)}"
                     transform="rotate(-90 36 36)"/>
           </svg>
-          <div class="score-ring-text">${score.score || 50}</div>
+          <div class="score-ring-text">${score.score||50}</div>
         </div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:.95rem">
@@ -445,23 +546,23 @@ function renderAccueil() {
       <div style="margin-top:var(--space-md)">
         <div style="font-size:.65rem;opacity:.6;
                     margin-bottom:6px;text-transform:uppercase;
-                    letter-spacing:.06em">
-          Cette semaine
-        </div>
+                    letter-spacing:.06em">Cette semaine</div>
         <div class="mini-heatmap">
           ${['L','M','M','J','V','S','D'].map((j, i) => {
-            let date  = '';
-            let etat  = 'none';
-            let isToday = false;
+            let date = '', etat = 'none', isToday = false;
             try {
-              date    = Utils.ajouterJours(Utils.debutSemaine(Utils.aujourd_hui()), i);
+              date    = Utils.ajouterJours(
+                Utils.debutSemaine(Utils.aujourd_hui()), i);
               etat    = heatmap[date] || 'none';
               isToday = date === Utils.aujourd_hui();
             } catch(e) {}
             return `
               <div style="text-align:center">
-                <div style="font-size:.6rem;opacity:.5;margin-bottom:3px">${j}</div>
-                <div class="mini-heatmap-cell ${etat} ${isToday?'today':''}"></div>
+                <div style="font-size:.6rem;opacity:.5;
+                            margin-bottom:3px">${j}</div>
+                <div class="mini-heatmap-cell
+                     ${etat} ${isToday?'today':''}">
+                </div>
               </div>`;
           }).join('')}
         </div>
@@ -471,12 +572,12 @@ function renderAccueil() {
     <!-- Actions rapides -->
     <div class="home-quick-actions mb-md">
       ${[
-        { icon:'⚡', label:'Express',  action:"naviguer('express')"  },
-        { icon:'📊', label:'Stats',    action:"naviguer('stats')"    },
-        { icon:'🏆', label:'Défis',    action:"naviguer('defis')"    },
-        { icon:'🔮', label:'Predict',  action:"naviguer('predict')"  },
-        { icon:'📸', label:'Partager', action:"naviguer('share')"    },
-        { icon:'🎵', label:'Musique',  action:"ouvrirPlaylist()"     }
+        { icon:'⚡', label:'Express',  action:"naviguer('express')" },
+        { icon:'📊', label:'Stats',    action:"naviguer('stats')"   },
+        { icon:'🏆', label:'Défis',    action:"naviguer('defis')"   },
+        { icon:'🔮', label:'Predict',  action:"naviguer('predict')" },
+        { icon:'📸', label:'Photos',   action:"naviguer('stats')"   },
+        { icon:'🎵', label:'Musique',  action:"ouvrirPlaylist()"    }
       ].map(a => `
         <button class="quick-action-btn" onclick="${a.action}">
           <span class="quick-action-icon">${a.icon}</span>
@@ -486,11 +587,11 @@ function renderAccueil() {
 
     <!-- Widgets -->
     <div class="widget-grid mb-md">
-      <div class="widget-card ${seanceDJ >= objectif ? 'highlight' : ''}">
+      <div class="widget-card ${seanceDJ >= objectif ? 'highlight':''}">
         <div class="widget-icon">📅</div>
         <div class="widget-value">${seanceDJ}/${objectif}</div>
         <div class="widget-label">Séances</div>
-        <div class="widget-trend ${seanceDJ >= objectif ? 'up' : 'flat'}">
+        <div class="widget-trend ${seanceDJ >= objectif ? 'up':'flat'}">
           ${seanceDJ >= objectif
             ? '✅ Objectif !'
             : `${objectif-seanceDJ} restante${objectif-seanceDJ>1?'s':''}`}
@@ -498,25 +599,29 @@ function renderAccueil() {
       </div>
       <div class="widget-card">
         <div class="widget-icon">🏋️</div>
-        <div class="widget-value">${Utils.formatVolume(volume)}</div>
+        <div class="widget-value">
+          ${Utils.formatVolume(volume)}
+        </div>
         <div class="widget-label">Volume</div>
-        <div class="widget-trend ${(comp.delta||0) >= 0 ? 'up' : 'down'}">
+        <div class="widget-trend ${(comp.delta||0) >= 0 ? 'up':'down'}">
           ${(comp.delta||0) >= 0 ? '+' : ''}${comp.delta||0}% vs S-1
         </div>
       </div>
       <div class="widget-card">
         <div class="widget-icon">🏆</div>
-        <div class="widget-value">
-          ${(() => { try { return Object.keys(Tracker.getAllPRs()).length; } catch(e) { return 0; } })()}
-        </div>
+        <div class="widget-value">${totalPRs}</div>
         <div class="widget-label">Records</div>
         <div class="widget-trend flat">PRs totaux</div>
       </div>
       <div class="widget-card">
         <div class="widget-icon">🎯</div>
-        <div class="widget-value">${defisOk}/${defis.length || 0}</div>
+        <div class="widget-value">
+          ${defisOk}/${defis.length||0}
+        </div>
         <div class="widget-label">Défis</div>
-        <div class="widget-trend ${defisOk > 0 && defisOk === defis.length ? 'up' : 'flat'}">
+        <div class="widget-trend ${
+          defisOk > 0 && defisOk === defis.length
+            ? 'up' : 'flat'}">
           ${defisOk > 0 && defisOk === defis.length
             ? '🏆 Complet !'
             : `${(defis.length||0) - defisOk} en cours`}
@@ -536,10 +641,11 @@ function renderAccueil() {
             : `📅 Dans ${seance.dansJours} jour${seance.dansJours>1?'s':''}`}
         </div>
         <div style="font-size:1.1rem;font-weight:700">
-          ${seance.emoji || '💪'} ${seance.nom}
+          ${seance.emoji||'💪'} ${seance.nom}
         </div>
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
-          ${seance.exercices?.length || 0} exercices · ~${seance.duree_estimee}min
+          ${seance.exercices?.length||0} exercices
+          · ~${seance.duree_estimee}min
         </div>
         <div style="margin-top:var(--space-sm)">
           <div class="progress-bar">
@@ -560,7 +666,8 @@ function renderAccueil() {
       <div class="card-label">😊 Humeur du jour</div>
       <div class="humeur-grid mt-md">
         ${['🔥','😊','😐','😒','😤'].map(h => `
-          <button class="humeur-btn ${humeur?.humeur===h?'selected':''}"
+          <button class="humeur-btn
+                  ${humeur?.humeur===h?'selected':''}"
                   onclick="selectionnerHumeur('${h}')">
             ${h}
           </button>`).join('')}
@@ -572,21 +679,22 @@ function renderAccueil() {
       <div class="card-label">🌡️ Niveau de fatigue</div>
       <div class="flex gap-sm mt-md">
         ${[
-          { val:0, label:'Frais',  color:'var(--fd-mint)'       },
-          { val:1, label:'OK',     color:'var(--fd-lemon)'      },
-          { val:2, label:'Modéré', color:'var(--fd-coral)'      },
-          { val:3, label:'Épuisé', color:'rgba(255,141,150,.6)' }
+          { val:0, label:'Frais',   color:'var(--fd-mint)'        },
+          { val:1, label:'OK',      color:'var(--fd-lemon)'       },
+          { val:2, label:'Modéré',  color:'var(--fd-coral)'       },
+          { val:3, label:'Épuisé',  color:'rgba(255,141,150,.6)'  }
         ].map(f => `
           <button onclick="selectionnerFatigue(${f.val})"
                   style="flex:1;padding:var(--space-sm) 4px;
                          border-radius:var(--radius-md);
                          border:2px solid ${fatigue?.niveau===f.val
-                           ? f.color:'var(--border-color)'};
+                           ? f.color : 'var(--border-color)'};
                          background:${fatigue?.niveau===f.val
-                           ? f.color+'22':'var(--bg-card)'};
+                           ? f.color+'22' : 'var(--bg-card)'};
                          color:${fatigue?.niveau===f.val
-                           ? f.color:'var(--text-muted)'};
-                         font-size:.72rem;font-weight:600;cursor:pointer">
+                           ? f.color : 'var(--text-muted)'};
+                         font-size:.72rem;font-weight:600;
+                         cursor:pointer">
             ${f.label}
           </button>`).join('')}
       </div>
@@ -595,15 +703,19 @@ function renderAccueil() {
     <!-- Apple Music -->
     <div class="apple-music-card mb-md"
          onclick="ouvrirPlaylist()" style="cursor:pointer">
-      <div style="display:flex;align-items:center;gap:var(--space-md)">
+      <div style="display:flex;align-items:center;
+                  gap:var(--space-md)">
         <div style="font-size:2rem">${playlist.emoji}</div>
         <div style="flex:1">
-          <div style="font-size:.65rem;color:#ff3b30;font-weight:700;
-                      text-transform:uppercase;letter-spacing:.06em">
-            🎵 Apple Music
+          <div style="font-size:.65rem;color:#ff3b30;
+                      font-weight:700;text-transform:uppercase;
+                      letter-spacing:.06em">🎵 Apple Music</div>
+          <div style="font-weight:700;font-size:.9rem">
+            ${playlist.nom}
           </div>
-          <div style="font-weight:700;font-size:.9rem">${playlist.nom}</div>
-          <div style="font-size:.72rem;color:var(--text-muted)">${playlist.genre}</div>
+          <div style="font-size:.72rem;color:var(--text-muted)">
+            ${playlist.genre}
+          </div>
         </div>
         <div style="color:#ff3b30;font-weight:700">→</div>
       </div>
@@ -613,12 +725,14 @@ function renderAccueil() {
     <div class="coach-tip-card mb-md">
       <div class="flex items-center gap-md mb-sm">
         <div class="coach-tip-avatar">🤖</div>
-        <div style="font-size:.75rem;font-weight:700;color:var(--fd-lavender)">
+        <div style="font-size:.75rem;font-weight:700;
+                    color:var(--fd-lavender)">
           Coach du jour
         </div>
       </div>
-      <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.5">
-        ${coach.message || ''}
+      <p style="font-size:.85rem;color:var(--text-secondary);
+                line-height:1.5">
+        ${coach?.message || '💪 Prêt pour la séance ?'}
       </p>
     </div>
 
@@ -628,7 +742,9 @@ function renderAccueil() {
            style="cursor:pointer">
         <div class="flex justify-between items-center">
           <div class="card-label">🏆 Défis semaine</div>
-          <span class="chip chip-lemon">${defisOk}/${defis.length}</span>
+          <span class="chip chip-lemon">
+            ${defisOk}/${defis.length}
+          </span>
         </div>
         <div class="progress-bar mt-md">
           <div class="progress-fill"
@@ -644,48 +760,65 @@ function renderAccueil() {
       <div class="flex justify-between items-center">
         <div>
           <div class="card-label">🌡️ Warm-up suggéré</div>
-          <div style="font-size:.88rem;color:var(--text-primary);margin-top:4px">
-            ${(() => { try { return Coach.getWarmupDuJour()?.[0]?.nom || '5 min · Cardio léger'; } catch(e) { return '5 min · Cardio léger'; } })()}
+          <div style="font-size:.88rem;color:var(--text-primary);
+                      margin-top:4px">
+            ${(() => {
+              try {
+                return Coach.getWarmupDuJour()?.[0]?.nom
+                  || '5 min · Cardio léger';
+              } catch(e) {
+                return '5 min · Cardio léger';
+              }
+            })()}
           </div>
         </div>
         <span style="color:var(--fd-indigo);font-size:1.2rem">→</span>
       </div>
     </div>
-`;
+  `;
 }
 
 function selectionnerHumeur(h) {
-  Tracker.sauvegarderHumeur(h);
-  Gamification.ajouterXP(10, 'humeur du jour');
+  try { Tracker.sauvegarderHumeur(h);              } catch(e) {}
+  try { Gamification.ajouterXP(10, 'humeur');      } catch(e) {}
   Utils.vibrerBeep();
   renderAccueil();
 }
 
 function selectionnerFatigue(niveau) {
-  Tracker.sauvegarderFatigue(niveau);
+  try { Tracker.sauvegarderFatigue(niveau); } catch(e) {}
   Utils.vibrerBeep();
   renderAccueil();
 }
 
 function ouvrirPlaylist() {
-  const playlist = Share.getPlaylistDuJour();
-  window.open(playlist.url, '_blank');
+  try {
+    const playlist = Share.getPlaylistDuJour();
+    window.open(playlist.url, '_blank');
+  } catch(e) {
+    window.open('https://music.apple.com', '_blank');
+  }
 }
 
 // ════════════════════════════════════════════════════════════
-// PAGE EXPRESS — Séance 30 minutes
+// PAGE EXPRESS
 // ════════════════════════════════════════════════════════════
 function renderExpress() {
-  const container  = document.getElementById('page-content');
-  const seance     = Programme.getSeanceduJour();
-  const fatigue    = Predict.analyserFatigue();
+  const container = document.getElementById('page-content');
+  if (!container) return;
 
-  // Sélectionner 5 exercices express selon fatigue
+  let seance  = null;
+  let fatigue = { score:70, recommandation:{
+    emoji:'🟢', message:'Forme optimale',
+    couleur:'var(--fd-mint)'
+  }};
+
+  try { seance  = Programme.getSeanceduJour();  } catch(e) {}
+  try { fatigue = Predict.analyserFatigue();    } catch(e) {}
+
   const exercices = _selectionnerExercicesExpress(seance, fatigue);
 
   container.innerHTML = `
-
-    <!-- Header -->
     <div class="express-header">
       <div class="flex justify-between items-center">
         <button class="btn-icon"
@@ -700,15 +833,13 @@ function renderExpress() {
                     color:var(--fd-lemon)"
              id="express-chrono">30:00</div>
       </div>
-
-      <!-- Steps -->
       <div class="express-steps mt-md">
-        ${exercices.map((_, i) => `
-          <div class="express-step" id="step-${i}"></div>`).join('')}
+        ${exercices.map((_,i) => `
+          <div class="express-step" id="step-${i}"></div>
+        `).join('')}
       </div>
     </div>
 
-    <!-- État forme -->
     <div class="card mb-md"
          style="background:${fatigue.recommandation.couleur}11;
                 border-color:${fatigue.recommandation.couleur}44">
@@ -728,18 +859,19 @@ function renderExpress() {
       </div>
     </div>
 
-    <!-- Liste exercices -->
     ${exercices.map((exo, i) => {
       const ex  = window.EXERCICES?.[exo.ref] || {};
-      const pr  = Tracker.getPR(exo.ref);
-      const reco = Predict.recommanderCharge(exo.ref);
-      const chargeReco = reco?.charge || (pr?.poids || '?');
+      let pr    = null, chargeReco = '?';
+      try { pr = Tracker.getPR(exo.ref); } catch(e) {}
+      try {
+        const reco = Predict.recommanderCharge(exo.ref);
+        chargeReco = reco?.charge || pr?.poids || '?';
+      } catch(e) { chargeReco = pr?.poids || '?'; }
 
       return `
         <div class="express-exo-card" id="express-exo-${i}">
           <div class="flex items-center gap-md">
-            <div style="width:44px;height:44px;
-                        border-radius:50%;
+            <div style="width:44px;height:44px;border-radius:50%;
                         background:var(--bg-input);
                         display:flex;align-items:center;
                         justify-content:center;
@@ -750,15 +882,12 @@ function renderExpress() {
               <div style="font-weight:700;font-size:.92rem">
                 ${i+1}. ${ex.nom || exo.ref}
               </div>
-              <div style="font-size:.72rem;
-                          color:var(--fd-mint)">
+              <div style="font-size:.72rem;color:var(--fd-mint)">
                 ${ex.muscle || ''}
               </div>
-              <div style="font-size:.72rem;
-                          color:var(--text-muted);
+              <div style="font-size:.72rem;color:var(--text-muted);
                           margin-top:2px">
-                ${exo.series} × ${exo.reps}
-                · Repos ${exo.repos}s
+                ${exo.series} × ${exo.reps} · Repos ${exo.repos}s
               </div>
             </div>
             <div style="text-align:right">
@@ -766,13 +895,11 @@ function renderExpress() {
                           color:var(--fd-indigo)">
                 ${chargeReco}kg
               </div>
-              <div style="font-size:.62rem;
-                          color:var(--text-muted)">
+              <div style="font-size:.62rem;color:var(--text-muted)">
                 recommandé
               </div>
               ${pr ? `
-                <div style="font-size:.6rem;
-                            color:var(--fd-lemon)">
+                <div style="font-size:.6rem;color:var(--fd-lemon)">
                   PR: ${pr.poids}kg
                 </div>` : ''}
             </div>
@@ -780,11 +907,10 @@ function renderExpress() {
         </div>`;
     }).join('')}
 
-    <!-- Bouton démarrer -->
     <button class="btn-primary"
             onclick="demarrerExpress(${JSON.stringify(exercices).replace(/"/g,"'")})"
             style="position:sticky;
-                   bottom:calc(var(--nav-height) + var(--space-md));
+                   bottom:calc(var(--nav-height)+var(--space-md));
                    width:100%;margin-top:var(--space-md);
                    box-shadow:0 8px 32px rgba(75,75,249,0.4)">
       ⚡ Démarrer la séance express
@@ -793,25 +919,20 @@ function renderExpress() {
 }
 
 function _selectionnerExercicesExpress(seance, fatigue) {
-  // Si séance du jour dispo → utiliser ses exercices
   if (seance?.exercices?.length >= 4) {
-    const intensiteAjust = fatigue.score < 50 ? 0.8 : 1;
+    const ajust = (fatigue?.score || 70) < 50 ? 0.8 : 1;
     return seance.exercices.slice(0, 5).map(ex => ({
       ...ex,
-      repos: Math.round((ex.repos || 90) * intensiteAjust)
+      repos: Math.round((ex.repos || 90) * ajust)
     }));
   }
-
-  // Sinon → Full Body express
-  const expressDefaut = [
-    { ref:'bench_press',     series:3, reps:'10',  repos:60 },
-    { ref:'lat_pulldown',    series:3, reps:'12',  repos:60 },
-    { ref:'squat',           series:3, reps:'10',  repos:75 },
-    { ref:'dev_militaire',   series:3, reps:'10',  repos:60 },
-    { ref:'planche',         series:3, reps:'45s', repos:45 }
+  return [
+    { ref:'bench_press',   series:3, reps:'10',  repos:60 },
+    { ref:'lat_pulldown',  series:3, reps:'12',  repos:60 },
+    { ref:'squat',         series:3, reps:'10',  repos:75 },
+    { ref:'dev_militaire', series:3, reps:'10',  repos:60 },
+    { ref:'planche',       series:3, reps:'45s', repos:45 }
   ];
-
-  return expressDefaut;
 }
 
 function demarrerExpress(exercices) {
@@ -825,7 +946,6 @@ function demarrerExpress(exercices) {
   AppState.expressSerieN = 1;
   AppState.expressDebut  = Date.now();
 
-  // Démarrer le chrono global
   chronoSeance.demarrer(elapsed => {
     const el    = document.getElementById('express-chrono');
     const reste = Math.max(0, 30*60 - elapsed);
@@ -835,23 +955,30 @@ function demarrerExpress(exercices) {
     }
   });
 
-  Tracker.demarrerSeance('express_' + Utils.aujourd_hui());
+  try { Tracker.demarrerSeance('express_' + Utils.aujourd_hui()); }
+  catch(e) {}
   renderExpressExercice(exercices);
 }
 
 function renderExpressExercice(exercices) {
   const container = document.getElementById('page-content');
-  const idx       = AppState.expressIndex;
-  const exo       = exercices[idx];
-  const ex        = window.EXERCICES?.[exo?.ref] || {};
-  const pr        = Tracker.getPR(exo?.ref);
-  const derniere  = Tracker.getDernierePerf('express_' + Utils.aujourd_hui(), exo?.ref);
-  const elapsed   = Math.floor((Date.now() - AppState.expressDebut) / 1000);
-  const reste     = Math.max(0, 30*60 - elapsed);
+  if (!container) return;
+
+  const idx      = AppState.expressIndex;
+  const exo      = exercices[idx];
+  const ex       = window.EXERCICES?.[exo?.ref] || {};
+  const elapsed  = Math.floor(
+    (Date.now() - (AppState.expressDebut || Date.now())) / 1000
+  );
+  const reste    = Math.max(0, 30*60 - elapsed);
+
+  let pr       = null;
+  let derniere = null;
+  try { pr       = Tracker.getPR(exo?.ref);                              } catch(e) {}
+  try { derniere = Tracker.getDernierePerf(
+          'express_' + Utils.aujourd_hui(), exo?.ref);                   } catch(e) {}
 
   container.innerHTML = `
-
-    <!-- Header express -->
     <div class="express-header">
       <div class="flex justify-between items-center">
         <button class="btn-secondary btn-sm"
@@ -860,46 +987,39 @@ function renderExpressExercice(exercices) {
         </button>
         <div style="text-align:center">
           <div style="font-weight:700">
-            ${idx+1}/${exercices.length} · ${ex.emoji || '💪'} ${ex.nom || exo?.ref}
+            ${idx+1}/${exercices.length}
+            · ${ex.emoji||'💪'} ${ex.nom||exo?.ref}
           </div>
           <div style="font-size:.72rem;color:var(--text-muted)">
-            Série ${AppState.expressSerieN}/${exo?.series || 3}
+            Série ${AppState.expressSerieN}/${exo?.series||3}
           </div>
         </div>
         <div style="font-size:.9rem;font-weight:800;
                     color:${reste < 300
-                      ? 'var(--fd-coral)'
-                      : 'var(--fd-lemon)'}"
+                      ? 'var(--fd-coral)' : 'var(--fd-lemon)'}"
              id="express-chrono">
           ${Utils.formatDureeMin(reste)}
         </div>
       </div>
-
-      <!-- Steps -->
       <div class="express-steps mt-sm">
-        ${exercices.map((_, i) => `
+        ${exercices.map((_,i) => `
           <div class="express-step
                ${i < idx ? 'done' : i === idx ? 'active' : ''}">
           </div>`).join('')}
       </div>
     </div>
 
-    <!-- Exercice actuel -->
     <div style="padding:var(--space-md)">
-
-      <!-- Info exercice -->
-      <div class="card mb-md"
-           style="text-align:center">
+      <div class="card mb-md" style="text-align:center">
         <div style="font-size:4rem;margin-bottom:8px">
-          ${ex.emoji || '💪'}
+          ${ex.emoji||'💪'}
         </div>
         <div style="font-weight:700;font-size:1.2rem">
-          ${ex.nom || exo?.ref}
+          ${ex.nom||exo?.ref}
         </div>
         <div style="font-size:.78rem;color:var(--fd-mint);
                     margin-top:4px">
-          ${ex.muscle || ''}
-          · ${exo?.series} × ${exo?.reps}
+          ${ex.muscle||''} · ${exo?.series} × ${exo?.reps}
         </div>
         ${pr ? `
           <div style="font-size:.72rem;color:var(--fd-lemon);
@@ -913,10 +1033,10 @@ function renderExpressExercice(exercices) {
           </div>` : ''}
       </div>
 
-      <!-- Série indicators -->
+      <!-- Indicateurs séries -->
       <div style="display:flex;justify-content:center;
                   gap:var(--space-sm);margin-bottom:var(--space-md)">
-        ${Array.from({length: exo?.series || 3}, (_, i) => `
+        ${Array.from({length: exo?.series||3}, (_,i) => `
           <div style="width:36px;height:36px;border-radius:50%;
                       border:2px solid ${i+1 < AppState.expressSerieN
                         ? 'var(--fd-mint)'
@@ -937,7 +1057,7 @@ function renderExpressExercice(exercices) {
           </div>`).join('')}
       </div>
 
-      <!-- Inputs poids + reps -->
+      <!-- Inputs -->
       <div class="express-set-input">
         <div class="express-input-group">
           <div class="express-input-label">Poids (kg)</div>
@@ -948,7 +1068,7 @@ function renderExpressExercice(exercices) {
           <div class="express-controls">
             <button class="express-adjust-btn"
                     onclick="ajusterExpressVal('exp-poids',-2.5)">
-              -
+              −
             </button>
             <button class="express-adjust-btn"
                     onclick="ajusterExpressVal('exp-poids',2.5)">
@@ -965,7 +1085,7 @@ function renderExpressExercice(exercices) {
           <div class="express-controls">
             <button class="express-adjust-btn"
                     onclick="ajusterExpressVal('exp-reps',-1)">
-              -
+              −
             </button>
             <button class="express-adjust-btn"
                     onclick="ajusterExpressVal('exp-reps',1)">
@@ -975,7 +1095,7 @@ function renderExpressExercice(exercices) {
         </div>
       </div>
 
-      <!-- RPE rapide -->
+      <!-- RPE -->
       <div style="margin:var(--space-md) 0">
         <div style="font-size:.72rem;color:var(--text-muted);
                     margin-bottom:var(--space-sm)">
@@ -997,24 +1117,25 @@ function renderExpressExercice(exercices) {
         </div>
       </div>
 
-      <!-- Bouton valider -->
       <button class="express-btn-next"
               onclick="validerSerieExpress(${JSON.stringify(exercices).replace(/"/g,"'")})">
-        ✅ Série ${AppState.expressSerieN}/${exo?.series || 3}
-        ${idx+1 < exercices.length || AppState.expressSerieN < (exo?.series||3)
-          ? '→ Suite'
-          : '🏁 Terminer'}
+        ✅ Série ${AppState.expressSerieN}/${exo?.series||3}
+        ${idx+1 < exercices.length
+          || AppState.expressSerieN < (exo?.series||3)
+          ? '→ Suite' : '🏁 Terminer'}
       </button>
     </div>
   `;
 
-  // Reprendre le chrono
+  // Reprendre chrono
   chronoSeance.arreter();
   AppState.expressDebut = Date.now() - elapsed * 1000;
   chronoSeance.demarrer(el => {
-    const chronoEl = document.getElementById('express-chrono');
+    const chronoEl =
+      document.getElementById('express-chrono');
     const r = Math.max(0, 30*60 - el);
-    if (chronoEl) chronoEl.textContent = Utils.formatDureeMin(r);
+    if (chronoEl) chronoEl.textContent =
+      Utils.formatDureeMin(r);
   });
 }
 
@@ -1025,23 +1146,21 @@ function selectionnerRPEExpress(val) {
   [6,7,8,9,10].forEach(v => {
     const btn = document.getElementById(`rpe-exp-${v}`);
     if (!btn) return;
-    btn.style.background = v === val
-      ? 'var(--fd-indigo)'
-      : 'var(--bg-input)';
-    btn.style.color = v === val
-      ? 'white'
-      : 'var(--text-muted)';
+    btn.style.background  = v === val
+      ? 'var(--fd-indigo)' : 'var(--bg-input)';
+    btn.style.color       = v === val
+      ? 'white' : 'var(--text-muted)';
     btn.style.borderColor = v === val
-      ? 'var(--fd-indigo)'
-      : 'var(--border-color)';
+      ? 'var(--fd-indigo)' : 'var(--border-color)';
   });
 }
 
 function ajusterExpressVal(id, delta) {
   const input = document.getElementById(id);
   if (!input) return;
-  const val = parseFloat(input.value) || 0;
-  input.value = Math.max(0, val + delta);
+  input.value = Math.max(
+    0, (parseFloat(input.value) || 0) + delta
+  );
 }
 
 function validerSerieExpress(exercices) {
@@ -1050,26 +1169,33 @@ function validerSerieExpress(exercices) {
     catch(e) { return; }
   }
 
-  const poids = parseFloat(document.getElementById('exp-poids')?.value);
-  const reps  = parseInt(document.getElementById('exp-reps')?.value);
+  const poids = parseFloat(
+    document.getElementById('exp-poids')?.value);
+  const reps  = parseInt(
+    document.getElementById('exp-reps')?.value);
 
   if (!poids || !reps) {
     Utils.toast('Entre le poids et les reps !', 'error');
-    document.getElementById('exp-poids')?.classList.add('shake');
+    document.getElementById('exp-poids')
+      ?.classList.add('shake');
     setTimeout(() =>
-      document.getElementById('exp-poids')?.classList.remove('shake'), 400
+      document.getElementById('exp-poids')
+        ?.classList.remove('shake'), 400
     );
     return;
   }
 
-  const exo    = exercices[AppState.expressIndex];
+  const exo      = exercices[AppState.expressIndex];
   const seanceId = 'express_' + Utils.aujourd_hui();
 
-  const result = Tracker.sauvegarderSerie(
-    seanceId, exo.ref,
-    AppState.expressSerieN,
-    reps, poids, _rpeExpress
-  );
+  let result = { isPR: false };
+  try {
+    result = Tracker.sauvegarderSerie(
+      seanceId, exo.ref,
+      AppState.expressSerieN,
+      reps, poids, _rpeExpress
+    );
+  } catch(e) {}
 
   _rpeExpress = null;
   Utils.vibrerSuccess();
@@ -1077,27 +1203,22 @@ function validerSerieExpress(exercices) {
   if (result.isPR) {
     timerRepos.jouerSon('pr');
     Utils.toast(`🏆 NOUVEAU PR ! ${poids}kg × ${reps}`, 'pr', 3000);
-    Gamification.recompenser('PR_BATTU');
+    try { Gamification.recompenser('PR_BATTU'); } catch(e) {}
   }
 
-  // Série suivante ou exercice suivant
-  if (AppState.expressSerieN < (exo.series || 3)) {
+  if (AppState.expressSerieN < (exo.series||3)) {
     AppState.expressSerieN++;
-
-    // Timer repos rapide (60s max en express)
-    const reposExpress = Math.min(exo.repos || 60, 60);
-    _lancerReposExpress(reposExpress, () => {
-      renderExpressExercice(exercices);
-    });
-
+    _lancerReposExpress(
+      Math.min(exo.repos||60, 60),
+      () => renderExpressExercice(exercices)
+    );
   } else if (AppState.expressIndex + 1 < exercices.length) {
     AppState.expressIndex++;
     AppState.expressSerieN = 1;
-
-    _lancerReposExpress(45, () => {
-      renderExpressExercice(exercices);
-    });
-
+    _lancerReposExpress(
+      45,
+      () => renderExpressExercice(exercices)
+    );
   } else {
     const duree = chronoSeance.arreter();
     terminerExpress(exercices, duree);
@@ -1105,9 +1226,6 @@ function validerSerieExpress(exercices) {
 }
 
 function _lancerReposExpress(secondes, callback) {
-  const container = document.getElementById('page-content');
-
-  // Overlay repos rapide
   const overlay = document.createElement('div');
   overlay.style.cssText = `
     position:fixed;inset:0;z-index:200;
@@ -1115,6 +1233,7 @@ function _lancerReposExpress(secondes, callback) {
     display:flex;flex-direction:column;
     align-items:center;justify-content:center;
     gap:var(--space-lg)`;
+  overlay.id = 'overlay-repos-express';
 
   overlay.innerHTML = `
     <div style="font-size:.9rem;color:var(--text-muted);
@@ -1127,21 +1246,23 @@ function _lancerReposExpress(secondes, callback) {
          id="repos-express-display">
       ${Utils.formatDureeMin(secondes)}
     </div>
-    <button onclick="document.getElementById('overlay-repos-express').remove();
-                     (${callback.toString()})();"
+    <button onclick="
+        timerRepos.arreter();
+        document.getElementById('overlay-repos-express')?.remove();
+        (${callback.toString()})();"
             style="padding:var(--space-md) var(--space-xl);
-                   background:var(--fd-indigo);
-                   border:none;border-radius:var(--radius-full);
+                   background:var(--fd-indigo);border:none;
+                   border-radius:var(--radius-full);
                    color:white;font-weight:700;cursor:pointer">
       ⏭ Passer
     </button>`;
 
-  overlay.id = 'overlay-repos-express';
   document.body.appendChild(overlay);
 
   timerRepos.demarrer(secondes,
     (r) => {
-      const el = document.getElementById('repos-express-display');
+      const el =
+        document.getElementById('repos-express-display');
       if (el) el.textContent = Utils.formatDureeMin(r);
     },
     () => {
@@ -1156,14 +1277,16 @@ function terminerExpress(exercices, duree) {
   chronoSeance.arreter();
   timerRepos.arreter();
 
-  Tracker.terminerSeance('express_' + Utils.aujourd_hui());
-  Gamification.recompenser('SEANCE_COMPLETE');
-  Defis.mettreAJourProgression();
+  try { Tracker.terminerSeance(
+    'express_' + Utils.aujourd_hui()); }        catch(e) {}
+  try { Gamification.recompenser('SEANCE_COMPLETE'); } catch(e) {}
+  try { Defis.mettreAJourProgression();              } catch(e) {}
+
   Utils.confetti(3000);
   Utils.vibrerFin();
 
   const container = document.getElementById('page-content');
-  const volume    = Tracker.getVolumeSemaine();
+  if (!container) return;
 
   container.innerHTML = `
     <div class="express-result">
@@ -1171,10 +1294,13 @@ function terminerExpress(exercices, duree) {
       <div class="express-result-titre">
         Séance Express terminée !
       </div>
-      <p style="color:var(--text-muted);margin-bottom:var(--space-lg)">
-        Bien joué ${Tracker.getProfil().nom || ''} ! 🔥
+      <p style="color:var(--text-muted);
+                margin-bottom:var(--space-lg)">
+        Bien joué ${(() => {
+          try { return Tracker.getProfil().nom || ''; }
+          catch(e) { return ''; }
+        })()} ! 🔥
       </p>
-
       <div class="express-result-stats">
         <div class="express-result-stat">
           <div class="express-result-val">
@@ -1190,28 +1316,31 @@ function terminerExpress(exercices, duree) {
         </div>
         <div class="express-result-stat">
           <div class="express-result-val">
-            ${Utils.formatVolume(Tracker.getVolumeSemaine())}
+            ${Utils.formatVolume(
+              (() => {
+                try { return Tracker.getVolumeSemaine(); }
+                catch(e) { return 0; }
+              })()
+            )}
           </div>
           <div class="express-result-lbl">Vol. sem.</div>
         </div>
       </div>
-
       <div style="margin:var(--space-lg) 0">
-        <button class="btn-primary mb-md"
-                style="width:100%"
+        <button class="btn-primary mb-md" style="width:100%"
                 onclick="naviguer('stats')">
           📊 Voir mes stats
         </button>
-        <button class="btn-secondary"
-                style="width:100%"
+        <button class="btn-secondary" style="width:100%"
                 onclick="naviguer('home')">
           🏠 Accueil
         </button>
       </div>
-    </div>
-  `;
+    </div>`;
 
-  setTimeout(() => Gamification.verifierTrophees(), 1000);
+  setTimeout(() => {
+    try { Gamification.verifierTrophees(); } catch(e) {}
+  }, 1000);
 }
 
 async function arreterExpress(exercices) {
@@ -1223,35 +1352,33 @@ async function arreterExpress(exercices) {
   AppState.expressActif = false;
   chronoSeance.arreter();
   timerRepos.arreter();
-  Tracker.terminerSeance('express_' + Utils.aujourd_hui());
+  try { Tracker.terminerSeance(
+    'express_' + Utils.aujourd_hui()); } catch(e) {}
   naviguer('home');
 }
 
 // ════════════════════════════════════════════════════════════
-// PAGE DÉFIS
+// PAGES DÉLÉGUÉES
 // ════════════════════════════════════════════════════════════
 function renderPageDefis() {
-  const container = document.getElementById('page-content');
-  container.innerHTML = `<div id="defis-wrapper"></div>`;
-  Defis.render(document.getElementById('defis-wrapper'));
+  const c = document.getElementById('page-content');
+  c.innerHTML = `<div id="defis-wrapper"></div>`;
+  try { Defis.render(document.getElementById('defis-wrapper')); }
+  catch(e) { _renderPageVide('🏆', 'Défis'); }
 }
 
-// ════════════════════════════════════════════════════════════
-// PAGE SHARE + APPLE MUSIC
-// ════════════════════════════════════════════════════════════
 function renderPageShare() {
-  const container = document.getElementById('page-content');
-  container.innerHTML = `<div id="share-wrapper"></div>`;
-  Share.render(document.getElementById('share-wrapper'));
+  const c = document.getElementById('page-content');
+  c.innerHTML = `<div id="share-wrapper"></div>`;
+  try { Share.render(document.getElementById('share-wrapper')); }
+  catch(e) { _renderPageVide('📸', 'Partage'); }
 }
 
-// ════════════════════════════════════════════════════════════
-// PAGE PREDICT
-// ════════════════════════════════════════════════════════════
 function renderPagePredict() {
-  const container = document.getElementById('page-content');
-  container.innerHTML = `<div id="predict-wrapper"></div>`;
-  Predict.render(document.getElementById('predict-wrapper'));
+  const c = document.getElementById('page-content');
+  c.innerHTML = `<div id="predict-wrapper"></div>`;
+  try { Predict.render(document.getElementById('predict-wrapper')); }
+  catch(e) { _renderPageVide('🔮', 'Prédictions'); }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1259,6 +1386,8 @@ function renderPagePredict() {
 // ════════════════════════════════════════════════════════════
 function renderTraining(tab = 'planning', offset = 0) {
   const container = document.getElementById('page-content');
+  if (!container) return;
+
   const tabs = ['planning','exercices','timer','phases','recup'];
 
   container.innerHTML = `
@@ -1275,8 +1404,7 @@ function renderTraining(tab = 'planning', offset = 0) {
           }[t]}
         </button>`).join('')}
     </div>
-    <div id="training-content"></div>
-  `;
+    <div id="training-content"></div>`;
 
   const content = document.getElementById('training-content');
   switch(tab) {
@@ -1288,30 +1416,38 @@ function renderTraining(tab = 'planning', offset = 0) {
   }
 }
 
-// ── Planning ──────────────────────────────────────────────────
 function renderPlanning(el, offset = 0) {
-  const semaines = Programme.getSeancesSemaine(offset);
-  const infos    = Programme.getInfosProgramme();
-  const semNum   = infos.semaine + offset;
-  const isCustom = Programme.estPlanningCustom();
+  let semaines = [];
+  let infos    = { semaine:1, phase:{ emoji:'🌱', nom:'Reprise' } };
+  let isCustom = false;
+
+  try { semaines = Programme.getSeancesSemaine(offset); } catch(e) {}
+  try { infos    = Programme.getInfosProgramme();        } catch(e) {}
+  try { isCustom = Programme.estPlanningCustom();        } catch(e) {}
+
+  const semNum = (infos.semaine || 1) + offset;
 
   el.innerHTML = `
     <div class="flex items-center justify-between mb-md">
       <button class="btn-icon"
-              onclick="renderTraining('planning',${offset-1})">◄</button>
+              onclick="renderTraining('planning',${offset-1})">
+        ◄
+      </button>
       <div style="text-align:center">
         <div style="font-weight:700;font-size:1rem">
           SEMAINE ${semNum}
         </div>
         <div style="font-size:.72rem;color:var(--text-muted)">
-          ${infos.phase.emoji} ${infos.phase.nom}
+          ${infos.phase?.emoji||'🌱'} ${infos.phase?.nom||''}
           ${isCustom
-            ? '<span style="color:var(--fd-lemon)"> · ✏️ Custom</span>'
+            ? '<span style="color:var(--fd-lemon)">· ✏️ Custom</span>'
             : ''}
         </div>
       </div>
       <button class="btn-icon"
-              onclick="renderTraining('planning',${offset+1})">►</button>
+              onclick="renderTraining('planning',${offset+1})">
+        ►
+      </button>
     </div>
 
     <button class="btn-secondary mb-md"
@@ -1325,7 +1461,8 @@ function renderPlanning(el, offset = 0) {
         <div class="seance-card">
           <span class="seance-day"
                 style="${jour.estAujourdhui
-                  ? 'color:var(--fd-indigo);font-weight:800' : ''}">
+                  ? 'color:var(--fd-indigo);font-weight:800':''
+                }">
             ${jour.label}
           </span>
           <div class="seance-info">
@@ -1339,8 +1476,7 @@ function renderPlanning(el, offset = 0) {
               <div class="seance-meta">
                 ${jour.seance.exercices.length} exercices
                 · ~${jour.seance.duree_estimee}min
-              </div>
-            ` : `
+              </div>` : `
               <div class="seance-name"
                    style="color:var(--text-muted)">
                 ✨ Récupération
@@ -1349,20 +1485,22 @@ function renderPlanning(el, offset = 0) {
           ${jour.seance ? `
             <button class="badge-seance"
                     onclick="ouvrirSeance('${jour.seance.id}')">
-              ${jour.estPasse&&!jour.estAujourdhui ? '📋' : '▶'} Séance
-            </button>
-          ` : `<span class="badge-repos">Repos</span>`}
+              ${jour.estPasse && !jour.estAujourdhui
+                ? '📋' : '▶'} Séance
+            </button>` : `
+            <span class="badge-repos">Repos</span>`}
         </div>`).join('')}
     </div>`;
 }
 
-// ── Liste Exercices ───────────────────────────────────────────
 function renderListeExercices(el) {
   const groupes = {};
-  Object.entries(EXERCICES).forEach(([ref, ex]) => {
-    if (!groupes[ex.muscle]) groupes[ex.muscle] = [];
-    groupes[ex.muscle].push({ ref, ...ex });
-  });
+  try {
+    Object.entries(EXERCICES || {}).forEach(([ref, ex]) => {
+      if (!groupes[ex.muscle]) groupes[ex.muscle] = [];
+      groupes[ex.muscle].push({ ref, ...ex });
+    });
+  } catch(e) {}
 
   el.innerHTML = `
     <div class="card mb-md">
@@ -1373,35 +1511,32 @@ function renderListeExercices(el) {
     <div id="ex-list">
       ${Object.entries(groupes).map(([muscle, exos]) => `
         <div class="section-title">
-          ${exos[0]?.emoji || '💪'} ${muscle}
+          ${exos?.emoji||'💪'} ${muscle}
         </div>
-        ${exos.map(ex => {
-          const uid = `list_gif_${ex.ref}`;
-          return `
-            <div class="exercice-card mb-md"
-                 onclick="afficherDetailExercice('${ex.ref}')">
-              <div class="exercice-header">
-                <div id="${uid}"
-                     style="width:70px;height:70px;
-                            border-radius:var(--radius-md);
-                            background:var(--fd-indigo-dim);
-                            display:flex;align-items:center;
-                            justify-content:center;font-size:1.8rem;
-                            flex-shrink:0;overflow:hidden">
-                  ${ex.emoji || '💪'}
-                </div>
-                <div class="exercice-details">
-                  <div class="exercice-name">${ex.nom}</div>
-                  <div class="exercice-muscle">${ex.muscle}</div>
-                  <div class="exercice-volume">${ex.equipement}</div>
-                  <div style="font-size:.75rem;margin-top:4px">
-                    ${'⭐'.repeat(ex.difficulte || 1)}
-                    ${'☆'.repeat(4 - (ex.difficulte || 1))}
-                  </div>
+        ${exos.map(ex => `
+          <div class="exercice-card mb-md"
+               onclick="afficherDetailExercice('${ex.ref}')">
+            <div class="exercice-header">
+              <div id="list_gif_${ex.ref}"
+                   style="width:70px;height:70px;
+                          border-radius:var(--radius-md);
+                          background:var(--fd-indigo-dim);
+                          display:flex;align-items:center;
+                          justify-content:center;
+                          font-size:1.8rem;flex-shrink:0;
+                          overflow:hidden">
+                ${ex.emoji||'💪'}
+              </div>
+              <div class="exercice-details">
+                <div class="exercice-name">${ex.nom}</div>
+                <div class="exercice-muscle">${ex.muscle}</div>
+                <div class="exercice-volume">${ex.equipement}</div>
+                <div style="font-size:.75rem;margin-top:4px">
+                  ${'⭐'.repeat(ex.difficulte||1)}${'☆'.repeat(4-(ex.difficulte||1))}
                 </div>
               </div>
-            </div>`;
-        }).join('')}
+            </div>
+          </div>`).join('')}
       `).join('')}
     </div>`;
 
@@ -1420,30 +1555,36 @@ function _observerGIFs() {
         }
       }
     });
-  }, { rootMargin: '100px' });
+  }, { rootMargin:'100px' });
 
-  document.querySelectorAll('[id^="list_gif_"]').forEach(el => {
-    el.dataset.ref = el.id.replace('list_gif_', '');
-    observer.observe(el);
-  });
+  document.querySelectorAll('[id^="list_gif_"]')
+    .forEach(el => {
+      el.dataset.ref = el.id.replace('list_gif_', '');
+      observer.observe(el);
+    });
 }
 
 function filtrerExercices(query) {
-  const q = query.toLowerCase();
-  document.querySelectorAll('.exercice-card').forEach(card => {
-    card.style.display =
-      card.textContent.toLowerCase().includes(q) ? '' : 'none';
-  });
+  const q = (query || '').toLowerCase();
+  document.querySelectorAll('.exercice-card')
+    .forEach(card => {
+      card.style.display =
+        card.textContent.toLowerCase().includes(q)
+          ? '' : 'none';
+    });
 }
 
 function afficherDetailExercice(ref) {
-  const ex  = EXERCICES[ref];
-  const pr  = Tracker.getPR(ref);
+  const ex    = (window.EXERCICES || {})[ref];
   if (!ex) return;
+
+  let pr = null;
+  try { pr = Tracker.getPR(ref); } catch(e) {}
 
   const gifUID  = `modal_gif_${ref}_${Date.now()}`;
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
+  if (!modal || !content) return;
 
   content.innerHTML = `
     <div id="${gifUID}"
@@ -1459,7 +1600,7 @@ function afficherDetailExercice(ref) {
       <h3 style="font-size:1.3rem;font-weight:700">${ex.nom}</h3>
       <span class="chip chip-mint">${ex.muscle}</span>
       <span style="margin-left:var(--space-sm)">
-        ${'⭐'.repeat(ex.difficulte)}${'☆'.repeat(4-ex.difficulte)}
+        ${'⭐'.repeat(ex.difficulte||1)}${'☆'.repeat(4-(ex.difficulte||1))}
       </span>
     </div>
     <div class="card mb-md">
@@ -1485,44 +1626,54 @@ function afficherDetailExercice(ref) {
         </div>`).join('')}
     </div>
     ${pr ? `
-      <div class="card">
+      <div class="card mb-md">
         <div class="card-label">🏆 Record personnel</div>
         <div class="flex justify-between mt-md">
           <div class="text-center">
             <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-lemon)">${pr.rm1}kg</div>
+                        color:var(--fd-lemon)">
+              ${pr.rm1}kg
+            </div>
             <div style="font-size:.7rem;color:var(--text-muted)">
               1RM estimé
             </div>
           </div>
           <div class="text-center">
             <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-indigo)">${pr.poids}kg</div>
+                        color:var(--fd-indigo)">
+              ${pr.poids}kg
+            </div>
             <div style="font-size:.7rem;color:var(--text-muted)">
               Meilleur poids
             </div>
           </div>
           <div class="text-center">
             <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-mint)">${pr.reps}</div>
+                        color:var(--fd-mint)">
+              ${pr.reps}
+            </div>
             <div style="font-size:.7rem;color:var(--text-muted)">
               Meilleur reps
             </div>
           </div>
         </div>
       </div>` : ''}
+    <button class="btn-secondary mt-md"
+            onclick="Stats._ajouterNoteExo('${ref}')">
+      📝 Ajouter une note technique
+    </button>
   `;
 
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick =
-    () => modal.classList.add('hidden');
-  modal.querySelector('.modal-overlay').onclick =
-    () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close')
+    .onclick = () => modal.classList.add('hidden');
+  modal.querySelector('.modal-overlay')
+    .onclick = () => modal.classList.add('hidden');
 
   ExerciseGIF.chargerDans(ref, gifUID);
 }
 
-// ── Timer Standalone ──────────────────────────────────────────
+// ── Timer ─────────────────────────────────────────────────────
 let timerDureeBase = 90;
 
 function renderTimerStandalone(el) {
@@ -1536,7 +1687,9 @@ function renderTimerStandalone(el) {
             ${s}s
           </button>`).join('')}
         <button class="preset-btn"
-                onclick="demanderCustomTimer()">⚙️</button>
+                onclick="demanderCustomTimer()">
+          ⚙️
+        </button>
       </div>
       <div class="countdown-ring">
         <svg width="200" height="200" viewBox="0 0 200 200">
@@ -1591,8 +1744,7 @@ function renderTimerStandalone(el) {
           </label>
         </label>
       </div>
-    </div>
-  `;
+    </div>`;
   updateTimerUI(90);
 }
 
@@ -1659,53 +1811,69 @@ function demanderCustomTimer() {
 
 // ── Phases ────────────────────────────────────────────────────
 function renderPhases(el) {
-  const infos  = Programme.getInfosProgramme();
+  let infos = {
+    cycle:1, semaineInCycle:1, progression:0,
+    phase:{ numero:1 }
+  };
+  try { infos = Programme.getInfosProgramme(); } catch(e) {}
+
   const phases = [
-    { num:1, nom:'Reprise',      emoji:'🌱', desc:'Technique & Adaptation',
-      s:'S1-S4',   intensite:'65-70%', color:'var(--fd-mint)'     },
-    { num:2, nom:'Construction', emoji:'🏗️', desc:'Volume & Hypertrophie',
-      s:'S5-S8',   intensite:'75-80%', color:'var(--fd-indigo)'   },
-    { num:3, nom:'Intensité',    emoji:'💥', desc:'Force & Records',
-      s:'S9-S12',  intensite:'85-90%', color:'var(--fd-lavender)' },
-    { num:4, nom:'Peak',         emoji:'🏆', desc:'Records & Décharge',
-      s:'S13-S16', intensite:'95%+',   color:'var(--fd-lemon)'    }
+    { num:1, nom:'Reprise',      emoji:'🌱',
+      desc:'Technique & Adaptation',
+      s:'S1-S4',   intensite:'65-70%',
+      color:'var(--fd-mint)'     },
+    { num:2, nom:'Construction', emoji:'🏗️',
+      desc:'Volume & Hypertrophie',
+      s:'S5-S8',   intensite:'75-80%',
+      color:'var(--fd-indigo)'   },
+    { num:3, nom:'Intensité',    emoji:'💥',
+      desc:'Force & Records',
+      s:'S9-S12',  intensite:'85-90%',
+      color:'var(--fd-lavender)' },
+    { num:4, nom:'Peak',         emoji:'🏆',
+      desc:'Records & Décharge',
+      s:'S13-S16', intensite:'95%+',
+      color:'var(--fd-lemon)'    }
   ];
 
   el.innerHTML = `
     <div class="card mb-md" style="text-align:center">
       <div class="card-label">
-        🔄 Cycle ${infos.cycle} — Semaine ${infos.semaineInCycle}/16
+        🔄 Cycle ${infos.cycle} — Semaine
+        ${infos.semaineInCycle}/16
       </div>
       <div style="margin:var(--space-md) 0">
         <div class="progress-bar">
           <div class="progress-fill"
-               style="width:${infos.progression}%"></div>
+               style="width:${infos.progression||0}%"></div>
         </div>
-        <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
-          ${infos.progression}% du cycle complété
+        <div style="font-size:.72rem;color:var(--text-muted);
+                    margin-top:4px">
+          ${infos.progression||0}% du cycle complété
         </div>
       </div>
     </div>
     ${phases.map(p => `
       <div class="card mb-md"
-           style="${p.num === infos.phase.numero
-             ? `border-color:${p.color};background:${p.color}15` : ''}">
+           style="${p.num === infos.phase?.numero
+             ? `border-color:${p.color};background:${p.color}15`
+             : ''}">
         <div class="flex items-center gap-md">
           <div style="width:44px;height:44px;border-radius:50%;
                       background:${p.color}22;
                       border:2px solid ${p.color};
                       display:flex;align-items:center;
-                      justify-content:center;font-size:1.2rem;
-                      flex-shrink:0">
-            ${p.num < infos.phase.numero ? '✅' :
-              p.num === infos.phase.numero ? p.emoji : '🔒'}
+                      justify-content:center;
+                      font-size:1.2rem;flex-shrink:0">
+            ${p.num < (infos.phase?.numero||1) ? '✅' :
+              p.num === (infos.phase?.numero||1) ? p.emoji : '🔒'}
           </div>
           <div style="flex:1">
             <div style="font-weight:700;font-size:.95rem;
-                        color:${p.num === infos.phase.numero
+                        color:${p.num === infos.phase?.numero
                           ? p.color : 'var(--text-primary)'}">
               Phase ${p.num} — ${p.nom}
-              ${p.num === infos.phase.numero
+              ${p.num === infos.phase?.numero
                 ? '<span style="font-size:.7rem;margin-left:4px">← Actuelle</span>'
                 : ''}
             </div>
@@ -1721,23 +1889,28 @@ function renderPhases(el) {
             </div>
           </div>
         </div>
-      </div>`).join('')}
-  `;
+      </div>`).join('')}`;
 }
 
 // ── Récup ─────────────────────────────────────────────────────
 function renderRecup(el) {
-  const indexJour  = Utils.indexJourSemaine(Utils.aujourd_hui());
-  const planning   = PLANNING_SEMAINE[indexJour];
-  const seanceId   = planning?.seanceId;
-  const etirements = seanceId ? (ETIREMENTS[seanceId] || []) : [];
+  let etirements = [];
+  try {
+    const indexJour  =
+      Utils.indexJourSemaine(Utils.aujourd_hui());
+    const planning   = PLANNING_SEMAINE?.[indexJour];
+    const seanceId   = planning?.seanceId;
+    etirements       = seanceId
+      ? (ETIREMENTS?.[seanceId] || [])
+      : [];
+  } catch(e) {}
 
   el.innerHTML = `
     <div class="card mb-md">
       <div class="card-label">🧘 Étirements du jour</div>
       ${etirements.length === 0 ? `
-        <p style="color:var(--text-muted);padding:var(--space-md);
-                  text-align:center">
+        <p style="color:var(--text-muted);
+                  padding:var(--space-md);text-align:center">
           Lance une séance pour voir les étirements adaptés.
         </p>` :
         etirements.map(e => `
@@ -1757,18 +1930,25 @@ function renderRecup(el) {
     <div class="card">
       <div class="card-label">💡 Conseils récupération</div>
       ${[
-        { emoji:'💧', titre:'Hydratation', desc:'2.5 à 3L d\'eau par jour.'      },
-        { emoji:'😴', titre:'Sommeil',     desc:'7 à 9 heures par nuit.'         },
-        { emoji:'🍗', titre:'Protéines',   desc:'~2g/kg de poids corporel.'      },
-        { emoji:'🧊', titre:'Bain froid',  desc:'2-3 min à 10-15°C post séance.' },
-        { emoji:'📱', titre:'Repos actif', desc:'Marche légère les jours off.'   }
+        { emoji:'💧', titre:'Hydratation',
+          desc:'2.5 à 3L d\'eau par jour.' },
+        { emoji:'😴', titre:'Sommeil',
+          desc:'7 à 9 heures par nuit.' },
+        { emoji:'🍗', titre:'Protéines',
+          desc:'~2g/kg de poids corporel.' },
+        { emoji:'🧊', titre:'Bain froid',
+          desc:'2-3 min à 10-15°C post séance.' },
+        { emoji:'📱', titre:'Repos actif',
+          desc:'Marche légère les jours off.' }
       ].map(c => `
         <div style="display:flex;gap:var(--space-md);
                     padding:var(--space-sm) 0;
                     border-bottom:1px solid var(--border-color)">
           <span style="font-size:1.3rem">${c.emoji}</span>
           <div>
-            <div style="font-weight:600;font-size:.88rem">${c.titre}</div>
+            <div style="font-weight:600;font-size:.88rem">
+              ${c.titre}
+            </div>
             <div style="font-size:.78rem;color:var(--text-muted);
                         margin-top:2px">${c.desc}</div>
           </div>
@@ -1778,15 +1958,19 @@ function renderRecup(el) {
 
 // ── Ouvrir séance ─────────────────────────────────────────────
 function ouvrirSeance(seanceId) {
-  const seance = Programme.getSeanceComplete(seanceId);
+  let seance = null;
+  try { seance = Programme.getSeanceComplete(seanceId); }
+  catch(e) {}
   if (!seance) return;
 
   AppState.seanceChoisie = seance;
   const container = document.getElementById('page-content');
+  if (!container) return;
 
   container.innerHTML = `
     <div class="flex items-center gap-md mb-md">
-      <button class="btn-icon" onclick="renderTraining()">←</button>
+      <button class="btn-icon"
+              onclick="renderTraining()">←</button>
       <div>
         <div style="font-weight:700;font-size:1.1rem">
           ${seance.emoji} ${seance.nom}
@@ -1815,11 +1999,12 @@ function ouvrirSeance(seanceId) {
 
     <div class="card mb-md">
       <div class="card-label">📋 Exercices</div>
-      ${seance.exercicesDetails.map((item, i) => {
-        const ex  = item.details;
-        const pr  = Tracker.getPR(item.ref);
-        const pred = Predict.predireProchainPR(item.ref);
-        const uid = `preview_gif_${item.ref}_${i}`;
+      ${(seance.exercicesDetails||[]).map((item, i) => {
+        const ex   = item.details;
+        let pr     = null, pred = null;
+        try { pr   = Tracker.getPR(item.ref);         } catch(e) {}
+        try { pred = Predict.predireProchainPR(item.ref); } catch(e) {}
+        const uid  = `preview_gif_${item.ref}_${i}`;
         return `
           <div style="display:flex;gap:var(--space-md);
                       padding:var(--space-md) 0;
@@ -1830,8 +2015,9 @@ function ouvrirSeance(seanceId) {
                         border-radius:var(--radius-md);
                         background:var(--fd-indigo-dim);
                         display:flex;align-items:center;
-                        justify-content:center;font-size:1.5rem;
-                        flex-shrink:0;overflow:hidden">
+                        justify-content:center;
+                        font-size:1.5rem;flex-shrink:0;
+                        overflow:hidden">
               ${ex?.emoji||'💪'}
             </div>
             <div style="flex:1">
@@ -1853,7 +2039,8 @@ function ouvrirSeance(seanceId) {
               ${pred ? `
                 <div style="font-size:.68rem;color:var(--fd-mint);
                             margin-top:2px">
-                  🔮 PR prédit: ${pred.rm1Predit}kg dans ~${pred.joursEstimes}j
+                  🔮 PR prédit: ${pred.rm1Predit}kg
+                  dans ~${pred.joursEstimes}j
                 </div>` : ''}
             </div>
           </div>`;
@@ -1865,10 +2052,9 @@ function ouvrirSeance(seanceId) {
             style="position:sticky;
                    bottom:calc(var(--nav-height)+var(--space-md))">
       ⚡ Démarrer la séance
-    </button>
-  `;
+    </button>`;
 
-  seance.exercicesDetails.forEach((item, i) => {
+  (seance.exercicesDetails||[]).forEach((item, i) => {
     setTimeout(() => {
       ExerciseGIF.chargerDans(
         item.ref, `preview_gif_${item.ref}_${i}`
@@ -1882,7 +2068,9 @@ function ouvrirSeance(seanceId) {
 // ════════════════════════════════════════════════════════════
 function renderLive() {
   const container = document.getElementById('page-content');
-  const seance    = AppState.seanceEnCours;
+  if (!container) return;
+
+  const seance = AppState.seanceEnCours;
 
   if (!seance && !AppState.seanceChoisie) {
     renderSelecteurSeance(container);
@@ -1896,13 +2084,17 @@ function renderLive() {
 }
 
 function renderSelecteurSeance(container) {
-  const seances   = Programme.getAllSeances();
-  const prochaine = Programme.getProchaineSeance();
+  let seances   = [];
+  let prochaine = null;
+  try { seances   = Programme.getAllSeances();        } catch(e) {}
+  try { prochaine = Programme.getProchaineSeance();  } catch(e) {}
 
   container.innerHTML = `
     <div style="text-align:center;padding:var(--space-lg) 0;
                 margin-bottom:var(--space-md)">
-      <div style="font-size:2.5rem;margin-bottom:var(--space-sm)">⚡</div>
+      <div style="font-size:2.5rem;margin-bottom:var(--space-sm)">
+        ⚡
+      </div>
       <h2 style="font-size:1.3rem;font-weight:700">
         Quelle séance aujourd'hui ?
       </h2>
@@ -1943,13 +2135,11 @@ function renderSelecteurSeance(container) {
               : ''}
           </div>
           <div class="seance-meta">
-            ${s.exercices.length} exercices
-            · ~${s.duree_estimee}min
+            ${s.exercices.length} exercices · ~${s.duree_estimee}min
           </div>
         </div>
         <span style="color:var(--fd-indigo)">▶</span>
-      </div>`).join('')}
-  `;
+      </div>`).join('')}`;
 }
 
 function demarrerNouvelleSeance(seance) {
@@ -1959,7 +2149,7 @@ function demarrerNouvelleSeance(seance) {
   AppState.seanceChoisie = null;
   AppState.prsSeance     = [];
 
-  Tracker.demarrerSeance(seance.id);
+  try { Tracker.demarrerSeance(seance.id); } catch(e) {}
 
   chronoSeance.demarrer(elapsed => {
     const el = document.getElementById('chrono-global');
@@ -1970,19 +2160,23 @@ function demarrerNouvelleSeance(seance) {
 }
 
 function renderExerciceActuel(container) {
-  const seance   = AppState.seanceEnCours;
-  if (!seance) return;
+  const seance = AppState.seanceEnCours;
+  if (!seance || !container) return;
 
-  const item     = seance.exercicesDetails[AppState.exerciceIndex];
-  const ex       = item?.details;
-  const derniere = Tracker.getDernierePerf(seance.id, item?.ref);
-  const pred     = Predict.recommanderCharge(item?.ref);
-  const gifUID   = `live_gif_${item?.ref}_${Date.now()}`;
+  const item   = seance.exercicesDetails?.[AppState.exerciceIndex];
+  const ex     = item?.details;
+  const gifUID = `live_gif_${item?.ref}_${Date.now()}`;
+
+  let derniere = null, pred = null;
+  try { derniere = Tracker.getDernierePerf(seance.id, item?.ref); } catch(e) {}
+  try { pred     = Predict.recommanderCharge(item?.ref);          } catch(e) {}
 
   container.innerHTML = `
     <div class="flex items-center justify-between mb-md">
       <button class="btn-secondary btn-sm"
-              onclick="confirmerAbandon()">✕ Arrêter</button>
+              onclick="confirmerAbandon()">
+        ✕ Arrêter
+      </button>
       <div style="text-align:center">
         <div style="font-weight:700;font-size:.9rem">
           ${AppState.exerciceIndex+1}/${seance.exercicesDetails.length}
@@ -2003,7 +2197,7 @@ function renderExerciceActuel(container) {
                   background:var(--fd-indigo-dim);
                   border-radius:var(--radius-md) var(--radius-md) 0 0;
                   font-size:4rem;overflow:hidden">
-        ${ex?.emoji || '💪'}
+        ${ex?.emoji||'💪'}
       </div>
 
       <div style="padding:var(--space-md);text-align:center;
@@ -2011,28 +2205,31 @@ function renderExerciceActuel(container) {
         <div style="font-size:1.2rem;font-weight:700">
           ${ex?.nom||item?.ref}
         </div>
-        <div style="font-size:.8rem;color:var(--fd-mint);margin-top:4px">
+        <div style="font-size:.8rem;color:var(--fd-mint);
+                    margin-top:4px">
           ${ex?.muscle||''}
         </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
+        <div style="font-size:.75rem;color:var(--text-muted);
+                    margin-top:4px">
           ${item?.series} séries × ${item?.reps} reps
           · Repos ${item?.repos}s
         </div>
         ${pred ? `
           <div style="font-size:.72rem;color:var(--fd-lemon);
                       margin-top:4px">
-            ⚡ Charge recommandée: <strong>${pred.charge}kg</strong>
-            (${pred.intensite}% · ${pred.fatigue.emoji})
+            ⚡ Recommandée: <strong>${pred.charge}kg</strong>
+            (${pred.intensite}% · ${pred.fatigue?.emoji||''})
           </div>` : ''}
         ${derniere ? `
-          <div style="font-size:.72rem;color:var(--fd-lemon);margin-top:4px">
-            📊 Dernière fois: ${derniere.poids}kg × ${derniere.reps} reps
+          <div style="font-size:.72rem;color:var(--fd-lemon);
+                      margin-top:4px">
+            📊 Dernière: ${derniere.poids}kg × ${derniere.reps}
           </div>` : ''}
       </div>
 
       <div style="padding:var(--space-sm) var(--space-md)">
         <div class="series-indicators">
-          ${Array.from({length:item?.series||4},(_,i) => `
+          ${Array.from({length:item?.series||4}, (_,i) => `
             <div class="serie-dot ${
               i+1 <  AppState.serieActuelle ? 'done'    :
               i+1 === AppState.serieActuelle ? 'current' : ''}">
@@ -2042,7 +2239,8 @@ function renderExerciceActuel(container) {
       </div>
 
       <div style="padding:var(--space-md)">
-        <div style="font-size:.85rem;font-weight:600;text-align:center;
+        <div style="font-size:.85rem;font-weight:600;
+                    text-align:center;
                     color:var(--text-secondary);
                     margin-bottom:var(--space-sm)">
           Série ${AppState.serieActuelle} / ${item?.series}
@@ -2053,8 +2251,8 @@ function renderExerciceActuel(container) {
               Poids (kg)
             </div>
             <input class="input" id="inp-poids" type="number"
-                   placeholder="${pred?.charge || derniere?.poids||'0'}"
-                   value="${pred?.charge || derniere?.poids||''}"
+                   placeholder="${pred?.charge||derniere?.poids||'0'}"
+                   value="${pred?.charge||derniere?.poids||''}"
                    step="2.5" />
           </div>
           <div style="flex:1">
@@ -2070,7 +2268,7 @@ function renderExerciceActuel(container) {
         <div class="rpe-selector">
           <div class="rpe-label">Effort ressenti (RPE)</div>
           <div class="rpe-grid">
-            ${Array.from({length:10},(_,i) => `
+            ${Array.from({length:10}, (_,i) => `
               <button class="rpe-btn" data-rpe="${i+1}"
                       onclick="selectionnerRPE(${i+1},this)">
                 ${i+1}
@@ -2086,10 +2284,12 @@ function renderExerciceActuel(container) {
     </div>
 
     <div id="zone-repos" class="hidden">
-      <div class="card" style="text-align:center;padding:var(--space-xl)">
+      <div class="card"
+           style="text-align:center;padding:var(--space-xl)">
         <div class="timer-title">💤 Repos</div>
         <div class="countdown-ring"
-             style="width:160px;height:160px;margin:var(--space-md) auto">
+             style="width:160px;height:160px;
+                    margin:var(--space-md) auto">
           <svg width="160" height="160" viewBox="0 0 160 160">
             <circle class="ring-bg" cx="80" cy="80" r="70"
                     stroke-dasharray="${2*Math.PI*70}"/>
@@ -2099,7 +2299,8 @@ function renderExerciceActuel(container) {
                     stroke-dashoffset="0"/>
           </svg>
           <div class="countdown-text">
-            <div class="countdown-number" id="live-countdown"
+            <div class="countdown-number"
+                 id="live-countdown"
                  style="font-size:2.2rem">
               ${Utils.formatDureeMin(item?.repos||90)}
             </div>
@@ -2109,17 +2310,22 @@ function renderExerciceActuel(container) {
         <div class="timer-controls">
           <button class="timer-adjust-btn"
                   onclick="timerRepos.ajuster(-15);
-                           updateLiveTimer()">-15s</button>
+                           updateLiveTimer()">
+            -15s
+          </button>
           <button class="timer-adjust-btn"
                   onclick="passerRepos()"
-                  style="color:var(--fd-mint)">⏭ Passer</button>
+                  style="color:var(--fd-mint)">
+            ⏭ Passer
+          </button>
           <button class="timer-adjust-btn"
                   onclick="timerRepos.ajuster(15);
-                           updateLiveTimer()">+15s</button>
+                           updateLiveTimer()">
+            +15s
+          </button>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
 
   ExerciseGIF.chargerDans(item?.ref, gifUID);
 }
@@ -2134,8 +2340,10 @@ function selectionnerRPE(val, btn) {
 }
 
 function validerSerie() {
-  const poids = parseFloat(document.getElementById('inp-poids')?.value);
-  const reps  = parseInt(document.getElementById('inp-reps')?.value);
+  const poids = parseFloat(
+    document.getElementById('inp-poids')?.value);
+  const reps  = parseInt(
+    document.getElementById('inp-reps')?.value);
 
   if (!poids || !reps) {
     Utils.toast('Entre le poids et les reps !', 'error');
@@ -2144,10 +2352,14 @@ function validerSerie() {
 
   const seance = AppState.seanceEnCours;
   const item   = seance.exercicesDetails[AppState.exerciceIndex];
-  const result = Tracker.sauvegarderSerie(
-    seance.id, item.ref, AppState.serieActuelle,
-    reps, poids, rpeActuel
-  );
+
+  let result = { isPR: false };
+  try {
+    result = Tracker.sauvegarderSerie(
+      seance.id, item.ref, AppState.serieActuelle,
+      reps, poids, rpeActuel
+    );
+  } catch(e) {}
 
   rpeActuel = null;
   Utils.vibrerSuccess();
@@ -2155,16 +2367,20 @@ function validerSerie() {
   if (result.isPR) {
     AppState.prsSeance.push({ ref:item.ref, poids, reps });
     timerRepos.jouerSon('pr');
-    Utils.toast(`🏆 NOUVEAU PR ! ${poids}kg × ${reps}`, 'pr', 4000);
-    Notifications.notifierPR(item.ref, poids, reps);
-    Gamification.recompenser('PR_BATTU');
-    Defis.mettreAJourProgression();
+    Utils.toast(
+      `🏆 NOUVEAU PR ! ${poids}kg × ${reps}`, 'pr', 4000
+    );
+    try { Notifications.notifierPR(item.ref, poids, reps); } catch(e) {}
+    try { Gamification.recompenser('PR_BATTU');             } catch(e) {}
+    try { Defis.mettreAJourProgression();                   } catch(e) {}
   }
 
   if (AppState.serieActuelle < item.series) {
     AppState.serieActuelle++;
     lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(document.getElementById('page-content'));
+      renderExerciceActuel(
+        document.getElementById('page-content')
+      );
     });
   } else if (
     AppState.exerciceIndex + 1 < seance.exercicesDetails.length
@@ -2172,7 +2388,9 @@ function validerSerie() {
     AppState.exerciceIndex++;
     AppState.serieActuelle = 1;
     lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(document.getElementById('page-content'));
+      renderExerciceActuel(
+        document.getElementById('page-content')
+      );
     });
   } else {
     terminerSeance();
@@ -2200,7 +2418,8 @@ function updateLiveTimer() {
 function updateLiveTimerValues(restant, total) {
   const display = document.getElementById('live-countdown');
   const ring    = document.getElementById('live-ring');
-  if (display) display.textContent = Utils.formatDureeMin(restant);
+  if (display) display.textContent =
+    Utils.formatDureeMin(restant);
   if (ring) {
     const circ = 2 * Math.PI * 70;
     const pct  = total > 0 ? restant / total : 1;
@@ -2214,8 +2433,11 @@ function updateLiveTimerValues(restant, total) {
 
 function passerRepos() {
   timerRepos.arreter();
-  document.getElementById('zone-repos')?.classList.add('hidden');
-  renderExerciceActuel(document.getElementById('page-content'));
+  document.getElementById('zone-repos')
+    ?.classList.add('hidden');
+  renderExerciceActuel(
+    document.getElementById('page-content')
+  );
 }
 
 async function confirmerAbandon() {
@@ -2226,7 +2448,8 @@ async function confirmerAbandon() {
   if (!ok) return;
   timerRepos.arreter();
   chronoSeance.arreter();
-  Tracker.terminerSeance(AppState.seanceEnCours.id);
+  try { Tracker.terminerSeance(AppState.seanceEnCours.id); }
+  catch(e) {}
   AppState.seanceEnCours = null;
   AppState.prsSeance     = [];
   naviguer('home');
@@ -2236,18 +2459,24 @@ function terminerSeance() {
   timerRepos.arreter();
   const duree  = chronoSeance.arreter();
   const seance = AppState.seanceEnCours;
-  const data   = Tracker.terminerSeance(seance.id);
   const prs    = [...AppState.prsSeance];
 
-  Gamification.recompenser('SEANCE_COMPLETE');
-  Notifications.verifierSemaineParf();
-  Defis.mettreAJourProgression();
+  let data = {};
+  try { data = Tracker.terminerSeance(seance.id) || {}; }
+  catch(e) {}
+
+  try { Gamification.recompenser('SEANCE_COMPLETE');  } catch(e) {}
+  try { Notifications.verifierSemaineParf();          } catch(e) {}
+  try { Defis.mettreAJourProgression();               } catch(e) {}
+
   Utils.confetti(4000);
   Utils.vibrerFin();
 
   const container = document.getElementById('page-content');
-  const volume    = data?.volumeTotal || 0;
-  const series    = data?.series?.length || 0;
+  if (!container) return;
+
+  const volume = data?.volumeTotal || 0;
+  const series = data?.series?.length || 0;
 
   container.innerHTML = `
     <div class="fin-screen">
@@ -2255,8 +2484,12 @@ function terminerSeance() {
       <div class="fin-title">Séance terminée !</div>
       <p style="color:var(--text-secondary);
                 margin-bottom:var(--space-lg)">
-        Bravo ${Tracker.getProfil().nom||''} ! Incroyable effort.
+        Bravo ${(() => {
+          try { return Tracker.getProfil().nom||''; }
+          catch(e) { return ''; }
+        })()} ! Incroyable effort. 🔥
       </p>
+
       <div class="fin-stats-grid mb-md">
         <div class="fin-stat">
           <div class="fin-stat-value">
@@ -2275,25 +2508,25 @@ function terminerSeance() {
           <div class="fin-stat-label">Séries</div>
         </div>
       </div>
+
       ${prs.length > 0 ? `
         <div class="pr-alert mb-md">
           <div class="pr-alert-title">
             🏆 ${prs.length} nouveau${prs.length>1?'x':''}
-            record${prs.length>1?'s':''}!
+            record${prs.length>1?'s':''} !
           </div>
           ${prs.map(p => `
             <div class="pr-alert-item">
               <span>🎯</span>
               <span>
-                ${EXERCICES[p.ref]?.nom||p.ref}:
+                ${(window.EXERCICES||{})[p.ref]?.nom||p.ref}:
                 ${p.poids}kg × ${p.reps}
               </span>
             </div>`).join('')}
         </div>` : ''}
 
-      <!-- Partage -->
       <button class="btn-secondary mb-md"
-              onclick="Share.partager('semaine')"
+              onclick="try{Share.partager('semaine')}catch(e){}"
               style="width:100%;font-size:.85rem">
         📸 Partager mes stats
       </button>
@@ -2302,6 +2535,7 @@ function terminerSeance() {
               onclick="ajouterJournalPostSeance('${seance.id}')">
         📔 Ajouter une note
       </button>
+
       <button class="btn-secondary"
               onclick="naviguer('home')">
         🏠 Retour accueil
@@ -2310,34 +2544,43 @@ function terminerSeance() {
 
   AppState.seanceEnCours = null;
   AppState.prsSeance     = [];
-  setTimeout(() => Gamification.verifierTrophees(), 1500);
+  setTimeout(() => {
+    try { Gamification.verifierTrophees(); } catch(e) {}
+  }, 1500);
 }
 
 function ajouterJournalPostSeance(seanceId) {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
+  if (!modal || !content) return;
+
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">📔 Note de séance</h3>
+    <h3 style="margin-bottom:var(--space-md)">
+      📔 Note de séance
+    </h3>
     <textarea class="input" id="journal-texte" rows="4"
               placeholder="Comment s'est passée la séance ?"
-              style="resize:vertical;min-height:120px"></textarea>
+              style="resize:vertical;min-height:120px">
+    </textarea>
     <button class="btn-primary mt-md"
             onclick="sauvegarderNoteJournal('${seanceId}')">
       💾 Sauvegarder
     </button>`;
+
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick =
-    () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close')
+    .onclick = () => modal.classList.add('hidden');
 }
 
 function sauvegarderNoteJournal(seanceId) {
-  const texte =
-    document.getElementById('journal-texte')?.value?.trim();
+  const texte = document.getElementById('journal-texte')
+    ?.value?.trim();
   if (!texte) return;
-  Tracker.ajouterEntreeJournal(texte, seanceId);
-  Gamification.ajouterXP(25, 'journal');
+  try { Tracker.ajouterEntreeJournal(texte, seanceId); } catch(e) {}
+  try { Gamification.ajouterXP(25, 'journal');         } catch(e) {}
   Utils.toast('Note sauvegardée !', 'success');
-  document.getElementById('modal-info')?.classList.add('hidden');
+  document.getElementById('modal-info')
+    ?.classList.add('hidden');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2345,6 +2588,8 @@ function sauvegarderNoteJournal(seanceId) {
 // ════════════════════════════════════════════════════════════
 function renderProfil(tab = 'moi') {
   const container = document.getElementById('page-content');
+  if (!container) return;
+
   const tabs = [
     'moi','stats','defis','predict','share',
     'journal','objectifs','blessure',
@@ -2376,18 +2621,35 @@ function renderProfil(tab = 'moi') {
 
   const content = document.getElementById('profil-content');
   switch(tab) {
-    case 'moi':        renderProfilMoi(content);            break;
-    case 'stats':      Stats.render(content,'dashboard');   break;
-    case 'defis':      Defis.render(content);               break;
-    case 'predict':    Predict.render(content);             break;
-    case 'share':      Share.render(content);               break;
-    case 'journal':    renderJournal(content);              break;
-    case 'objectifs':  renderObjectifs(content);            break;
-    case 'blessure':   renderBlessure(content);             break;
-    case 'coach':      Coach.renderCoachTab(content);       break;
-    case 'custom':     renderExercicesCustom(content);      break;
-    case 'programme':  renderProgrammeCustom(content);      break;
-    case 'outils':     renderOutils(content);               break;
+    case 'moi':
+      renderProfilMoi(content);
+      break;
+    case 'stats':
+      try { Stats.render(content, 'dashboard'); }
+      catch(e) { _renderPageVide('📊','Stats'); }
+      break;
+    case 'defis':
+      try { Defis.render(content); }
+      catch(e) { _renderPageVide('🏆','Défis'); }
+      break;
+    case 'predict':
+      try { Predict.render(content); }
+      catch(e) { _renderPageVide('🔮','Predict'); }
+      break;
+    case 'share':
+      try { Share.render(content); }
+      catch(e) { _renderPageVide('📸','Share'); }
+      break;
+    case 'journal':    renderJournal(content);         break;
+    case 'objectifs':  renderObjectifs(content);       break;
+    case 'blessure':   renderBlessure(content);        break;
+    case 'coach':
+      try { Coach.renderCoachTab(content); }
+      catch(e) { _renderPageVide('🤖','Coach'); }
+      break;
+    case 'custom':     renderExercicesCustom(content); break;
+    case 'programme':  renderProgrammeCustom(content); break;
+    case 'outils':     renderOutils(content);          break;
   }
 }
 
@@ -2395,16 +2657,27 @@ function renderProfil(tab = 'moi') {
 // PROFIL — MOI
 // ════════════════════════════════════════════════════════════
 function renderProfilMoi(el) {
-  const profil  = Tracker.getProfil();
-  const mesures = Tracker.getDerniereMesure() || {};
-  const xp      = Gamification.getXP();
-  const streak  = Tracker.getStreak();
-  const avatars = ['💪','🏋️','🔥','⚡','🦁','🐺','🦅','👑','🚀','💎'];
+  let profil  = {};
+  let mesures = {};
+  let xp      = { total:0, pourcentage:0,
+    niveau:{ emoji:'💪', numero:1, nom:'Débutant', xpSuivant:500 }};
+  let streak  = { count:0, max:0 };
+
+  try { profil  = Tracker.getProfil();           } catch(e) {}
+  try { mesures = Tracker.getDerniereMesure()||{}; } catch(e) {}
+  try { xp      = Gamification.getXP();          } catch(e) {}
+  try { streak  = Tracker.getStreak();           } catch(e) {}
+
+  const avatars = [
+    '💪','🏋️','🔥','⚡','🦁',
+    '🐺','🦅','👑','🚀','💎'
+  ];
 
   el.innerHTML = `
     ${typeof renderBoutonDeconnexion === 'function'
-       ? renderBoutonDeconnexion()
-       : ''} 
+      ? renderBoutonDeconnexion()
+      : ''}
+
     <div class="profil-card mb-md">
       <div style="margin-bottom:var(--space-md)">
         <div style="font-size:3rem;text-align:center;
@@ -2416,34 +2689,36 @@ function renderProfilMoi(el) {
           ${avatars.map(a => `
             <button onclick="changerAvatar('${a}')"
                     data-avatar="${a}"
-                    class="avatar-option ${
-                      (profil.avatar||'💪').trim()===a.trim()
-                        ?'avatar-selected':''}"
                     style="font-size:1.4rem;padding:4px 8px;
                            border-radius:var(--radius-sm);
                            border:2px solid ${
                              (profil.avatar||'💪').trim()===a.trim()
-                               ?'var(--fd-lemon)':'transparent'};
+                               ? 'var(--fd-lemon)'
+                               : 'transparent'};
                            background:${
                              (profil.avatar||'💪').trim()===a.trim()
-                               ?'rgba(249,239,119,0.1)':'transparent'};
-                           cursor:pointer;transition:all .2s ease">
+                               ? 'rgba(249,239,119,0.1)'
+                               : 'transparent'};
+                           cursor:pointer;transition:all .2s">
               ${a}
             </button>`).join('')}
         </div>
       </div>
+
       <div class="profil-name">${profil.nom||'Athlète'}</div>
       <div class="profil-level">
         ${xp.niveau.emoji} Niveau ${xp.niveau.numero}
         — ${xp.niveau.nom}
       </div>
+
       <div style="margin-top:var(--space-md)">
         <div class="flex justify-between"
              style="font-size:.72rem;opacity:.8;margin-bottom:4px">
           <span>${xp.total} XP</span>
           <span>${xp.niveau.xpSuivant} XP</span>
         </div>
-        <div style="height:6px;background:rgba(255,255,255,0.2);
+        <div style="height:6px;
+                    background:rgba(255,255,255,0.2);
                     border-radius:99px;overflow:hidden">
           <div style="height:100%;width:${xp.pourcentage}%;
                       background:white;border-radius:99px;
@@ -2454,7 +2729,12 @@ function renderProfilMoi(el) {
 
     <div class="stats-grid mb-md">
       <div class="stat-card">
-        <span class="stat-value">${Tracker.getTotalSeances()}</span>
+        <span class="stat-value">
+          ${(() => {
+            try { return Tracker.getTotalSeances(); }
+            catch(e) { return 0; }
+          })()}
+        </span>
         <span class="stat-label">Séances</span>
       </div>
       <div class="stat-card">
@@ -2467,7 +2747,10 @@ function renderProfilMoi(el) {
       </div>
       <div class="stat-card">
         <span class="stat-value">
-          ${Object.keys(Tracker.getAllPRs()).length}
+          ${(() => {
+            try { return Object.keys(Tracker.getAllPRs()).length; }
+            catch(e) { return 0; }
+          })()}
         </span>
         <span class="stat-label">PRs</span>
       </div>
@@ -2479,22 +2762,23 @@ function renderProfilMoi(el) {
                   gap:var(--space-sm);margin-top:var(--space-md)">
         ${[
           { id:'m-poids',    label:'Poids (kg)',
-            val:mesures.poids   ||profil.poids   ||'' },
+            val: mesures.poids   ||profil.poids   ||'' },
           { id:'m-taille',   label:'Taille (cm)',
-            val:mesures.taille  ||profil.taille  ||'' },
+            val: mesures.taille  ||profil.taille  ||'' },
           { id:'m-bras',     label:'Bras (cm)',
-            val:mesures.bras    ||''                   },
+            val: mesures.bras    ||'' },
           { id:'m-poitrine', label:'Poitrine (cm)',
-            val:mesures.poitrine||''                   },
+            val: mesures.poitrine||'' },
           { id:'m-taille2',  label:'Tour taille (cm)',
-            val:mesures.taille2 ||''                   },
+            val: mesures.taille2 ||'' },
           { id:'m-hanches',  label:'Hanches (cm)',
-            val:mesures.hanches ||''                   }
+            val: mesures.hanches ||'' }
         ].map(m => `
           <div>
             <div class="input-label">${m.label}</div>
             <input class="input" id="${m.id}" type="number"
-                   placeholder="${m.label}" value="${m.val}" />
+                   placeholder="${m.label}"
+                   value="${m.val}" />
           </div>`).join('')}
       </div>
       <button class="btn-primary mt-md"
@@ -2517,43 +2801,54 @@ function renderProfilMoi(el) {
 }
 
 function changerAvatar(avatar) {
-  Tracker.sauvegarderProfil({ avatar });
-  document.querySelectorAll('.avatar-option').forEach(btn => {
-    btn.style.border      = '2px solid transparent';
-    btn.style.background  = 'transparent';
-    btn.classList.remove('avatar-selected');
+  try { Tracker.sauvegarderProfil({ avatar }); } catch(e) {}
+
+  document.querySelectorAll('[data-avatar]').forEach(btn => {
+    const isActif = btn.dataset.avatar === avatar;
+    btn.style.border     = `2px solid ${isActif
+      ? 'var(--fd-lemon)' : 'transparent'}`;
+    btn.style.background = isActif
+      ? 'rgba(249,239,119,0.1)' : 'transparent';
   });
-  const btnActif = document.querySelector(
-    `.avatar-option[data-avatar="${avatar}"]`
-  );
-  if (btnActif) {
-    btnActif.style.border     = '2px solid var(--fd-lemon)';
-    btnActif.style.background = 'rgba(249,239,119,0.1)';
-    btnActif.classList.add('avatar-selected');
-  }
+
   Utils.toast('Avatar mis à jour !', 'success');
   Utils.vibrerBeep();
 }
 
 function sauvegarderMesures() {
   const data = {
-    poids:    parseFloat(document.getElementById('m-poids')?.value)    ||undefined,
-    taille:   parseFloat(document.getElementById('m-taille')?.value)   ||undefined,
-    bras:     parseFloat(document.getElementById('m-bras')?.value)     ||undefined,
-    poitrine: parseFloat(document.getElementById('m-poitrine')?.value) ||undefined,
-    taille2:  parseFloat(document.getElementById('m-taille2')?.value)  ||undefined,
-    hanches:  parseFloat(document.getElementById('m-hanches')?.value)  ||undefined
+    poids:    parseFloat(
+      document.getElementById('m-poids')?.value)    ||undefined,
+    taille:   parseFloat(
+      document.getElementById('m-taille')?.value)   ||undefined,
+    bras:     parseFloat(
+      document.getElementById('m-bras')?.value)     ||undefined,
+    poitrine: parseFloat(
+      document.getElementById('m-poitrine')?.value) ||undefined,
+    taille2:  parseFloat(
+      document.getElementById('m-taille2')?.value)  ||undefined,
+    hanches:  parseFloat(
+      document.getElementById('m-hanches')?.value)  ||undefined
   };
-  Tracker.ajouterMesure(data);
-  if (data.poids)  Tracker.sauvegarderProfil({ poids:data.poids   });
-  if (data.taille) Tracker.sauvegarderProfil({ taille:data.taille });
+
+  try { Tracker.ajouterMesure(data); } catch(e) {}
+  if (data.poids)  {
+    try { Tracker.sauvegarderProfil({ poids:data.poids });   } catch(e) {}
+    try { Tracker.ajouterPoids(data.poids);                  } catch(e) {}
+  }
+  if (data.taille) {
+    try { Tracker.sauvegarderProfil({ taille:data.taille }); } catch(e) {}
+  }
+
   Utils.toast('Mesures sauvegardées !', 'success');
+  Utils.vibrerBeep();
 }
 
 function sauvegarderProfil() {
-  const nom = document.getElementById('edit-nom')?.value?.trim();
+  const nom = document.getElementById('edit-nom')
+    ?.value?.trim();
   if (!nom) return;
-  Tracker.sauvegarderProfil({ nom });
+  try { Tracker.sauvegarderProfil({ nom }); } catch(e) {}
   Utils.toast('Profil mis à jour !', 'success');
 }
 
@@ -2561,7 +2856,9 @@ function sauvegarderProfil() {
 // JOURNAL
 // ════════════════════════════════════════════════════════════
 function renderJournal(el) {
-  const journal = Tracker.getJournal();
+  let journal = [];
+  try { journal = Tracker.getJournal(); } catch(e) {}
+
   el.innerHTML = `
     <button class="btn-primary mb-md"
             onclick="ajouterEntreeJournal()">
@@ -2585,8 +2882,9 @@ function renderJournal(el) {
           </div>
           ${e.seanceId ? `
             <div class="journal-seance">
-              ${SEANCES_BASE[e.seanceId]?.emoji||''}
-              ${SEANCES_BASE[e.seanceId]?.nom||e.seanceId}
+              ${(window.SEANCES_BASE||{})[e.seanceId]?.emoji||''}
+              ${(window.SEANCES_BASE||{})[e.seanceId]?.nom
+                ||e.seanceId}
             </div>` : ''}
           <div class="journal-text">${e.texte}</div>
           <button onclick="supprimerJournal('${e.id}')"
@@ -2602,29 +2900,36 @@ function renderJournal(el) {
 function ajouterEntreeJournal() {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
+  if (!modal || !content) return;
+
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">📔 Nouvelle note</h3>
+    <h3 style="margin-bottom:var(--space-md)">
+      📔 Nouvelle note
+    </h3>
     <textarea class="input" id="new-journal" rows="5"
               placeholder="Tes pensées, sensations, objectifs..."
-              style="resize:vertical;min-height:140px"></textarea>
+              style="resize:vertical;min-height:140px">
+    </textarea>
     <button class="btn-primary mt-md"
             onclick="sauvegarderJournal()">
       💾 Sauvegarder
     </button>`;
+
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick =
-    () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close')
+    .onclick = () => modal.classList.add('hidden');
 }
 
 function sauvegarderJournal() {
-  const texte =
-    document.getElementById('new-journal')?.value?.trim();
+  const texte = document.getElementById('new-journal')
+    ?.value?.trim();
   if (!texte) return;
-  Tracker.ajouterEntreeJournal(texte);
-  Gamification.ajouterXP(25, 'journal');
-  Defis.mettreAJourProgression();
+  try { Tracker.ajouterEntreeJournal(texte);           } catch(e) {}
+  try { Gamification.ajouterXP(25, 'journal');         } catch(e) {}
+  try { Defis.mettreAJourProgression();                } catch(e) {}
   Utils.toast('Note ajoutée !', 'success');
-  document.getElementById('modal-info')?.classList.add('hidden');
+  document.getElementById('modal-info')
+    ?.classList.add('hidden');
   renderProfil('journal');
 }
 
@@ -2634,7 +2939,7 @@ async function supprimerJournal(id) {
     'Cette action est irréversible.'
   );
   if (ok) {
-    Tracker.supprimerEntreeJournal(id);
+    try { Tracker.supprimerEntreeJournal(id); } catch(e) {}
     renderProfil('journal');
   }
 }
@@ -2643,7 +2948,9 @@ async function supprimerJournal(id) {
 // OBJECTIFS
 // ════════════════════════════════════════════════════════════
 function renderObjectifs(el) {
-  const objectifs = Tracker.getObjectifs();
+  let objectifs = [];
+  try { objectifs = Tracker.getObjectifs(); } catch(e) {}
+
   el.innerHTML = `
     <button class="btn-primary mb-md"
             onclick="ajouterObjectif()">
@@ -2658,8 +2965,9 @@ function renderObjectifs(el) {
         </p>
       </div>` :
       objectifs.map(o => {
-        const pct  = Tracker.calculerProgressionObjectif(o);
-        const pred = Predict.predireObjectif(o);
+        let pct  = 0, pred = null;
+        try { pct  = Tracker.calculerProgressionObjectif(o);  } catch(e) {}
+        try { pred = Predict.predireObjectif(o);              } catch(e) {}
         return `
           <div class="objectif-card">
             <div class="objectif-header">
@@ -2676,8 +2984,7 @@ function renderObjectifs(el) {
             </div>
             <div class="objectif-progress">
               <span>
-                Actuel:
-                <strong>
+                Actuel: <strong>
                   ${o.valeurActuelle||'?'} ${o.unite||''}
                 </strong>
               </span>
@@ -2705,8 +3012,12 @@ function renderObjectifs(el) {
 function ajouterObjectif() {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
+  if (!modal || !content) return;
+
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">🎯 Nouvel objectif</h3>
+    <h3 style="margin-bottom:var(--space-md)">
+      🎯 Nouvel objectif
+    </h3>
     <div class="input-label">Objectif</div>
     <input class="input mb-md" id="obj-nom"
            placeholder="ex: Bench Press 100kg"/>
@@ -2725,7 +3036,8 @@ function ajouterObjectif() {
     <div class="flex gap-sm mb-md">
       <div style="flex:1">
         <div class="input-label">Unité</div>
-        <input class="input" id="obj-unite" placeholder="kg"/>
+        <input class="input" id="obj-unite"
+               placeholder="kg"/>
       </div>
       <div style="flex:1">
         <div class="input-label">Émoji</div>
@@ -2735,52 +3047,63 @@ function ajouterObjectif() {
     </div>
     <div class="input-label">Échéance (optionnel)</div>
     <input class="input mb-md" id="obj-date" type="date"/>
-    <button class="btn-primary" onclick="sauvegarderObjectif()">
+    <button class="btn-primary"
+            onclick="sauvegarderObjectif()">
       💾 Ajouter
     </button>`;
+
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick =
-    () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close')
+    .onclick = () => modal.classList.add('hidden');
 }
 
 function sauvegarderObjectif() {
-  const nom   = document.getElementById('obj-nom')?.value?.trim();
-  const cible = parseFloat(document.getElementById('obj-cible')?.value);
-  if (!nom||!cible) {
-    Utils.toast('Remplis le nom et la cible !','error');
+  const nom   = document.getElementById('obj-nom')
+    ?.value?.trim();
+  const cible = parseFloat(
+    document.getElementById('obj-cible')?.value);
+  if (!nom || !cible) {
+    Utils.toast('Remplis le nom et la cible !', 'error');
     return;
   }
-  Tracker.ajouterObjectif({
-    nom,
-    valeurActuelle: parseFloat(
-      document.getElementById('obj-actuel')?.value
-    ) || 0,
-    valeurCible: cible,
-    unite:    document.getElementById('obj-unite')?.value || '',
-    emoji:    document.getElementById('obj-emoji')?.value || '🎯',
-    echeance: document.getElementById('obj-date')?.value  || null
-  });
-  Utils.toast('Objectif ajouté !','success');
-  document.getElementById('modal-info')?.classList.add('hidden');
+  try {
+    Tracker.ajouterObjectif({
+      nom,
+      valeurActuelle: parseFloat(
+        document.getElementById('obj-actuel')?.value) || 0,
+      valeurCible: cible,
+      unite:    document.getElementById('obj-unite')?.value || '',
+      emoji:    document.getElementById('obj-emoji')?.value || '🎯',
+      echeance: document.getElementById('obj-date')?.value  || null
+    });
+  } catch(e) {}
+  Utils.toast('Objectif ajouté !', 'success');
+  document.getElementById('modal-info')
+    ?.classList.add('hidden');
   renderProfil('objectifs');
 }
 
 function mettreAJourObjectif(id) {
-  const obj = Tracker.getObjectifs().find(o => o.id === id);
+  let obj = null;
+  try { obj = Tracker.getObjectifs().find(o => o.id === id); }
+  catch(e) {}
   if (!obj) return;
+
   const val = prompt(
     `Valeur actuelle pour "${obj.nom}":`,
     obj.valeurActuelle
   );
   if (!val) return;
-  Tracker.mettreAJourObjectif(id, {
-    valeurActuelle: parseFloat(val)
-  });
+
+  try { Tracker.mettreAJourObjectif(id,
+    { valeurActuelle: parseFloat(val) }); } catch(e) {}
+
   if (parseFloat(val) >= obj.valeurCible) {
-    Tracker.mettreAJourObjectif(id, { complete: true });
+    try { Tracker.mettreAJourObjectif(id, { complete:true }); }
+    catch(e) {}
     Utils.confetti(2000);
     Utils.toast('🎉 Objectif atteint !', 'success', 4000);
-    Gamification.recompenser('DEFI_SEMAINE');
+    try { Gamification.recompenser('DEFI_SEMAINE'); } catch(e) {}
   }
   renderProfil('objectifs');
 }
@@ -2789,7 +3112,11 @@ function mettreAJourObjectif(id) {
 // BLESSURE
 // ════════════════════════════════════════════════════════════
 function renderBlessure(el) {
-  const blessures = Tracker.getBlessures().filter(b => b.active);
+  let blessures = [];
+  try {
+    blessures = Tracker.getBlessures().filter(b => b.active);
+  } catch(e) {}
+
   const zones = [
     'Épaule gauche','Épaule droite','Dos haut','Dos bas',
     'Genou gauche','Genou droit','Coude','Poignet',
@@ -2804,7 +3131,8 @@ function renderBlessure(el) {
         <div>
           <div class="input-label">Zone</div>
           <select class="input" id="b-zone">
-            ${zones.map(z => `<option>${z}</option>`).join('')}
+            ${zones.map(z => `
+              <option>${z}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -2819,10 +3147,12 @@ function renderBlessure(el) {
       <textarea class="input mb-md" id="b-notes" rows="2"
                 placeholder="Notes..."
                 style="resize:none"></textarea>
-      <button class="btn-primary" onclick="ajouterBlessure()">
+      <button class="btn-primary"
+              onclick="ajouterBlessure()">
         🩹 Signaler
       </button>
     </div>
+
     ${blessures.length > 0 ? `
       <div class="section-title">⚠️ Blessures actives</div>
       ${blessures.map(b => `
@@ -2864,7 +3194,8 @@ function ajouterBlessure() {
   const severite = document.getElementById('b-severite')?.value;
   const notes    = document.getElementById('b-notes')?.value?.trim();
   if (!zone) return;
-  Tracker.ajouterBlessure(zone, severite, notes);
+  try { Tracker.ajouterBlessure(zone, severite, notes); }
+  catch(e) {}
   Utils.toast('Blessure signalée. Sois prudent !', 'info');
   renderProfil('blessure');
 }
@@ -2872,7 +3203,7 @@ function ajouterBlessure() {
 async function guerirBlessure(id) {
   const ok = await Utils.confirmer('Marquer comme guéri ?', '');
   if (ok) {
-    Tracker.guerirBlessure(id);
+    try { Tracker.guerirBlessure(id); } catch(e) {}
     Utils.toast('Bien récupéré ! 💪', 'success');
     renderProfil('blessure');
   }
@@ -2893,6 +3224,7 @@ function sauvegarderExercicesCustom(liste) {
 function _fusionnerExercicesCustom() {
   const custom = getExercicesCustom();
   custom.forEach(ex => {
+    if (!window.EXERCICES) window.EXERCICES = {};
     window.EXERCICES[ex.ref] = {
       nom:         ex.nom,
       emoji:       ex.emoji       || '💪',
@@ -2932,8 +3264,9 @@ function renderExercicesCustom(el) {
       custom.map(ex => `
         <div class="card mb-md">
           <div class="flex items-center gap-md">
-            <div style="font-size:2rem;width:48px;text-align:center">
-              ${ex.emoji || '💪'}
+            <div style="font-size:2rem;width:48px;
+                        text-align:center">
+              ${ex.emoji||'💪'}
             </div>
             <div style="flex:1">
               <div style="font-weight:700;font-size:.95rem">
@@ -2959,15 +3292,17 @@ function renderExercicesCustom(el) {
               </button>
             </div>
           </div>
-        </div>`).join('')}
-  `;
+        </div>`).join('')}`;
 }
 
 function ouvrirFormExercice(ref = null) {
   const custom   = getExercicesCustom();
-  const existant = ref ? custom.find(e => e.ref === ref) : null;
+  const existant = ref
+    ? custom.find(e => e.ref === ref)
+    : null;
   const modal    = document.getElementById('modal-info');
   const content  = document.getElementById('modal-info-content');
+  if (!modal || !content) return;
 
   const muscles = [
     'Pectoraux','Dos','Épaules','Biceps','Triceps',
@@ -2985,13 +3320,13 @@ function ouvrirFormExercice(ref = null) {
         <div class="input-label">Nom *</div>
         <input class="input" id="ex-nom"
                placeholder="ex: Hip Thrust"
-               value="${existant?.nom || ''}" />
+               value="${existant?.nom||''}" />
       </div>
       <div>
         <div class="input-label">Émoji</div>
         <input class="input" id="ex-emoji"
                placeholder="🏋️" maxlength="2"
-               value="${existant?.emoji || '💪'}" />
+               value="${existant?.emoji||'💪'}" />
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;
@@ -3019,36 +3354,43 @@ function ouvrirFormExercice(ref = null) {
     <div class="input-label">Équipement</div>
     <input class="input mb-md" id="ex-equip"
            placeholder="ex: Barre + rack"
-           value="${existant?.equipement || ''}" />
+           value="${existant?.equipement||''}" />
     <div class="input-label">Description</div>
     <textarea class="input mb-md" id="ex-desc" rows="3"
               placeholder="Décris l'exercice..."
               style="resize:none">${existant?.description||''}</textarea>
     <div class="input-label">Conseils (un par ligne)</div>
     <textarea class="input mb-md" id="ex-conseils" rows="3"
-              style="resize:none">${(existant?.conseils||[]).join('\n')}</textarea>
+              style="resize:none">${
+                (existant?.conseils||[]).join('\n')
+              }</textarea>
     <button class="btn-primary w-full"
             onclick="sauvegarderFormExercice('${ref||''}')">
       💾 ${existant ? 'Modifier' : 'Créer'}
-    </button>
-  `;
+    </button>`;
 
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick =
-    () => modal.classList.add('hidden');
-  modal.querySelector('.modal-overlay').onclick =
-    () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close')
+    .onclick = () => modal.classList.add('hidden');
+  modal.querySelector('.modal-overlay')
+    .onclick = () => modal.classList.add('hidden');
 }
 
 function sauvegarderFormExercice(refExistant = '') {
-  const nom    = document.getElementById('ex-nom')?.value?.trim();
-  const emoji  = document.getElementById('ex-emoji')?.value?.trim() || '💪';
+  const nom    = document.getElementById('ex-nom')
+    ?.value?.trim();
+  const emoji  = document.getElementById('ex-emoji')
+    ?.value?.trim() || '💪';
   const muscle = document.getElementById('ex-muscle')?.value;
-  const diff   = parseInt(document.getElementById('ex-diff')?.value) || 2;
-  const equip  = document.getElementById('ex-equip')?.value?.trim() || '';
-  const desc   = document.getElementById('ex-desc')?.value?.trim()  || '';
-  const conseils = (document.getElementById('ex-conseils')?.value || '')
-    .split('\n').map(c => c.trim()).filter(Boolean);
+  const diff   = parseInt(
+    document.getElementById('ex-diff')?.value) || 2;
+  const equip  = document.getElementById('ex-equip')
+    ?.value?.trim() || '';
+  const desc   = document.getElementById('ex-desc')
+    ?.value?.trim() || '';
+  const conseils = (
+    document.getElementById('ex-conseils')?.value || ''
+  ).split('\n').map(c => c.trim()).filter(Boolean);
 
   if (!nom || !muscle) {
     Utils.toast('Nom et muscle sont obligatoires !', 'error');
@@ -3068,11 +3410,14 @@ function sauvegarderFormExercice(refExistant = '') {
     }
   } else {
     const ref = 'custom_' +
-      nom.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')
+      nom.toLowerCase()
+        .replace(/\s+/g,'_')
+        .replace(/[^a-z0-9_]/g,'')
       + '_' + Date.now();
     custom.push({
-      ref, nom, emoji, muscle, difficulte: diff,
-      equipement: equip, description: desc, conseils,
+      ref, nom, emoji, muscle,
+      difficulte: diff, equipement: equip,
+      description: desc, conseils,
       dateCreation: Utils.aujourd_hui()
     });
   }
@@ -3082,9 +3427,10 @@ function sauvegarderFormExercice(refExistant = '') {
     refExistant ? '✅ Exercice modifié !' : '✅ Exercice créé !',
     'success'
   );
-  document.getElementById('modal-info')?.classList.add('hidden');
-  const el = document.getElementById('profil-content');
-  if (el) renderExercicesCustom(el);
+  document.getElementById('modal-info')
+    ?.classList.add('hidden');
+  const profil = document.getElementById('profil-content');
+  if (profil) renderExercicesCustom(profil);
 }
 
 async function supprimerExerciceCustom(ref) {
@@ -3093,9 +3439,10 @@ async function supprimerExerciceCustom(ref) {
     'Tes données liées seront conservées.'
   );
   if (!ok) return;
-  const custom = getExercicesCustom().filter(e => e.ref !== ref);
+  const custom = getExercicesCustom()
+    .filter(e => e.ref !== ref);
   sauvegarderExercicesCustom(custom);
-  delete window.EXERCICES[ref];
+  if (window.EXERCICES) delete window.EXERCICES[ref];
   Utils.toast('Exercice supprimé.', 'info');
   const el = document.getElementById('profil-content');
   if (el) renderExercicesCustom(el);
@@ -3105,17 +3452,22 @@ async function supprimerExerciceCustom(ref) {
 // PROGRAMME CUSTOM
 // ════════════════════════════════════════════════════════════
 function renderProgrammeCustom(el) {
-  const planning  = Programme.getPlanningActuel();
-  const toutes    = Programme.getAllSeances();
-  const isCustom  = Programme.estPlanningCustom();
-  const customs   = Programme.getSeancesCustom();
-  const joursNoms = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+  let planning = [], toutes = [];
+  let isCustom = false, customs = {};
+  const joursNoms = [
+    'Lundi','Mardi','Mercredi',
+    'Jeudi','Vendredi','Samedi','Dimanche'
+  ];
+
+  try { planning = Programme.getPlanningActuel();  } catch(e) {}
+  try { toutes   = Programme.getAllSeances();       } catch(e) {}
+  try { isCustom = Programme.estPlanningCustom();  } catch(e) {}
+  try { customs  = Programme.getSeancesCustom();   } catch(e) {}
 
   el.innerHTML = `
     <div class="card mb-md"
          style="background:linear-gradient(135deg,
-                rgba(75,75,249,0.2) 0%,
-                rgba(191,161,255,0.1) 100%)">
+                rgba(75,75,249,0.2),rgba(191,161,255,0.1))">
       <div class="flex justify-between items-center">
         <div>
           <div class="card-label">🗓️ Planning hebdomadaire</div>
@@ -3145,20 +3497,17 @@ function renderProgrammeCustom(el) {
             ${joursNoms[idx].slice(0,3).toUpperCase()}
           </div>
           <div style="flex:1">
-            <select class="input"
-                    id="planning-jour-${idx}"
+            <select class="input" id="planning-jour-${idx}"
                     style="font-size:.8rem;padding:6px 8px">
               <option value="">😴 Repos</option>
               ${toutes.map(s => `
                 <option value="${s.id}"
                   ${p.seanceId===s.id?'selected':''}>
-                  ${s.emoji} ${s.nom}
-                  ${s.custom?' ✏️':''}
+                  ${s.emoji} ${s.nom}${s.custom?' ✏️':''}
                 </option>`).join('')}
             </select>
           </div>
         </div>`).join('')}
-
       <button class="btn-primary mt-md w-full"
               onclick="sauvegarderPlanningCustom()">
         💾 Sauvegarder le planning
@@ -3176,10 +3525,11 @@ function renderProgrammeCustom(el) {
 
       <div style="font-size:.72rem;font-weight:700;
                   text-transform:uppercase;letter-spacing:.06em;
-                  color:var(--text-muted);margin-bottom:var(--space-sm)">
+                  color:var(--text-muted);
+                  margin-bottom:var(--space-sm)">
         Séances de base
       </div>
-      ${Object.values(SEANCES_BASE).map(s => `
+      ${Object.values(window.SEANCES_BASE||{}).map(s => `
         <div class="flex items-center justify-between"
              style="padding:var(--space-sm) 0;
                     border-bottom:1px solid var(--border-color)">
@@ -3214,7 +3564,8 @@ function renderProgrammeCustom(el) {
                 ${s.emoji} ${s.nom}
               </div>
               <div style="font-size:.72rem;color:var(--text-muted)">
-                ${s.exercices.length} exercices · ${s.duree_estimee}min
+                ${s.exercices.length} exercices
+                · ${s.duree_estimee}min
               </div>
             </div>
             <div style="display:flex;gap:4px">
@@ -3230,18 +3581,19 @@ function renderProgrammeCustom(el) {
             </div>
           </div>`).join('')}
       ` : ''}
-    </div>
-  `;
+    </div>`;
 }
 
 function sauvegarderPlanningCustom() {
-  const joursNoms = ['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
+  const joursNoms =
+    ['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
   const nouveau = joursNoms.map((label, idx) => ({
     jour:     idx,
     label,
-    seanceId: document.getElementById(`planning-jour-${idx}`)?.value || null
+    seanceId: document.getElementById(
+      `planning-jour-${idx}`)?.value || null
   }));
-  Programme.sauvegarderPlanning(nouveau);
+  try { Programme.sauvegarderPlanning(nouveau); } catch(e) {}
   Utils.toast('✅ Planning sauvegardé !', 'success');
   Utils.vibrerBeep();
   const el = document.getElementById('profil-content');
@@ -3254,15 +3606,15 @@ async function resetPlanningCustom() {
     'Le planning par défaut sera restauré.'
   );
   if (!ok) return;
-  Programme.resetPlanning();
+  try { Programme.resetPlanning(); } catch(e) {}
   Utils.toast('Planning réinitialisé !', 'info');
   const el = document.getElementById('profil-content');
   if (el) renderProgrammeCustom(el);
 }
 
 async function dupliquerSeance(id) {
-  Programme.dupliquerSeanceBase(id);
-  Utils.toast('Séance dupliquée ! Tu peux la modifier.', 'success');
+  try { Programme.dupliquerSeanceBase(id); } catch(e) {}
+  Utils.toast('Séance dupliquée !', 'success');
   const el = document.getElementById('profil-content');
   if (el) renderProgrammeCustom(el);
 }
@@ -3273,18 +3625,21 @@ async function supprimerSeanceCustom(id) {
     'Elle sera retirée du planning si nécessaire.'
   );
   if (!ok) return;
-  Programme.supprimerSeanceCustom(id);
+  try { Programme.supprimerSeanceCustom(id); } catch(e) {}
   Utils.toast('Séance supprimée.', 'info');
   const el = document.getElementById('profil-content');
   if (el) renderProgrammeCustom(el);
 }
 
 function ouvrirFormSeance(id = null) {
-  const customs  = Programme.getSeancesCustom();
+  let customs  = {};
+  try { customs = Programme.getSeancesCustom(); } catch(e) {}
   const existant = id ? customs[id] : null;
   const modal    = document.getElementById('modal-info');
   const content  = document.getElementById('modal-info-content');
-  const toutesExos = Object.entries(EXERCICES);
+  if (!modal || !content) return;
+
+  const toutesExos = Object.entries(window.EXERCICES || {});
 
   content.innerHTML = `
     <h3 style="margin-bottom:var(--space-md)">
@@ -3296,22 +3651,22 @@ function ouvrirFormSeance(id = null) {
         <div class="input-label">Nom *</div>
         <input class="input" id="s-nom"
                placeholder="ex: Push Day"
-               value="${existant?.nom || ''}" />
+               value="${existant?.nom||''}" />
       </div>
       <div>
         <div class="input-label">Émoji</div>
         <input class="input" id="s-emoji"
                placeholder="💪" maxlength="2"
-               value="${existant?.emoji || '💪'}" />
+               value="${existant?.emoji||'💪'}" />
       </div>
     </div>
     <div class="input-label">Durée estimée (min)</div>
     <input class="input mb-md" id="s-duree"
            type="number" placeholder="60"
-           value="${existant?.duree_estimee || 60}" />
+           value="${existant?.duree_estimee||60}" />
     <div class="card-label mb-sm">🏋️ Exercices</div>
     <div id="seance-exercices-list">
-      ${(existant?.exercices || []).map((ex, i) =>
+      ${(existant?.exercices||[]).map((ex, i) =>
         _renderLigneExerciceForm(ex, i, toutesExos)
       ).join('')}
     </div>
@@ -3320,23 +3675,21 @@ function ouvrirFormSeance(id = null) {
       ➕ Ajouter un exercice
     </button>
     <button class="btn-primary w-full"
-            onclick="sauvegarderFormSeance('${id || ''}')">
+            onclick="sauvegarderFormSeance('${id||''}')">
       💾 ${existant ? 'Modifier' : 'Créer'}
-    </button>
-  `;
+    </button>`;
 
   window._seanceLigneCount = existant?.exercices?.length || 0;
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick =
-    () => modal.classList.add('hidden');
-  modal.querySelector('.modal-overlay').onclick =
-    () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close')
+    .onclick = () => modal.classList.add('hidden');
+  modal.querySelector('.modal-overlay')
+    .onclick = () => modal.classList.add('hidden');
 }
 
 function _renderLigneExerciceForm(ex = null, idx, toutesExos) {
   return `
-    <div class="seance-exo-ligne"
-         id="exo-ligne-${idx}"
+    <div class="seance-exo-ligne" id="exo-ligne-${idx}"
          style="display:grid;
                 grid-template-columns:1fr 60px 60px 60px 32px;
                 gap:4px;margin-bottom:4px;align-items:center">
@@ -3345,21 +3698,24 @@ function _renderLigneExerciceForm(ex = null, idx, toutesExos) {
         ${toutesExos.map(([ref, e]) => `
           <option value="${ref}"
             ${ex?.ref===ref?'selected':''}>
-            ${e.emoji} ${e.nom}
+            ${e.emoji||''} ${e.nom}
           </option>`).join('')}
       </select>
       <input class="input" id="exo-series-${idx}"
              type="number" placeholder="Sér."
              value="${ex?.series||3}"
-             style="font-size:.75rem;padding:6px 4px;text-align:center"/>
+             style="font-size:.75rem;padding:6px 4px;
+                    text-align:center"/>
       <input class="input" id="exo-reps-${idx}"
              type="text" placeholder="Reps"
              value="${ex?.reps||'10'}"
-             style="font-size:.75rem;padding:6px 4px;text-align:center"/>
+             style="font-size:.75rem;padding:6px 4px;
+                    text-align:center"/>
       <input class="input" id="exo-repos-${idx}"
              type="number" placeholder="Repos"
              value="${ex?.repos||90}"
-             style="font-size:.75rem;padding:6px 4px;text-align:center"/>
+             style="font-size:.75rem;padding:6px 4px;
+                    text-align:center"/>
       <button onclick="supprimerLigneExercice(${idx})"
               style="background:none;border:none;
                      color:var(--fd-coral);font-size:1rem;
@@ -3370,8 +3726,8 @@ function _renderLigneExerciceForm(ex = null, idx, toutesExos) {
 }
 
 function ajouterLigneExercice() {
-  const toutesExos = Object.entries(EXERCICES);
-  const idx = window._seanceLigneCount || 0;
+  const toutesExos = Object.entries(window.EXERCICES || {});
+  const idx  = window._seanceLigneCount || 0;
   window._seanceLigneCount = idx + 1;
   const liste = document.getElementById('seance-exercices-list');
   if (!liste) return;
@@ -3385,9 +3741,12 @@ function supprimerLigneExercice(idx) {
 }
 
 function sauvegarderFormSeance(idExistant = '') {
-  const nom   = document.getElementById('s-nom')?.value?.trim();
-  const emoji = document.getElementById('s-emoji')?.value?.trim() || '💪';
-  const duree = parseInt(document.getElementById('s-duree')?.value) || 60;
+  const nom   = document.getElementById('s-nom')
+    ?.value?.trim();
+  const emoji = document.getElementById('s-emoji')
+    ?.value?.trim() || '💪';
+  const duree = parseInt(
+    document.getElementById('s-duree')?.value) || 60;
 
   if (!nom) {
     Utils.toast('Entre un nom pour la séance !', 'error');
@@ -3395,32 +3754,42 @@ function sauvegarderFormSeance(idExistant = '') {
   }
 
   const exercices = [];
-  const lignes = document.querySelectorAll('.seance-exo-ligne');
-  lignes.forEach(ligne => {
-    const id = ligne.id.replace('exo-ligne-', '');
-    const ref    = document.getElementById(`exo-ref-${id}`)?.value;
-    const series = parseInt(document.getElementById(`exo-series-${id}`)?.value) || 3;
-    const reps   = document.getElementById(`exo-reps-${id}`)?.value || '10';
-    const repos  = parseInt(document.getElementById(`exo-repos-${id}`)?.value) || 90;
-    if (ref) exercices.push({ ref, series, reps, repos });
-  });
+  document.querySelectorAll('.seance-exo-ligne')
+    .forEach(ligne => {
+      const id     = ligne.id.replace('exo-ligne-', '');
+      const ref    = document
+        .getElementById(`exo-ref-${id}`)?.value;
+      const series = parseInt(document
+        .getElementById(`exo-series-${id}`)?.value) || 3;
+      const reps   = document
+        .getElementById(`exo-reps-${id}`)?.value || '10';
+      const repos  = parseInt(document
+        .getElementById(`exo-repos-${id}`)?.value) || 90;
+      if (ref) exercices.push({ ref, series, reps, repos });
+    });
 
   if (exercices.length === 0) {
     Utils.toast('Ajoute au moins un exercice !', 'error');
     return;
   }
 
-  const data = { nom, emoji, duree_estimee: duree, exercices };
+  const data = { nom, emoji, duree_estimee:duree, exercices };
 
-  if (idExistant) {
-    Programme.modifierSeanceCustom(idExistant, data);
-    Utils.toast('✅ Séance modifiée !', 'success');
-  } else {
-    Programme.creerSeanceCustom(data);
-    Utils.toast('✅ Séance créée !', 'success');
+  try {
+    if (idExistant) {
+      Programme.modifierSeanceCustom(idExistant, data);
+      Utils.toast('✅ Séance modifiée !', 'success');
+    } else {
+      Programme.creerSeanceCustom(data);
+      Utils.toast('✅ Séance créée !', 'success');
+    }
+  } catch(e) {
+    Utils.toast('Erreur lors de la sauvegarde.', 'error');
+    return;
   }
 
-  document.getElementById('modal-info')?.classList.add('hidden');
+  document.getElementById('modal-info')
+    ?.classList.add('hidden');
   const el = document.getElementById('profil-content');
   if (el) renderProgrammeCustom(el);
 }
@@ -3429,27 +3798,33 @@ function sauvegarderFormSeance(idExistant = '') {
 // OUTILS
 // ════════════════════════════════════════════════════════════
 function renderOutils(el) {
-  const config = Notifications.getConfig();
-  const langue = i18n.getLangue();
+  let config = {};
+  let langue = 'fr';
+  try { config = Notifications.getConfig(); } catch(e) {}
+  try { langue = i18n.getLangue();          } catch(e) {}
 
   el.innerHTML = `
 
     <!-- Langue -->
     <div class="card mb-md">
-      <div class="card-label">🌍 ${t('commun.ok') === 'OK' ? 'Language' : 'Langue'}</div>
+      <div class="card-label">🌍 Langue / Language</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;
                   gap:var(--space-md);margin-top:var(--space-md)">
-        <button onclick="i18n.setLangue('fr')"
+        <button onclick="try{i18n.setLangue('fr')}catch(e){}"
                 class="langue-btn ${langue==='fr'?'active':''}">
           <span class="langue-flag">🇫🇷</span>
           <span class="langue-nom">Français</span>
-          ${langue==='fr'?'<span class="langue-actif">✅ Actif</span>':''}
+          ${langue==='fr'
+            ? '<span class="langue-actif">✅ Actif</span>'
+            : ''}
         </button>
-        <button onclick="i18n.setLangue('en')"
+        <button onclick="try{i18n.setLangue('en')}catch(e){}"
                 class="langue-btn ${langue==='en'?'active':''}">
           <span class="langue-flag">🇬🇧</span>
           <span class="langue-nom">English</span>
-          ${langue==='en'?'<span class="langue-actif">✅ Active</span>':''}
+          ${langue==='en'
+            ? '<span class="langue-actif">✅ Active</span>'
+            : ''}
         </button>
       </div>
     </div>
@@ -3479,34 +3854,15 @@ function renderOutils(el) {
           📱 QR Sync
         </button>
         <button class="btn-secondary"
-                onclick="Utils.exporterPDF()"
-                style="grid-column:span 2">
+                style="grid-column:span 2"
+                onclick="Utils.exporterPDF()">
           📄 Rapport PDF
         </button>
         <button class="btn-secondary"
-                onclick="naviguer('share')"
-                style="grid-column:span 2">
+                style="grid-column:span 2"
+                onclick="naviguer('share')">
           📸 Partager mes stats
         </button>
-      </div>
-      <div style="margin-top:var(--space-md);padding:var(--space-sm);
-                  background:var(--bg-input);
-                  border-radius:var(--radius-sm)">
-        <div style="font-size:.78rem;color:var(--text-secondary);
-                    display:flex;justify-content:space-between;
-                    align-items:center">
-          <span>🎞️ GIFs: ${ExerciseGIF.statsCache().cached}/${ExerciseGIF.statsCache().total}</span>
-          <button onclick="rechargerGIFs()"
-                  style="background:none;border:none;
-                         color:var(--fd-indigo);font-size:.78rem;
-                         cursor:pointer;font-weight:600">
-            🔄 Recharger
-          </button>
-        </div>
-        <div class="progress-bar" style="margin-top:var(--space-xs)">
-          <div class="progress-fill"
-               style="width:${ExerciseGIF.statsCache().pct}%"></div>
-        </div>
       </div>
       <div style="font-size:.72rem;color:var(--text-muted);
                   margin-top:var(--space-sm)">
@@ -3532,23 +3888,20 @@ function renderOutils(el) {
             <label class="toggle">
               <input type="checkbox"
                      ${config[n.id]?'checked':''}
-                     onchange="Notifications.sauvegarderConfig(
-                       {'${n.id}':this.checked})">
+                     onchange="try{Notifications.sauvegarderConfig({'${n.id}':this.checked})}catch(e){}">
               <span class="toggle-slider"></span>
             </label>
           </div>`).join('')}
         <div style="margin-top:var(--space-md)">
           <div class="input-label">Heure rappel</div>
           <input class="input" type="time"
-                 value="${config.heureRappel}"
-                 onchange="Notifications.sauvegarderConfig(
-                   {heureRappel:this.value})"/>
+                 value="${config.heureRappel||'08:00'}"
+                 onchange="try{Notifications.sauvegarderConfig({heureRappel:this.value})}catch(e){}"/>
         </div>
         <div style="margin-top:var(--space-md)">
           <div class="input-label">Ton des messages</div>
           <select class="input"
-                  onchange="Notifications.sauvegarderConfig(
-                    {ton:this.value})">
+                  onchange="try{Notifications.sauvegarderConfig({ton:this.value})}catch(e){}">
             <option value="motivant"
               ${config.ton==='motivant'?'selected':''}>
               💪 Motivant
@@ -3564,7 +3917,7 @@ function renderOutils(el) {
           </select>
         </div>
         <button class="btn-secondary mt-md"
-                onclick="Notifications.tester()">
+                onclick="try{Notifications.tester()}catch(e){}">
           🔔 Tester une notification
         </button>
       </div>
@@ -3575,8 +3928,10 @@ function renderOutils(el) {
       <div class="card-label">⚙️ Paramètres</div>
       <div style="margin-bottom:var(--space-md)">
         <div class="input-label">Thème</div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);
-                    gap:var(--space-xs);margin-top:var(--space-xs)">
+        <div style="display:grid;
+                    grid-template-columns:repeat(4,1fr);
+                    gap:var(--space-xs);
+                    margin-top:var(--space-xs)">
           ${[
             { val:'dark',     label:'🌙 Dark'    },
             { val:'light',    label:'☀️ Light'   },
@@ -3585,17 +3940,16 @@ function renderOutils(el) {
           ].map(t => {
             const actuel = document.documentElement
               .getAttribute('data-theme') || 'dark';
-            const isActif = actuel === t.val;
             return `
               <button class="theme-btn"
                       data-theme="${t.val}"
                       onclick="appliquerTheme('${t.val}')"
                       style="padding:var(--space-sm) 4px;
                              border-radius:var(--radius-sm);
-                             border:2px solid ${isActif
+                             border:2px solid ${actuel===t.val
                                ? 'var(--fd-indigo)'
                                : 'var(--border-color)'};
-                             background:${isActif
+                             background:${actuel===t.val
                                ? 'var(--fd-indigo-dim)'
                                : 'var(--bg-card)'};
                              font-size:.7rem;font-weight:600;
@@ -3609,11 +3963,13 @@ function renderOutils(el) {
         <div class="input-label">Objectif séances/semaine</div>
         <select class="input"
                 onchange="Utils.storage.set(
-                  'ft_objectif_seances_semaine',parseInt(this.value))">
+                  'ft_objectif_seances_semaine',
+                  parseInt(this.value))">
           ${[3,4,5].map(n => `
             <option value="${n}"
-              ${Utils.storage.get('ft_objectif_seances_semaine',4)===n
-                ?'selected':''}>
+              ${Utils.storage.get(
+                'ft_objectif_seances_semaine',4)===n
+                ? 'selected' : ''}>
               ${n} séances
             </option>`).join('')}
         </select>
@@ -3621,13 +3977,16 @@ function renderOutils(el) {
       <div>
         <div class="input-label">Unités de poids</div>
         <select class="input"
-                onchange="Utils.storage.set('ft_unite_poids',this.value)">
+                onchange="Utils.storage.set(
+                  'ft_unite_poids',this.value)">
           <option value="kg"
-            ${Utils.storage.get('ft_unite_poids','kg')==='kg'?'selected':''}>
+            ${Utils.storage.get('ft_unite_poids','kg')==='kg'
+              ? 'selected' : ''}>
             ⚖️ Kilogrammes (kg)
           </option>
           <option value="lbs"
-            ${Utils.storage.get('ft_unite_poids','kg')==='lbs'?'selected':''}>
+            ${Utils.storage.get('ft_unite_poids','kg')==='lbs'
+              ? 'selected' : ''}>
             🇺🇸 Livres (lbs)
           </option>
         </select>
@@ -3635,7 +3994,8 @@ function renderOutils(el) {
     </div>
 
     <!-- Danger zone -->
-    <div class="card" style="border-color:rgba(255,141,150,0.3)">
+    <div class="card"
+         style="border-color:rgba(255,141,150,0.3)">
       <div class="card-label" style="color:var(--fd-coral)">
         ⚠️ Zone danger
       </div>
@@ -3647,33 +4007,21 @@ function renderOutils(el) {
   `;
 }
 
-// ─── OUTILS — Fonctions ───────────────────────────────────────
-function rechargerGIFs() {
-  ExerciseGIF.viderCache();
-  Utils.toast('Cache GIFs vidé — Rechargement...', 'info');
-  setTimeout(() => {
-    ExerciseGIF.prechargerTout((current, total) => {
-      if (current === total) {
-        Utils.toast(`✅ ${total} GIFs rechargés !`, 'success', 2000);
-      }
-    });
-  }, 500);
-}
-
+// ─── Outils fonctions ─────────────────────────────────────────
 function importerFichier() {
   document.getElementById('file-import')?.click();
 }
 
 async function handleImport(input) {
-  if (!input.files) return;
+  if (!input.files?.length) return;
   await Utils.importerJSON(input.files);
-  window.location.reload();
+  setTimeout(() => window.location.reload(), 1000);
 }
 
 async function resetDonnees() {
   const ok = await Utils.confirmer(
     '⚠️ Réinitialiser TOUTES les données ?',
-    'Cette action est IRRÉVERSIBLE. Toute ta progression sera perdue.'
+    'Cette action est IRRÉVERSIBLE. Ta progression sera perdue.'
   );
   if (!ok) return;
   const ok2 = await Utils.confirmer(
@@ -3681,8 +4029,8 @@ async function resetDonnees() {
     'Es-tu absolument certain ? Exporte d\'abord tes données.'
   );
   if (!ok2) return;
-  Tracker.resetComplet();
-  Utils.toast('Données réinitialisées. Rechargement...', 'info');
+  try { Tracker.resetComplet(); } catch(e) {}
+  Utils.toast('Données réinitialisées.', 'info');
   setTimeout(() => window.location.reload(), 1500);
 }
 
@@ -3691,6 +4039,7 @@ async function genererQRSync() {
   const json    = JSON.stringify(data);
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
+  if (!modal || !content) return;
 
   content.innerHTML = `
     <h3 style="margin-bottom:var(--space-md);text-align:center">
@@ -3712,8 +4061,8 @@ async function genererQRSync() {
     </p>`;
 
   modal.classList.remove('hidden');
-  document.getElementById('modal-info-close').onclick =
-    () => modal.classList.add('hidden');
+  document.getElementById('modal-info-close')
+    .onclick = () => modal.classList.add('hidden');
 
   await Utils.genererQR(
     json.substring(0, 500),
@@ -3721,4 +4070,4 @@ async function genererQRSync() {
   );
 }
 
-console.log('✅ App.js v2.0 chargé — FitTracker Pro complet !');
+console.log('✅ App.js v3.0 chargé — PowerApp complet !');
