@@ -23,10 +23,28 @@ const AppState = {
 
 // ─── INITIALISATION ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🏋️ FitTracker Pro v2.0 — Démarrage');
-  await initServiceWorker();
-  await afficherSplash();
+  console.log('⚡ PowerApp — Démarrage');
 
+  try { await initServiceWorker(); } catch(e) {}
+  try { await afficherSplash();    } catch(e) {}
+  try { i18n.init();               } catch(e) {}
+
+  // ── Si Firebase est chargé → attendre l'auth
+  if (window.Auth) {
+    // onAuthStateChanged dans firebase.js gère la suite
+    window._appEnAttente = true;
+    console.log('🔐 En attente auth Firebase...');
+    return;
+  }
+
+  // ── Fallback sans Firebase
+  const profil = Tracker.getProfil();
+  if (!profil.nom || profil.nom === 'Athlète') {
+    afficherOnboarding();
+  } else {
+    lancerApp();
+  }
+});
   // Init i18n en premier
   i18n.init();
 
