@@ -67,7 +67,7 @@ const Nutrition = {
         'Incorporer la whey hors du feu.',
         'Servir avec la banane en rondelles et le beurre de cacahuète.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr'
     },
 
     pd_oeufs_avocat: {
@@ -92,7 +92,7 @@ const Nutrition = {
         'Écraser l\'avocat avec une pincée de sel.',
         'Servir les œufs sur le pain avec l\'avocat.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     pd_yaourt_granola: {
@@ -117,7 +117,7 @@ const Nutrition = {
         'Arroser de miel.',
         'Parsemer de graines de chia.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     // ── DÉJEUNERS ─────────────────────────────────────────
@@ -144,7 +144,7 @@ const Nutrition = {
         'Cuire les brocolis vapeur 8 min.',
         'Dresser : riz + poulet tranché + brocolis.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     dej_saumon_patate: {
@@ -170,7 +170,7 @@ const Nutrition = {
         'Faire revenir les épinards 2 min à l\'huile d\'olive.',
         'Servir avec citron et aneth.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     dej_pates_thon: {
@@ -196,7 +196,7 @@ const Nutrition = {
         'Égoutter le thon, l\'ajouter à la poêle.',
         'Mélanger avec les pâtes. Basilic et huile d\'olive.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     dej_bowl_quinoa: {
@@ -223,7 +223,7 @@ const Nutrition = {
         'Assembler : quinoa + légumes + pois chiches + feta.',
         'Servir avec houmous et jus de citron.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     // ── DÎNERS ────────────────────────────────────────────
@@ -251,7 +251,7 @@ const Nutrition = {
         'Cuire le steak à la poêle (2-3 min / côté).',
         'Dresser avec les herbes.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     din_poulet_curry: {
@@ -279,7 +279,7 @@ const Nutrition = {
         'Verser lait de coco + tomates, mijoter 15 min.',
         'Servir avec coriandre fraîche.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     din_omelette_fromage: {
@@ -305,7 +305,7 @@ const Nutrition = {
         'Ajouter jambon et fromage quand l\'œuf est mi-pris.',
         'Plier l\'omelette. Servir avec la salade.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     din_cabillaud_lentilles: {
@@ -331,7 +331,7 @@ const Nutrition = {
         'Égoutter les lentilles, assaisonner.',
         'Dresser avec persil et quartier de citron.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     // ── SNACKS ────────────────────────────────────────────
@@ -354,7 +354,7 @@ const Nutrition = {
         'Mixer 30 secondes.',
         'Servir immédiatement.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     snack_riz_gateaux: {
@@ -375,7 +375,7 @@ const Nutrition = {
         'Ajouter quelques rondelles de banane.',
         'C\'est prêt !'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     },
 
     snack_fromage_blanc: {
@@ -396,7 +396,7 @@ const Nutrition = {
         'Ajouter les fruits rouges.',
         'Arroser de miel.'
       ],
-      leclerc: 'https://www.courses.leclerc.com'
+      leclerc: 'https://www.leclercdrive.fr/search/?q=${encodeURIComponent(nomProduit)}'
     }
   },
 
@@ -946,7 +946,7 @@ const Nutrition = {
       </div>
 
       <!-- Lien E.Leclerc -->
-      <a href="https://www.courses.leclerc.com/search/?q=${
+      <a href="https://www.leclercdrive.fr/search/?q=${
           encodeURIComponent(r.ingredients[0].nom)}"
          target="_blank"
          style="display:flex;align-items:center;justify-content:center;
@@ -997,7 +997,7 @@ const Nutrition = {
           ${objectif === 'prise' ? 'Prise de masse' :
             objectif === 'seche' ? 'Sèche' : 'Maintien'}
         </div>
-        <a href="https://www.courses.leclerc.com"
+        <a href="https://www.leclercdrive.fr"
            target="_blank"
            style="display:inline-flex;align-items:center;gap:6px;
                   margin-top:var(--space-md);
@@ -1041,7 +1041,7 @@ const Nutrition = {
               <div style="flex:1;font-size:.88rem">
                 ${item.nom}
               </div>
-              <a href="https://www.courses.leclerc.com/search/?q=${
+              <a href="https://www.leclercdrive.fr/search/?q=${
                   encodeURIComponent(item.nom)}"
                  target="_blank"
                  style="font-size:.65rem;color:var(--fd-indigo);
