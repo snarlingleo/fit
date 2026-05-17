@@ -1,4073 +1,2084 @@
 /* ============================================================
    FitTracker Pro — App.js v3.0
-   Router SPA + Init + Pages + Express + Live + Profil
-   + Supersets + Historique + Photos + Auth intégré
+   Point d'entrée principal + Navigation + Init + UI
    ============================================================ */
+
+'use strict';
 
 // ════════════════════════════════════════════════════════════
 // ÉTAT GLOBAL
 // ════════════════════════════════════════════════════════════
-const AppState = {
-  pageCourante:   'home',
-  seanceEnCours:  null,
-  seanceChoisie:  null,
-  exerciceIndex:  0,
-  serieActuelle:  1,
-  prsSeance:      [],
-  thème:          'dark',
-  installPrompt:  null,
-  expressActif:   false,
-  expressIndex:   0,
-  expressSerieN:  1,
-  expressDebut:   null,
-  supersetActif:  null
-};
-
-// ════════════════════════════════════════════════════════════
-// INITIALISATION
-// ════════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('⚡ PowerApp v3.0 — Démarrage');
-
-  try { await initServiceWorker(); } catch(e) {}
-  try { await afficherSplash();    } catch(e) {}
-  try { i18n?.init();              } catch(e) {}
-
-  // Attendre Firebase (max 5s)
-  let attente = 0;
-  while (!window.Auth && attente < 50) {
-    await new Promise(r => setTimeout(r, 100));
-    attente++;
-  }
-
-  if (window.Auth) {
-    window._appEnAttente = true;
-    console.log('🔐 Firebase prêt — attente auth...');
-
-    setTimeout(() => {
-      if (window._appEnAttente) {
-        console.warn('⚠️ Auth timeout — mode local');
-        window._appEnAttente = false;
-        _demarrerSansAuth();
-      }
-    }, 5000);
-    return;
-  }
-
-  console.warn('⚠️ Firebase indisponible — mode local');
-  _demarrerSansAuth();
-});
-
-function _demarrerSansAuth() {
-  const profil = Tracker.getProfil();
-  if (!profil.nom || profil.nom === 'Athlète') {
-    afficherOnboarding();
-  } else {
-    lancerApp();
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// SERVICE WORKER
-// ════════════════════════════════════════════════════════════
-async function initServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    const reg = await navigator.serviceWorker
-      .register('./service-worker.js');
-    console.log('✅ SW enregistré');
-
-    reg.addEventListener('updatefound', () => {
-      const nw = reg.installing;
-      nw?.addEventListener('statechange', () => {
-        if (nw.state === 'installed'
-            && navigator.serviceWorker.controller) {
-          document.getElementById('update-banner')
-            ?.classList.remove('hidden');
-        }
-      });
-    });
-
-    document.getElementById('btn-update')
-      ?.addEventListener('click', () => {
-        reg.waiting?.postMessage({ type:'SKIP_WAITING' });
-        window.location.reload();
-      });
-  } catch(e) {
-    console.warn('SW Error:', e);
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// SPLASH
-// ════════════════════════════════════════════════════════════
-function afficherSplash() {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const splash = document.getElementById('splash-screen');
-      if (splash) {
-        splash.style.opacity    = '0';
-        splash.style.transition = 'opacity 0.5s ease';
-        setTimeout(() => {
-          splash.classList.add('hidden');
-          resolve();
-        }, 500);
-      } else {
-        resolve();
-      }
-    }, 1800);
-  });
-}
-
-// ════════════════════════════════════════════════════════════
-// ONBOARDING
-// ════════════════════════════════════════════════════════════
-function afficherOnboarding() {
-  document.getElementById('onboarding')
-    ?.classList.remove('hidden');
-  document.getElementById('app-wrapper')
-    ?.classList.add('hidden');
-  renderOnboardingStep(0);
-}
-
-function renderOnboardingStep(step) {
-  const wrapper = document.getElementById('onboarding');
-  if (!wrapper) return;
-
-  const t = (k) => {
-    try { return window.i18n?.t(k) || k; } catch(e) { return k; }
-  };
-
-  const etapes = [
-    {
-      emoji: '🏋️',
-      titre: t('onboarding.bienvenue') || 'Bienvenue sur PowerApp',
-      desc:  t('onboarding.sous_titre') || 'Ton coach fitness personnel',
-      action: t('onboarding.commencer') || 'Commencer'
-    },
-    {
-      emoji: '👤',
-      titre: t('onboarding.etape1') || 'Quel est ton prénom ?',
-      desc:  '',
-      champ: {
-        id: 'ob-nom',
-        placeholder: t('onboarding.prenom') || 'Ton prénom',
-        type: 'text'
-      },
-      action: t('onboarding.suivant') || 'Suivant'
-    },
-    {
-      emoji: '⚖️',
-      titre: t('onboarding.etape2') || 'Tes mensurations',
-      desc:  'Pour calculer tes stats et personnaliser ton programme.',
-      champs: [
-        {
-          id: 'ob-poids',
-          placeholder: t('onboarding.poids') || 'Poids (kg)',
-          type: 'number'
-        },
-        {
-          id: 'ob-taille',
-          placeholder: t('onboarding.taille') || 'Taille (cm)',
-          type: 'number'
-        }
-      ],
-      action: t('onboarding.suivant') || 'Suivant'
-    },
-    {
-      emoji:     '🔔',
-      titre:     'Activer les rappels ?',
-      desc:      'Reçois des notifications si tu sautes une séance.',
-      action:    'Activer',
-      actionAlt: 'Plus tard'
-    },
-    {
-      emoji:  '🚀',
-      titre:  t('onboarding.etape4') || 'C\'est parti !',
-      desc:   'Ton programme commence aujourd\'hui. Allons-y !',
-      action: t('onboarding.commencer') || 'Démarrer'
-    }
-  ];
-
-  const e = etapes[step];
-
-  wrapper.innerHTML = `
-    <div class="onboarding-step">
-      <div class="onboarding-dots">
-        ${etapes.map((_,i) => `
-          <div class="dot ${i===step?'active':''}"></div>
-        `).join('')}
-      </div>
-      <div class="onboarding-emoji">${e.emoji}</div>
-      <h2>${e.titre}</h2>
-      ${e.desc ? `<p>${e.desc}</p>` : ''}
-      ${e.champ ? `
-        <input class="input mt-lg" id="${e.champ.id}"
-               type="${e.champ.type}"
-               placeholder="${e.champ.placeholder}"
-               autocomplete="off" />` : ''}
-      ${e.champs ? `
-        <div class="flex-col gap-sm mt-lg">
-          ${e.champs.map(c => `
-            <input class="input" id="${c.id}"
-                   type="${c.type}"
-                   placeholder="${c.placeholder}" />
-          `).join('')}
-        </div>` : ''}
-      <div style="margin-top:var(--space-xl)">
-        <button class="btn-primary"
-                onclick="avancerOnboarding(${step})">
-          ${e.action}
-        </button>
-        ${e.actionAlt ? `
-          <button class="btn-secondary mt-md"
-                  onclick="avancerOnboarding(${step}, true)">
-            ${e.actionAlt}
-          </button>` : ''}
-      </div>
-    </div>`;
-}
-
-async function avancerOnboarding(step, alt = false) {
-  if (step === 1) {
-    const nom = document.getElementById('ob-nom')
-      ?.value?.trim();
-    if (!nom) {
-      Utils.toast('Entre ton prénom !', 'error');
-      return;
-    }
-    Tracker.sauvegarderProfil({ nom });
-  }
-
-  if (step === 2) {
-    const poids  = parseFloat(
-      document.getElementById('ob-poids')?.value);
-    const taille = parseFloat(
-      document.getElementById('ob-taille')?.value);
-    if (!poids || !taille) {
-      Utils.toast('Remplis tes mesures !', 'error');
-      return;
-    }
-    Tracker.sauvegarderProfil({ poids, taille });
-    Tracker.ajouterMesure({ poids, taille });
-  }
-
-  if (step === 3 && !alt) {
-    try { await Notifications.init(); } catch(e) {}
-  }
-
-  if (step === 4) {
-    try {
-      Programme.setDateDebut(Utils.aujourd_hui());
-      Gamification.recompenser('PREMIERE_SEANCE');
-      Defis.genererDefis();
-    } catch(e) {}
-    document.getElementById('onboarding')
-      ?.classList.add('hidden');
-    lancerApp();
-    return;
-  }
-
-  renderOnboardingStep(step + 1);
-}
-
-// ════════════════════════════════════════════════════════════
-// LANCER L'APP
-// ════════════════════════════════════════════════════════════
-function lancerApp() {
-  document.getElementById('app-wrapper')
-    ?.classList.remove('hidden');
-
-  initHeader();
-  initNav();
-  initInstallPrompt();
-  initTheme();
-  initExercicesCustom();
-
-  try { Notifications.init();          } catch(e) {}
-  try { Utils.verifierBackupAuto();    } catch(e) {}
-  try { Defis.genererDefis();          } catch(e) {}
-
-  const params = new URLSearchParams(window.location.search);
-  const page   = params.get('page')   || 'home';
-  const action = params.get('action');
-
-  naviguer(action === 'start-session' ? 'live' : page);
-
-  setTimeout(() => {
-    try { Gamification.verifierTrophees();    } catch(e) {}
-  }, 2000);
-  setTimeout(() => {
-    try { Defis.mettreAJourProgression();     } catch(e) {}
-  }, 3000);
-}
-
-// ════════════════════════════════════════════════════════════
-// HEADER
-// ════════════════════════════════════════════════════════════
-function initHeader() {
-  try {
-    const infos = Programme.getInfosProgramme();
-    const sub   = document.getElementById('header-phase');
-    if (sub) sub.textContent = infos.label;
-  } catch(e) {}
-
-  document.getElementById('btn-theme')
-    ?.addEventListener('click', toggleTheme);
-  document.getElementById('btn-profile-quick')
-    ?.addEventListener('click', () => naviguer('profile'));
-}
+window._pageActive    = 'home';
+window._pageHistory   = [];
+window._seanceActive  = null;
+window._timerInterval = null;
 
 // ════════════════════════════════════════════════════════════
 // NAVIGATION
 // ════════════════════════════════════════════════════════════
-function initNav() {
-  document.querySelectorAll('.nav-item, .nav-center-btn')
-    .forEach(btn => {
-      btn.addEventListener('click', () => {
-        const page = btn.dataset.page;
-        if (page) naviguer(page);
-      });
-    });
-}
-
-function naviguer(page) {
-  AppState.pageCourante = page;
-  window._pageActive    = page;
-
-  document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.classList.toggle(
-      'active', btn.dataset.page === page
-    );
-  });
-
+function naviguer(page, options = {}) {
   try {
-    const infos = Programme.getInfosProgramme();
-    const sub   = document.getElementById('header-phase');
-    if (sub) sub.textContent = infos.label;
-  } catch(e) {}
+    // Masquer toutes les pages
+    document.querySelectorAll('.page').forEach(p => {
+      p.classList.remove('active');
+      p.style.display = 'none';
+    });
 
-  document.getElementById('page-content')?.scrollTo(0, 0);
+    // Mettre à jour nav bas
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
 
-  switch(page) {
-    case 'home':      renderAccueil();                break;
-    case 'training':  renderTraining();               break;
-    case 'live':      renderLive();                   break;
-    case 'nutrition': try { Nutrition.render(); } catch(e) { _renderPageVide('🥗', 'Nutrition'); } break;
-    case 'stats':     try { Stats.render(null, 'dashboard'); } catch(e) {} break;
-    case 'profile':   renderProfil();                 break;
-    case 'express':   renderExpress();                break;
-    case 'defis':     renderPageDefis();              break;
-    case 'share':     renderPageShare();              break;
-    case 'predict':   renderPagePredict();            break;
-    default:          renderAccueil();
+    const navPages = ['home','training','live','stats','profil'];
+    if (navPages.includes(page)) {
+      document.getElementById(`nav-${page}`)
+        ?.classList.add('active');
+    }
+
+    // Afficher la page cible
+    const pageEl = document.getElementById(`page-${page}`)
+      || document.getElementById('page-home');
+
+    pageEl.classList.add('active');
+    pageEl.style.display = 'block';
+
+    // Mettre à jour header
+    _updateHeader(page);
+
+    // Scroll en haut
+    pageEl.scrollTop = 0;
+    window.scrollTo(0, 0);
+
+    // Historique navigation
+    if (window._pageActive !== page) {
+      window._pageHistory.push(window._pageActive);
+      if (window._pageHistory.length > 10) {
+        window._pageHistory.shift();
+      }
+    }
+    window._pageActive = page;
+
+    // Rendre le contenu
+    _rendreContenu(page, pageEl, options);
+
+    // Fermer le menu si ouvert
+    UI.fermerMenu();
+
+  } catch(e) {
+    console.error('[App] Erreur navigation:', e);
   }
 }
 
-function _renderPageVide(emoji, titre) {
-  const c = document.getElementById('page-content');
-  if (!c) return;
-  c.innerHTML = `
-    <div style="text-align:center;padding:var(--space-2xl)">
-      <div style="font-size:3rem;margin-bottom:var(--space-md)">
-        ${emoji}
-      </div>
-      <p style="color:var(--text-muted)">${titre} — bientôt disponible</p>
-    </div>`;
+function retourArriere() {
+  const prev = window._pageHistory.pop();
+  if (prev) naviguer(prev);
+  else naviguer('home');
 }
 
 // ════════════════════════════════════════════════════════════
-// THÈME
+// MISE À JOUR HEADER
 // ════════════════════════════════════════════════════════════
-function initTheme() {
-  appliquerTheme(Utils.storage.get('ft_theme', 'dark'));
-}
-
-function toggleTheme() {
-  const themes = ['dark','light','indigo','midnight'];
-  const actuel = document.documentElement
-    .getAttribute('data-theme') || 'dark';
-  const idx    = themes.indexOf(actuel);
-  appliquerTheme(themes[(idx + 1) % themes.length]);
-}
-
-function appliquerTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  document.body.setAttribute('data-theme', theme);
-  Utils.storage.set('ft_theme', theme);
-
-  document.querySelectorAll('.theme-btn').forEach(btn => {
-    const isActif = btn.dataset.theme === theme;
-    btn.style.border     = `2px solid ${isActif
-      ? 'var(--fd-indigo)' : 'var(--border-color)'}`;
-    btn.style.background = isActif
-      ? 'var(--fd-indigo-dim)' : 'var(--bg-card)';
-  });
-}
-
-// ════════════════════════════════════════════════════════════
-// INSTALL PROMPT
-// ════════════════════════════════════════════════════════════
-function initInstallPrompt() {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    AppState.installPrompt = e;
-    document.getElementById('install-prompt')
-      ?.classList.remove('hidden');
-  });
-
-  document.getElementById('btn-install')
-    ?.addEventListener('click', async () => {
-      if (!AppState.installPrompt) return;
-      AppState.installPrompt.prompt();
-      const result = await AppState.installPrompt.userChoice;
-      if (result.outcome === 'accepted')
-        Utils.toast('App installée ! 🎉', 'success');
-      document.getElementById('install-prompt')
-        ?.classList.add('hidden');
-    });
-
-  document.getElementById('btn-install-dismiss')
-    ?.addEventListener('click', () => {
-      document.getElementById('install-prompt')
-        ?.classList.add('hidden');
-    });
-}
-
-// ════════════════════════════════════════════════════════════
-// PAGE ACCUEIL
-// ════════════════════════════════════════════════════════════
-function renderAccueil() {
-  const container = document.getElementById('page-content');
-  if (!container) return;
-
-  let profil   = {};
-  let infos    = {
-    label:'S1', cycle:1, semaine:1, progression:0,
-    phase:{ nom:'Reprise', emoji:'🌱', numero:1 }
+function _updateHeader(page) {
+  const configs = {
+    home:         { emoji:'⚡', titre:'PowerApp'    },
+    training:     { emoji:'📅', titre:'Programme'   },
+    live:         { emoji:'💪', titre:'Séance live' },
+    stats:        { emoji:'📊', titre:'Statistiques'},
+    profil:       { emoji:'👤', titre:'Profil'      },
+    coach:        { emoji:'🤖', titre:'Coach IA'    },
+    defis:        { emoji:'🏆', titre:'Défis'       },
+    predict:      { emoji:'📈', titre:'Prédictions' },
+    share:        { emoji:'📤', titre:'Partage'     },
+    gamification: { emoji:'⭐', titre:'Niveaux & XP'},
+    history:      { emoji:'📅', titre:'Historique'  },
+    photos:       { emoji:'📸', titre:'Photos'      },
+    social:       { emoji:'📱', titre:'Réseaux'     },
+    supersets:    { emoji:'⚡', titre:'Supersets'   },
+    offline:      { emoji:'📵', titre:'Hors-ligne'  },
+    settings:     { emoji:'⚙️', titre:'Paramètres'  },
+    nutrition:    { emoji:'🥗', titre:'Nutrition'   }
   };
-  let seance   = null;
-  let streak   = { count:0, max:0 };
-  let score    = { score:50, niveau:'En forme' };
-  let humeur   = null;
-  let fatigue  = null;
-  let coach    = { message:'Prêt pour la séance ?' };
-  let seanceDJ = 0;
-  let objectif = 4;
-  let heatmap  = {};
-  let analyse  = {
-    fatigue: {
-      recommandation: {
-        message:'', emoji:'🟢',
-        couleur:'var(--fd-mint)'
-      }
+
+  const cfg = configs[page] || configs.home;
+
+  const emojiEl = document.getElementById('header-emoji');
+  const titleEl = document.getElementById('header-title');
+  if (emojiEl) emojiEl.textContent = cfg.emoji;
+  if (titleEl) titleEl.textContent = cfg.titre;
+
+  // Mettre à jour XP dans le header
+  _updateHeaderXP();
+}
+
+function _updateHeaderXP() {
+  const el = document.getElementById('header-xp');
+  if (!el) return;
+  try {
+    const xp = Gamification.getXP();
+    el.innerHTML = `
+      <span style="font-size:.72rem;font-weight:700;
+                   color:var(--fd-lemon)">
+        ${xp.niveau.emoji} Niv.${xp.niveau.numero}
+      </span>
+      <span style="font-size:.65rem;
+                   color:var(--text-muted);
+                   margin-left:4px">
+        ${xp.total}XP
+      </span>`;
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDU DES PAGES
+// ════════════════════════════════════════════════════════════
+function _rendreContenu(page, container, options = {}) {
+  try {
+    switch(page) {
+
+      case 'home':
+        _rendreHome(container);
+        break;
+
+      case 'training':
+        _rendreTraining(container);
+        break;
+
+      case 'live':
+        _rendreLive(container, options);
+        break;
+
+      case 'stats':
+        Stats.render(container);
+        break;
+
+      case 'profil':
+        _rendreProfil(container);
+        break;
+
+      case 'coach':
+        Coach.renderCoachTab(container);
+        break;
+
+      case 'defis':
+        Defis.render(container);
+        break;
+
+      case 'predict':
+        Predict.render(container);
+        break;
+
+      case 'share':
+        Share.render(container);
+        break;
+
+      case 'gamification':
+        Gamification.renderGamificationTab(container);
+        break;
+
+      // ✅ NOUVEAUX MODULES v3.0
+      case 'history':
+        History.render(container);
+        break;
+
+      case 'photos':
+        Photos.render(container);
+        break;
+
+      case 'social':
+        Social.render(container);
+        break;
+
+      case 'supersets':
+        Superset.render(container);
+        break;
+
+      case 'offline':
+        Offline.render(container);
+        break;
+
+      case 'settings':
+        _rendreSettings(container);
+        break;
+
+      case 'nutrition':
+        _rendreNutrition(container);
+        break;
+
+      default:
+        _rendreHome(container);
     }
-  };
-  let defis    = [];
-  let playlist = {
-    emoji:'🎵', nom:'Workout',
-    genre:'Mix', url:'#'
-  };
-  let volume   = 0;
-  let comp     = { delta:0 };
+  } catch(e) {
+    console.error(`[App] Erreur rendu page ${page}:`, e);
+    container.innerHTML = `
+      <div class="card mt-md"
+           style="text-align:center;
+                  padding:var(--space-xl)">
+        <div style="font-size:2rem">⚠️</div>
+        <p style="color:var(--text-muted);
+                  margin-top:var(--space-sm)">
+          Erreur chargement de la page.<br>
+          <button onclick="naviguer('home')"
+                  class="btn-secondary mt-md">
+            Retour à l'accueil
+          </button>
+        </p>
+      </div>`;
+  }
+}
 
-  try { profil   = Tracker.getProfil();                 } catch(e) {}
-  try { infos    = Programme.getInfosProgramme();       } catch(e) {}
-  try { seance   = Programme.getProchaineSeance();      } catch(e) {}
-  try { streak   = Tracker.getStreak();                 } catch(e) {}
-  try { score    = Tracker.calculerScoreForme();        } catch(e) {}
-  try { humeur   = Tracker.getHumeur();                 } catch(e) {}
-  try { fatigue  = Tracker.getFatigue();                } catch(e) {}
-  try { coach    = Coach.getMessageDuJour();            } catch(e) {}
-  try { seanceDJ = Tracker.getSeancesParSemaine();      } catch(e) {}
-  try { objectif = Utils.storage.get(
-          'ft_objectif_seances_semaine', 4);            } catch(e) {}
-  try { heatmap  = Tracker.getHeatmapData(7);          } catch(e) {}
-  try { analyse  = Predict.getAnalyseGlobale();        } catch(e) {}
-  try { defis    = Defis.mettreAJourProgression()||[];  } catch(e) {}
-  try { playlist = Share.getPlaylistDuJour();          } catch(e) {}
-  try { volume   = Tracker.getVolumeSemaine();         } catch(e) {}
-  try { comp     = Tracker.getComparaisonSemaines
-          ?.() || { delta:0 };                          } catch(e) {}
+// ════════════════════════════════════════════════════════════
+// PAGE HOME
+// ════════════════════════════════════════════════════════════
+function _rendreHome(container) {
+  let profil   = { nom:'Athlète', avatar:'💪' };
+  let seance   = null, prochaine = null;
+  let infos    = { label:'S1', cycle:1, phase:{ emoji:'🌱', nom:'Reprise', couleur:'#8bf0bb' } };
+  let streak   = { count:0, max:0 };
+  let xp       = { total:0, pourcentage:0, niveau:{ emoji:'💪', numero:1, nom:'Débutant' } };
+  let analyse  = { seances:0, objectif:4, volume:0, rpe:0, recommendation:'Continue !' };
+  let msg      = { emoji:'💡', message:'Bonne séance !' };
+  let defisSem = [];
 
-  const defisOk = defis.filter(d => d.complete).length;
-  const totalPRs = (() => {
-    try { return Object.keys(Tracker.getAllPRs()).length; }
-    catch(e) { return 0; }
-  })();
+  try { profil   = Tracker.getProfil();                     } catch(e) {}
+  try { seance   = Programme.getSeanceduJour();             } catch(e) {}
+  try { prochaine= Programme.getProchaineSeance();          } catch(e) {}
+  try { infos    = Programme.getInfosProgramme();           } catch(e) {}
+  try { streak   = Tracker.getStreak();                     } catch(e) {}
+  try { xp       = Gamification.getXP();                   } catch(e) {}
+  try { analyse  = Coach.getAnalyseSemaine();               } catch(e) {}
+  try { msg      = Coach.getMessageDuJour();                } catch(e) {}
+  try { defisSem = (Defis.mettreAJourProgression()||[])
+          .filter(d => !d.complete).slice(0, 2);            } catch(e) {}
+
+  const heure = new Date().getHours();
+  const salut = heure < 12 ? 'Bonjour' :
+                heure < 18 ? 'Bon après-midi' : 'Bonsoir';
 
   container.innerHTML = `
 
-    <!-- Hero -->
-    <div class="dashboard-hero mb-md">
-      <div class="dashboard-greeting">
-        ${Utils.salutation()},
-        ${profil.nom || 'Athlète'} ${profil.avatar || '💪'}
+    <!-- Salutation -->
+    <div style="padding:var(--space-md) 0
+                var(--space-sm)">
+      <div style="font-size:1.4rem;font-weight:800;
+                  color:var(--text-primary)">
+        ${salut} ${profil.nom} ${profil.avatar||'💪'}
       </div>
-      <div class="dashboard-sub">
+      <div style="font-size:.82rem;
+                  color:var(--text-muted);
+                  margin-top:2px">
         ${infos.label} · Cycle ${infos.cycle}
-        · ${infos.phase?.emoji||'🌱'} ${infos.phase?.nom||'Reprise'}
-      </div>
-
-      <div class="dashboard-score">
-        <div class="score-ring">
-          <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle cx="36" cy="36" r="30" fill="none"
-                    stroke="rgba(255,255,255,0.1)"
-                    stroke-width="6"/>
-            <circle cx="36" cy="36" r="30" fill="none"
-                    stroke="${score.score >= 80
-                      ? 'var(--fd-mint)'
-                      : score.score >= 60
-                        ? 'var(--fd-lemon)'
-                        : 'var(--fd-coral)'}"
-                    stroke-width="6"
-                    stroke-linecap="round"
-                    stroke-dasharray="${2*Math.PI*30}"
-                    stroke-dashoffset="${2*Math.PI*30*(1-(score.score||50)/100)}"
-                    transform="rotate(-90 36 36)"/>
-          </svg>
-          <div class="score-ring-text">${score.score||50}</div>
-        </div>
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:.95rem">
-            ${score.niveau || 'En forme'}
-          </div>
-          <div style="font-size:.72rem;opacity:.7;margin-top:2px">
-            ${analyse?.fatigue?.recommandation?.message || ''}
-          </div>
-          <div style="font-size:.72rem;opacity:.6;margin-top:4px">
-            Streak ${streak.count}🔥 · Record ${streak.max}
-          </div>
-        </div>
-      </div>
-
-      <!-- Mini heatmap -->
-      <div style="margin-top:var(--space-md)">
-        <div style="font-size:.65rem;opacity:.6;
-                    margin-bottom:6px;text-transform:uppercase;
-                    letter-spacing:.06em">Cette semaine</div>
-        <div class="mini-heatmap">
-          ${['L','M','M','J','V','S','D'].map((j, i) => {
-            let date = '', etat = 'none', isToday = false;
-            try {
-              date    = Utils.ajouterJours(
-                Utils.debutSemaine(Utils.aujourd_hui()), i);
-              etat    = heatmap[date] || 'none';
-              isToday = date === Utils.aujourd_hui();
-            } catch(e) {}
-            return `
-              <div style="text-align:center">
-                <div style="font-size:.6rem;opacity:.5;
-                            margin-bottom:3px">${j}</div>
-                <div class="mini-heatmap-cell
-                     ${etat} ${isToday?'today':''}">
-                </div>
-              </div>`;
-          }).join('')}
-        </div>
+        · ${infos.phase.emoji} ${infos.phase.nom}
       </div>
     </div>
 
-    <!-- Actions rapides -->
-    <div class="home-quick-actions mb-md">
-      ${[
-        { icon:'⚡', label:'Express',  action:"naviguer('express')" },
-        { icon:'📊', label:'Stats',    action:"naviguer('stats')"   },
-        { icon:'🏆', label:'Défis',    action:"naviguer('defis')"   },
-        { icon:'🔮', label:'Predict',  action:"naviguer('predict')" },
-        { icon:'📸', label:'Photos',   action:"naviguer('stats')"   },
-        { icon:'🎵', label:'Musique',  action:"ouvrirPlaylist()"    }
-      ].map(a => `
-        <button class="quick-action-btn" onclick="${a.action}">
-          <span class="quick-action-icon">${a.icon}</span>
-          <span class="quick-action-label">${a.label}</span>
-        </button>`).join('')}
-    </div>
-
-    <!-- Widgets -->
-    <div class="widget-grid mb-md">
-      <div class="widget-card ${seanceDJ >= objectif ? 'highlight':''}">
-        <div class="widget-icon">📅</div>
-        <div class="widget-value">${seanceDJ}/${objectif}</div>
-        <div class="widget-label">Séances</div>
-        <div class="widget-trend ${seanceDJ >= objectif ? 'up':'flat'}">
-          ${seanceDJ >= objectif
-            ? '✅ Objectif !'
-            : `${objectif-seanceDJ} restante${objectif-seanceDJ>1?'s':''}`}
+    <!-- Streak + XP rapide -->
+    <div style="display:grid;
+                grid-template-columns:1fr 1fr;
+                gap:var(--space-sm);
+                margin-bottom:var(--space-md)">
+      <div class="card"
+           style="text-align:center;cursor:pointer"
+           onclick="naviguer('stats')">
+        <div style="font-size:1.4rem">🔥</div>
+        <div style="font-size:1.5rem;font-weight:800;
+                    color:var(--fd-lemon)">
+          ${streak.count}
+        </div>
+        <div style="font-size:.65rem;
+                    color:var(--text-muted)">
+          Streak actuel
         </div>
       </div>
-      <div class="widget-card">
-        <div class="widget-icon">🏋️</div>
-        <div class="widget-value">
-          ${Utils.formatVolume(volume)}
+      <div class="card"
+           style="text-align:center;cursor:pointer"
+           onclick="naviguer('gamification')">
+        <div style="font-size:1.4rem">
+          ${xp.niveau.emoji}
         </div>
-        <div class="widget-label">Volume</div>
-        <div class="widget-trend ${(comp.delta||0) >= 0 ? 'up':'down'}">
-          ${(comp.delta||0) >= 0 ? '+' : ''}${comp.delta||0}% vs S-1
+        <div style="font-size:1.2rem;font-weight:800;
+                    color:var(--fd-indigo)">
+          Niv.${xp.niveau.numero}
         </div>
-      </div>
-      <div class="widget-card">
-        <div class="widget-icon">🏆</div>
-        <div class="widget-value">${totalPRs}</div>
-        <div class="widget-label">Records</div>
-        <div class="widget-trend flat">PRs totaux</div>
-      </div>
-      <div class="widget-card">
-        <div class="widget-icon">🎯</div>
-        <div class="widget-value">
-          ${defisOk}/${defis.length||0}
-        </div>
-        <div class="widget-label">Défis</div>
-        <div class="widget-trend ${
-          defisOk > 0 && defisOk === defis.length
-            ? 'up' : 'flat'}">
-          ${defisOk > 0 && defisOk === defis.length
-            ? '🏆 Complet !'
-            : `${(defis.length||0) - defisOk} en cours`}
+        <div style="font-size:.65rem;
+                    color:var(--text-muted)">
+          ${xp.total} XP
         </div>
       </div>
     </div>
 
     <!-- Séance du jour -->
     ${seance ? `
-      <div class="next-seance-card mb-md"
-           onclick="ouvrirSeance('${seance.id}')">
-        <div style="font-size:.65rem;font-weight:700;
-                    letter-spacing:.08em;text-transform:uppercase;
-                    color:var(--fd-indigo);margin-bottom:6px">
-          ${(seance.dansJours||0) === 0
-            ? '⚡ Séance du jour'
-            : `📅 Dans ${seance.dansJours} jour${seance.dansJours>1?'s':''}`}
-        </div>
-        <div style="font-size:1.1rem;font-weight:700">
-          ${seance.emoji||'💪'} ${seance.nom}
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
-          ${seance.exercices?.length||0} exercices
-          · ~${seance.duree_estimee}min
-        </div>
-        <div style="margin-top:var(--space-sm)">
-          <div class="progress-bar">
-            <div class="progress-fill"
-                 style="width:${infos.progression||0}%"></div>
+      <div class="card mb-md"
+           style="border-color:var(--fd-indigo);
+                  background:rgba(75,75,249,0.06)">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="card-label"
+                 style="color:var(--fd-indigo)">
+              📅 Séance du jour
+            </div>
+            <div style="font-size:1.1rem;
+                        font-weight:700;
+                        margin-top:4px">
+              ${seance.emoji} ${seance.nom}
+            </div>
+            <div style="font-size:.75rem;
+                        color:var(--text-muted);
+                        margin-top:2px">
+              ~${seance.duree_estimee}min
+              · ${seance.exercices?.length||0} exercices
+            </div>
           </div>
+          <button onclick="naviguer('live')"
+                  class="btn-primary"
+                  style="font-size:.82rem;
+                         padding:var(--space-sm)
+                         var(--space-md)">
+            ▶ Démarrer
+          </button>
+        </div>
+
+        <!-- Muscles -->
+        <div style="display:flex;flex-wrap:wrap;
+                    gap:4px;margin-top:var(--space-sm)">
+          ${(seance.muscles||[]).map(m => `
+            <span class="chip chip-indigo"
+                  style="font-size:.62rem">
+              ${m}
+            </span>`).join('')}
         </div>
       </div>` : `
-      <div class="card mb-md" style="text-align:center">
-        <div style="font-size:1.5rem;margin-bottom:4px">😴</div>
-        <div style="font-size:.88rem;color:var(--text-muted)">
-          Bon repos aujourd'hui !
+      <div class="card mb-md"
+           style="text-align:center;
+                  border-color:var(--fd-mint)">
+        <div style="font-size:1.5rem;margin-bottom:4px">
+          😴
         </div>
+        <div style="font-weight:700">
+          Jour de repos
+        </div>
+        ${prochaine ? `
+          <div style="font-size:.75rem;
+                      color:var(--text-muted);
+                      margin-top:4px">
+            Prochaine séance :
+            ${prochaine.emoji} ${prochaine.nom}
+            ${prochaine.dansJours > 0
+              ? `dans ${prochaine.dansJours}j`
+              : 'demain'}
+          </div>` : ''}
       </div>`}
 
-    <!-- Humeur -->
-    <div class="card mb-md">
-      <div class="card-label">😊 Humeur du jour</div>
-      <div class="humeur-grid mt-md">
-        ${['🔥','😊','😐','😒','😤'].map(h => `
-          <button class="humeur-btn
-                  ${humeur?.humeur===h?'selected':''}"
-                  onclick="selectionnerHumeur('${h}')">
-            ${h}
-          </button>`).join('')}
+    <!-- Message coach -->
+    <div class="card mb-md"
+         onclick="naviguer('coach')"
+         style="cursor:pointer;
+                border-left:3px solid var(--fd-lavender)">
+      <div style="font-size:.65rem;font-weight:700;
+                  text-transform:uppercase;
+                  letter-spacing:.08em;
+                  color:var(--fd-lavender);
+                  margin-bottom:var(--space-xs)">
+        ${msg.emoji} Coach du jour
       </div>
-    </div>
-
-    <!-- Fatigue -->
-    <div class="card mb-md">
-      <div class="card-label">🌡️ Niveau de fatigue</div>
-      <div class="flex gap-sm mt-md">
-        ${[
-          { val:0, label:'Frais',   color:'var(--fd-mint)'        },
-          { val:1, label:'OK',      color:'var(--fd-lemon)'       },
-          { val:2, label:'Modéré',  color:'var(--fd-coral)'       },
-          { val:3, label:'Épuisé',  color:'rgba(255,141,150,.6)'  }
-        ].map(f => `
-          <button onclick="selectionnerFatigue(${f.val})"
-                  style="flex:1;padding:var(--space-sm) 4px;
-                         border-radius:var(--radius-md);
-                         border:2px solid ${fatigue?.niveau===f.val
-                           ? f.color : 'var(--border-color)'};
-                         background:${fatigue?.niveau===f.val
-                           ? f.color+'22' : 'var(--bg-card)'};
-                         color:${fatigue?.niveau===f.val
-                           ? f.color : 'var(--text-muted)'};
-                         font-size:.72rem;font-weight:600;
-                         cursor:pointer">
-            ${f.label}
-          </button>`).join('')}
-      </div>
-    </div>
-
-    <!-- Apple Music -->
-    <div class="apple-music-card mb-md"
-         onclick="ouvrirPlaylist()" style="cursor:pointer">
-      <div style="display:flex;align-items:center;
-                  gap:var(--space-md)">
-        <div style="font-size:2rem">${playlist.emoji}</div>
-        <div style="flex:1">
-          <div style="font-size:.65rem;color:#ff3b30;
-                      font-weight:700;text-transform:uppercase;
-                      letter-spacing:.06em">🎵 Apple Music</div>
-          <div style="font-weight:700;font-size:.9rem">
-            ${playlist.nom}
-          </div>
-          <div style="font-size:.72rem;color:var(--text-muted)">
-            ${playlist.genre}
-          </div>
-        </div>
-        <div style="color:#ff3b30;font-weight:700">→</div>
-      </div>
-    </div>
-
-    <!-- Coach -->
-    <div class="coach-tip-card mb-md">
-      <div class="flex items-center gap-md mb-sm">
-        <div class="coach-tip-avatar">🤖</div>
-        <div style="font-size:.75rem;font-weight:700;
-                    color:var(--fd-lavender)">
-          Coach du jour
-        </div>
-      </div>
-      <p style="font-size:.85rem;color:var(--text-secondary);
-                line-height:1.5">
-        ${coach?.message || '💪 Prêt pour la séance ?'}
+      <p style="font-size:.85rem;
+                color:var(--text-secondary);
+                line-height:1.5;margin:0">
+        ${msg.message}
       </p>
     </div>
 
-    <!-- Défis aperçu -->
-    ${defis.length > 0 ? `
-      <div class="card mb-md" onclick="naviguer('defis')"
+    <!-- Stats semaine -->
+    <div class="card mb-md">
+      <div class="flex justify-between items-center mb-sm">
+        <div class="card-label">📊 Cette semaine</div>
+        <button onclick="naviguer('stats')"
+                style="background:none;border:none;
+                       font-size:.72rem;
+                       color:var(--fd-indigo);
+                       cursor:pointer;font-weight:600">
+          Voir tout →
+        </button>
+      </div>
+      <div style="display:grid;
+                  grid-template-columns:repeat(3,1fr);
+                  gap:var(--space-sm)">
+        ${[
+          {
+            label:'Séances',
+            val:`${analyse.seances}/${analyse.objectif}`,
+            color:'var(--fd-indigo)'
+          },
+          {
+            label:'Volume',
+            val:Utils.formatVolume(analyse.volume),
+            color:'var(--fd-mint)'
+          },
+          {
+            label:'RPE moy.',
+            val:analyse.rpe > 0
+              ? `${analyse.rpe}/10` : '—',
+            color:'var(--fd-lemon)'
+          }
+        ].map(s => `
+          <div style="text-align:center;
+                      padding:var(--space-sm);
+                      background:var(--bg-input);
+                      border-radius:var(--radius-sm)">
+            <div style="font-size:.92rem;
+                        font-weight:800;
+                        color:${s.color}">
+              ${s.val}
+            </div>
+            <div style="font-size:.62rem;
+                        color:var(--text-muted)">
+              ${s.label}
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="progress-bar mt-sm">
+        <div class="progress-fill"
+             style="width:${Math.min(100,
+               Math.round((analyse.seances/
+                 Math.max(analyse.objectif,1))*100)
+             )}%">
+        </div>
+      </div>
+    </div>
+
+    <!-- Défis en cours -->
+    ${defisSem.length > 0 ? `
+      <div class="card mb-md"
+           onclick="naviguer('defis')"
            style="cursor:pointer">
-        <div class="flex justify-between items-center">
-          <div class="card-label">🏆 Défis semaine</div>
-          <span class="chip chip-lemon">
-            ${defisOk}/${defis.length}
+        <div class="flex justify-between items-center mb-sm">
+          <div class="card-label">🏆 Défis en cours</div>
+          <span style="font-size:.72rem;
+                       color:var(--fd-indigo)">
+            Voir tout →
           </span>
         </div>
-        <div class="progress-bar mt-md">
-          <div class="progress-fill"
-               style="width:${Math.round((defisOk/Math.max(defis.length,1))*100)}%;
-                      background:var(--fd-lemon)">
-          </div>
-        </div>
+        ${defisSem.map(d => {
+          const pct = Math.round(
+            (d.progression/Math.max(d.cible,1))*100
+          );
+          return `
+            <div style="margin-bottom:var(--space-sm)">
+              <div class="flex justify-between"
+                   style="font-size:.78rem;
+                          margin-bottom:4px">
+                <span>
+                  ${d.emoji} ${d.titre}
+                </span>
+                <span style="color:var(--fd-lemon);
+                             font-weight:700">
+                  ${d.progression}/${d.cible}
+                </span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill"
+                     style="width:${pct}%;
+                            background:var(--fd-lemon)">
+                </div>
+              </div>
+            </div>`;
+        }).join('')}
       </div>` : ''}
 
-    <!-- Warm-up -->
-    <div class="card mb-md" onclick="naviguer('training')"
-         style="cursor:pointer">
-      <div class="flex justify-between items-center">
-        <div>
-          <div class="card-label">🌡️ Warm-up suggéré</div>
-          <div style="font-size:.88rem;color:var(--text-primary);
-                      margin-top:4px">
-            ${(() => {
-              try {
-                return Coach.getWarmupDuJour()?.[0]?.nom
-                  || '5 min · Cardio léger';
-              } catch(e) {
-                return '5 min · Cardio léger';
-              }
-            })()}
+    <!-- Actions rapides -->
+    <div class="section-title">⚡ Actions rapides</div>
+    <div style="display:grid;
+                grid-template-columns:repeat(3,1fr);
+                gap:var(--space-sm);
+                margin-bottom:var(--space-md)">
+      ${[
+        { emoji:'📈', label:'Predict', page:'predict' },
+        { emoji:'🤖', label:'Coach',   page:'coach'   },
+        { emoji:'🏆', label:'Défis',   page:'defis'   },
+        { emoji:'📸', label:'Photos',  page:'photos'  },
+        { emoji:'📱', label:'Réseaux', page:'social'  },
+        { emoji:'📅', label:'Historique', page:'history'}
+      ].map(a => `
+        <button onclick="naviguer('${a.page}')"
+                class="card"
+                style="text-align:center;
+                       cursor:pointer;
+                       border:none;
+                       padding:var(--space-md)
+                       var(--space-sm)">
+          <div style="font-size:1.5rem">
+            ${a.emoji}
           </div>
-        </div>
-        <span style="color:var(--fd-indigo);font-size:1.2rem">→</span>
-      </div>
+          <div style="font-size:.68rem;
+                      font-weight:600;
+                      margin-top:4px;
+                      color:var(--text-secondary)">
+            ${a.label}
+          </div>
+        </button>`).join('')}
     </div>
+
+    <!-- Humeur + Fatigue du jour -->
+    ${_renderHumeurFatigue()}
   `;
 }
 
-function selectionnerHumeur(h) {
-  try { Tracker.sauvegarderHumeur(h);              } catch(e) {}
-  try { Gamification.ajouterXP(10, 'humeur');      } catch(e) {}
-  Utils.vibrerBeep();
-  renderAccueil();
-}
+function _renderHumeurFatigue() {
+  let humeur  = null, fatigue = null;
+  try { humeur  = Tracker.getHumeur();  } catch(e) {}
+  try { fatigue = Tracker.getFatigue(); } catch(e) {}
 
-function selectionnerFatigue(niveau) {
-  try { Tracker.sauvegarderFatigue(niveau); } catch(e) {}
-  Utils.vibrerBeep();
-  renderAccueil();
-}
+  if (humeur && fatigue) return '';
 
-function ouvrirPlaylist() {
-  try {
-    const playlist = Share.getPlaylistDuJour();
-    window.open(playlist.url, '_blank');
-  } catch(e) {
-    window.open('https://music.apple.com', '_blank');
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// PAGE EXPRESS
-// ════════════════════════════════════════════════════════════
-function renderExpress() {
-  const container = document.getElementById('page-content');
-  if (!container) return;
-
-  let seance  = null;
-  let fatigue = { score:70, recommandation:{
-    emoji:'🟢', message:'Forme optimale',
-    couleur:'var(--fd-mint)'
-  }};
-
-  try { seance  = Programme.getSeanceduJour();  } catch(e) {}
-  try { fatigue = Predict.analyserFatigue();    } catch(e) {}
-
-  const exercices = _selectionnerExercicesExpress(seance, fatigue);
-
-  container.innerHTML = `
-    <div class="express-header">
-      <div class="flex justify-between items-center">
-        <button class="btn-icon"
-                onclick="naviguer('home')">←</button>
-        <div style="text-align:center">
-          <div style="font-weight:700">⚡ Séance Express</div>
-          <div style="font-size:.72rem;color:var(--text-muted)">
-            ~30 minutes · ${exercices.length} exercices
+  return `
+    <div class="card mb-md">
+      <div class="card-label">😊 Comment tu te sens ?</div>
+      ${!humeur ? `
+        <div style="margin-top:var(--space-sm)">
+          <div style="font-size:.72rem;
+                      color:var(--text-muted);
+                      margin-bottom:6px">
+            Humeur du jour
           </div>
-        </div>
-        <div style="font-size:.82rem;font-weight:700;
-                    color:var(--fd-lemon)"
-             id="express-chrono">30:00</div>
-      </div>
-      <div class="express-steps mt-md">
-        ${exercices.map((_,i) => `
-          <div class="express-step" id="step-${i}"></div>
-        `).join('')}
-      </div>
-    </div>
-
-    <div class="card mb-md"
-         style="background:${fatigue.recommandation.couleur}11;
-                border-color:${fatigue.recommandation.couleur}44">
-      <div class="flex items-center gap-md">
-        <div style="font-size:1.5rem">
-          ${fatigue.recommandation.emoji}
-        </div>
-        <div>
-          <div style="font-size:.82rem;font-weight:700;
-                      color:${fatigue.recommandation.couleur}">
-            ${fatigue.recommandation.message}
+          <div style="display:flex;gap:8px">
+            ${['😒','😐','🙂','😊','🔥'].map(h => `
+              <button onclick="App.setHumeur('${h}')"
+                      style="flex:1;padding:8px;
+                             font-size:1.2rem;
+                             background:var(--bg-input);
+                             border:1px solid var(--border-color);
+                             border-radius:var(--radius-sm);
+                             cursor:pointer">
+                ${h}
+              </button>`).join('')}
           </div>
-          <div style="font-size:.7rem;color:var(--text-muted)">
-            Score forme : ${fatigue.score}/100
+        </div>` : ''}
+      ${!fatigue ? `
+        <div style="margin-top:var(--space-sm)">
+          <div style="font-size:.72rem;
+                      color:var(--text-muted);
+                      margin-bottom:6px">
+            Niveau de fatigue
           </div>
-        </div>
-      </div>
-    </div>
-
-    ${exercices.map((exo, i) => {
-      const ex  = window.EXERCICES?.[exo.ref] || {};
-      let pr    = null, chargeReco = '?';
-      try { pr = Tracker.getPR(exo.ref); } catch(e) {}
-      try {
-        const reco = Predict.recommanderCharge(exo.ref);
-        chargeReco = reco?.charge || pr?.poids || '?';
-      } catch(e) { chargeReco = pr?.poids || '?'; }
-
-      return `
-        <div class="express-exo-card" id="express-exo-${i}">
-          <div class="flex items-center gap-md">
-            <div style="width:44px;height:44px;border-radius:50%;
-                        background:var(--bg-input);
-                        display:flex;align-items:center;
-                        justify-content:center;
-                        font-size:1.3rem;flex-shrink:0">
-              ${ex.emoji || '💪'}
-            </div>
-            <div style="flex:1">
-              <div style="font-weight:700;font-size:.92rem">
-                ${i+1}. ${ex.nom || exo.ref}
-              </div>
-              <div style="font-size:.72rem;color:var(--fd-mint)">
-                ${ex.muscle || ''}
-              </div>
-              <div style="font-size:.72rem;color:var(--text-muted);
-                          margin-top:2px">
-                ${exo.series} × ${exo.reps} · Repos ${exo.repos}s
-              </div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:1rem;font-weight:800;
-                          color:var(--fd-indigo)">
-                ${chargeReco}kg
-              </div>
-              <div style="font-size:.62rem;color:var(--text-muted)">
-                recommandé
-              </div>
-              ${pr ? `
-                <div style="font-size:.6rem;color:var(--fd-lemon)">
-                  PR: ${pr.poids}kg
-                </div>` : ''}
-            </div>
+          <div style="display:flex;gap:6px">
+            ${[
+              { val:0, label:'Frais', color:'var(--fd-mint)' },
+              { val:1, label:'OK',   color:'var(--fd-lemon)' },
+              { val:2, label:'Mod.', color:'#ffa500' },
+              { val:3, label:'Épuisé',color:'var(--fd-coral)' }
+            ].map(f => `
+              <button onclick="App.setFatigue(${f.val})"
+                      style="flex:1;padding:6px 2px;
+                             font-size:.68rem;font-weight:600;
+                             background:${f.color}22;
+                             color:${f.color};
+                             border:1px solid ${f.color}44;
+                             border-radius:var(--radius-sm);
+                             cursor:pointer">
+                ${f.label}
+              </button>`).join('')}
           </div>
-        </div>`;
-    }).join('')}
-
-    <button class="btn-primary"
-            onclick="demarrerExpress(${JSON.stringify(exercices).replace(/"/g,"'")})"
-            style="position:sticky;
-                   bottom:calc(var(--nav-height)+var(--space-md));
-                   width:100%;margin-top:var(--space-md);
-                   box-shadow:0 8px 32px rgba(75,75,249,0.4)">
-      ⚡ Démarrer la séance express
-    </button>
-  `;
-}
-
-function _selectionnerExercicesExpress(seance, fatigue) {
-  if (seance?.exercices?.length >= 4) {
-    const ajust = (fatigue?.score || 70) < 50 ? 0.8 : 1;
-    return seance.exercices.slice(0, 5).map(ex => ({
-      ...ex,
-      repos: Math.round((ex.repos || 90) * ajust)
-    }));
-  }
-  return [
-    { ref:'bench_press',   series:3, reps:'10',  repos:60 },
-    { ref:'lat_pulldown',  series:3, reps:'12',  repos:60 },
-    { ref:'squat',         series:3, reps:'10',  repos:75 },
-    { ref:'dev_militaire', series:3, reps:'10',  repos:60 },
-    { ref:'planche',       series:3, reps:'45s', repos:45 }
-  ];
-}
-
-function demarrerExpress(exercices) {
-  if (typeof exercices === 'string') {
-    try { exercices = JSON.parse(exercices.replace(/'/g,'"')); }
-    catch(e) { return; }
-  }
-
-  AppState.expressActif  = true;
-  AppState.expressIndex  = 0;
-  AppState.expressSerieN = 1;
-  AppState.expressDebut  = Date.now();
-
-  chronoSeance.demarrer(elapsed => {
-    const el    = document.getElementById('express-chrono');
-    const reste = Math.max(0, 30*60 - elapsed);
-    if (el) el.textContent = Utils.formatDureeMin(reste);
-    if (reste <= 0 && AppState.expressActif) {
-      terminerExpress(exercices, elapsed);
-    }
-  });
-
-  try { Tracker.demarrerSeance('express_' + Utils.aujourd_hui()); }
-  catch(e) {}
-  renderExpressExercice(exercices);
-}
-
-function renderExpressExercice(exercices) {
-  const container = document.getElementById('page-content');
-  if (!container) return;
-
-  const idx      = AppState.expressIndex;
-  const exo      = exercices[idx];
-  const ex       = window.EXERCICES?.[exo?.ref] || {};
-  const elapsed  = Math.floor(
-    (Date.now() - (AppState.expressDebut || Date.now())) / 1000
-  );
-  const reste    = Math.max(0, 30*60 - elapsed);
-
-  let pr       = null;
-  let derniere = null;
-  try { pr       = Tracker.getPR(exo?.ref);                              } catch(e) {}
-  try { derniere = Tracker.getDernierePerf(
-          'express_' + Utils.aujourd_hui(), exo?.ref);                   } catch(e) {}
-
-  container.innerHTML = `
-    <div class="express-header">
-      <div class="flex justify-between items-center">
-        <button class="btn-secondary btn-sm"
-                onclick="arreterExpress(${JSON.stringify(exercices).replace(/"/g,"'")})">
-          ✕
-        </button>
-        <div style="text-align:center">
-          <div style="font-weight:700">
-            ${idx+1}/${exercices.length}
-            · ${ex.emoji||'💪'} ${ex.nom||exo?.ref}
-          </div>
-          <div style="font-size:.72rem;color:var(--text-muted)">
-            Série ${AppState.expressSerieN}/${exo?.series||3}
-          </div>
-        </div>
-        <div style="font-size:.9rem;font-weight:800;
-                    color:${reste < 300
-                      ? 'var(--fd-coral)' : 'var(--fd-lemon)'}"
-             id="express-chrono">
-          ${Utils.formatDureeMin(reste)}
-        </div>
-      </div>
-      <div class="express-steps mt-sm">
-        ${exercices.map((_,i) => `
-          <div class="express-step
-               ${i < idx ? 'done' : i === idx ? 'active' : ''}">
-          </div>`).join('')}
-      </div>
-    </div>
-
-    <div style="padding:var(--space-md)">
-      <div class="card mb-md" style="text-align:center">
-        <div style="font-size:4rem;margin-bottom:8px">
-          ${ex.emoji||'💪'}
-        </div>
-        <div style="font-weight:700;font-size:1.2rem">
-          ${ex.nom||exo?.ref}
-        </div>
-        <div style="font-size:.78rem;color:var(--fd-mint);
-                    margin-top:4px">
-          ${ex.muscle||''} · ${exo?.series} × ${exo?.reps}
-        </div>
-        ${pr ? `
-          <div style="font-size:.72rem;color:var(--fd-lemon);
-                      margin-top:4px">
-            🏆 PR: ${pr.poids}kg × ${pr.reps}
-          </div>` : ''}
-        ${derniere ? `
-          <div style="font-size:.7rem;color:var(--text-muted);
-                      margin-top:2px">
-            Dernière fois: ${derniere.poids}kg × ${derniere.reps}
-          </div>` : ''}
-      </div>
-
-      <!-- Indicateurs séries -->
-      <div style="display:flex;justify-content:center;
-                  gap:var(--space-sm);margin-bottom:var(--space-md)">
-        ${Array.from({length: exo?.series||3}, (_,i) => `
-          <div style="width:36px;height:36px;border-radius:50%;
-                      border:2px solid ${i+1 < AppState.expressSerieN
-                        ? 'var(--fd-mint)'
-                        : i+1 === AppState.expressSerieN
-                          ? 'var(--fd-indigo)'
-                          : 'var(--border-color)'};
-                      background:${i+1 < AppState.expressSerieN
-                        ? 'var(--fd-mint)'
-                        : i+1 === AppState.expressSerieN
-                          ? 'rgba(75,75,249,0.2)'
-                          : 'transparent'};
-                      display:flex;align-items:center;
-                      justify-content:center;
-                      font-size:.8rem;font-weight:700;
-                      color:${i+1 <= AppState.expressSerieN
-                        ? 'white' : 'var(--text-muted)'}">
-            ${i+1 < AppState.expressSerieN ? '✓' : i+1}
-          </div>`).join('')}
-      </div>
-
-      <!-- Inputs -->
-      <div class="express-set-input">
-        <div class="express-input-group">
-          <div class="express-input-label">Poids (kg)</div>
-          <input class="express-input-val"
-                 id="exp-poids" type="number"
-                 value="${derniere?.poids || pr?.poids || ''}"
-                 placeholder="0" step="2.5" />
-          <div class="express-controls">
-            <button class="express-adjust-btn"
-                    onclick="ajusterExpressVal('exp-poids',-2.5)">
-              −
-            </button>
-            <button class="express-adjust-btn"
-                    onclick="ajusterExpressVal('exp-poids',2.5)">
-              +
-            </button>
-          </div>
-        </div>
-        <div class="express-input-group">
-          <div class="express-input-label">Reps</div>
-          <input class="express-input-val"
-                 id="exp-reps" type="number"
-                 value="${derniere?.reps || ''}"
-                 placeholder="0" />
-          <div class="express-controls">
-            <button class="express-adjust-btn"
-                    onclick="ajusterExpressVal('exp-reps',-1)">
-              −
-            </button>
-            <button class="express-adjust-btn"
-                    onclick="ajusterExpressVal('exp-reps',1)">
-              +
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- RPE -->
-      <div style="margin:var(--space-md) 0">
-        <div style="font-size:.72rem;color:var(--text-muted);
-                    margin-bottom:var(--space-sm)">
-          Effort ressenti (RPE)
-        </div>
-        <div style="display:flex;gap:4px">
-          ${[6,7,8,9,10].map(v => `
-            <button id="rpe-exp-${v}"
-                    onclick="selectionnerRPEExpress(${v})"
-                    style="flex:1;padding:var(--space-sm);
-                           border-radius:var(--radius-sm);
-                           border:1px solid var(--border-color);
-                           background:var(--bg-input);
-                           color:var(--text-muted);
-                           font-size:.82rem;font-weight:600;
-                           cursor:pointer;transition:all .15s">
-              ${v}
-            </button>`).join('')}
-        </div>
-      </div>
-
-      <button class="express-btn-next"
-              onclick="validerSerieExpress(${JSON.stringify(exercices).replace(/"/g,"'")})">
-        ✅ Série ${AppState.expressSerieN}/${exo?.series||3}
-        ${idx+1 < exercices.length
-          || AppState.expressSerieN < (exo?.series||3)
-          ? '→ Suite' : '🏁 Terminer'}
-      </button>
-    </div>
-  `;
-
-  // Reprendre chrono
-  chronoSeance.arreter();
-  AppState.expressDebut = Date.now() - elapsed * 1000;
-  chronoSeance.demarrer(el => {
-    const chronoEl =
-      document.getElementById('express-chrono');
-    const r = Math.max(0, 30*60 - el);
-    if (chronoEl) chronoEl.textContent =
-      Utils.formatDureeMin(r);
-  });
-}
-
-let _rpeExpress = null;
-
-function selectionnerRPEExpress(val) {
-  _rpeExpress = val;
-  [6,7,8,9,10].forEach(v => {
-    const btn = document.getElementById(`rpe-exp-${v}`);
-    if (!btn) return;
-    btn.style.background  = v === val
-      ? 'var(--fd-indigo)' : 'var(--bg-input)';
-    btn.style.color       = v === val
-      ? 'white' : 'var(--text-muted)';
-    btn.style.borderColor = v === val
-      ? 'var(--fd-indigo)' : 'var(--border-color)';
-  });
-}
-
-function ajusterExpressVal(id, delta) {
-  const input = document.getElementById(id);
-  if (!input) return;
-  input.value = Math.max(
-    0, (parseFloat(input.value) || 0) + delta
-  );
-}
-
-function validerSerieExpress(exercices) {
-  if (typeof exercices === 'string') {
-    try { exercices = JSON.parse(exercices.replace(/'/g,'"')); }
-    catch(e) { return; }
-  }
-
-  const poids = parseFloat(
-    document.getElementById('exp-poids')?.value);
-  const reps  = parseInt(
-    document.getElementById('exp-reps')?.value);
-
-  if (!poids || !reps) {
-    Utils.toast('Entre le poids et les reps !', 'error');
-    document.getElementById('exp-poids')
-      ?.classList.add('shake');
-    setTimeout(() =>
-      document.getElementById('exp-poids')
-        ?.classList.remove('shake'), 400
-    );
-    return;
-  }
-
-  const exo      = exercices[AppState.expressIndex];
-  const seanceId = 'express_' + Utils.aujourd_hui();
-
-  let result = { isPR: false };
-  try {
-    result = Tracker.sauvegarderSerie(
-      seanceId, exo.ref,
-      AppState.expressSerieN,
-      reps, poids, _rpeExpress
-    );
-  } catch(e) {}
-
-  _rpeExpress = null;
-  Utils.vibrerSuccess();
-
-  if (result.isPR) {
-    timerRepos.jouerSon('pr');
-    Utils.toast(`🏆 NOUVEAU PR ! ${poids}kg × ${reps}`, 'pr', 3000);
-    try { Gamification.recompenser('PR_BATTU'); } catch(e) {}
-  }
-
-  if (AppState.expressSerieN < (exo.series||3)) {
-    AppState.expressSerieN++;
-    _lancerReposExpress(
-      Math.min(exo.repos||60, 60),
-      () => renderExpressExercice(exercices)
-    );
-  } else if (AppState.expressIndex + 1 < exercices.length) {
-    AppState.expressIndex++;
-    AppState.expressSerieN = 1;
-    _lancerReposExpress(
-      45,
-      () => renderExpressExercice(exercices)
-    );
-  } else {
-    const duree = chronoSeance.arreter();
-    terminerExpress(exercices, duree);
-  }
-}
-
-function _lancerReposExpress(secondes, callback) {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:200;
-    background:rgba(9,9,45,0.95);
-    display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    gap:var(--space-lg)`;
-  overlay.id = 'overlay-repos-express';
-
-  overlay.innerHTML = `
-    <div style="font-size:.9rem;color:var(--text-muted);
-                text-transform:uppercase;letter-spacing:.1em">
-      💤 Repos
-    </div>
-    <div style="font-size:5rem;font-weight:800;
-                color:var(--fd-lemon);
-                font-variant-numeric:tabular-nums"
-         id="repos-express-display">
-      ${Utils.formatDureeMin(secondes)}
-    </div>
-    <button onclick="
-        timerRepos.arreter();
-        document.getElementById('overlay-repos-express')?.remove();
-        (${callback.toString()})();"
-            style="padding:var(--space-md) var(--space-xl);
-                   background:var(--fd-indigo);border:none;
-                   border-radius:var(--radius-full);
-                   color:white;font-weight:700;cursor:pointer">
-      ⏭ Passer
-    </button>`;
-
-  document.body.appendChild(overlay);
-
-  timerRepos.demarrer(secondes,
-    (r) => {
-      const el =
-        document.getElementById('repos-express-display');
-      if (el) el.textContent = Utils.formatDureeMin(r);
-    },
-    () => {
-      overlay.remove();
-      callback();
-    }
-  );
-}
-
-function terminerExpress(exercices, duree) {
-  AppState.expressActif = false;
-  chronoSeance.arreter();
-  timerRepos.arreter();
-
-  try { Tracker.terminerSeance(
-    'express_' + Utils.aujourd_hui()); }        catch(e) {}
-  try { Gamification.recompenser('SEANCE_COMPLETE'); } catch(e) {}
-  try { Defis.mettreAJourProgression();              } catch(e) {}
-
-  Utils.confetti(3000);
-  Utils.vibrerFin();
-
-  const container = document.getElementById('page-content');
-  if (!container) return;
-
-  container.innerHTML = `
-    <div class="express-result">
-      <div class="express-result-icon">⚡</div>
-      <div class="express-result-titre">
-        Séance Express terminée !
-      </div>
-      <p style="color:var(--text-muted);
-                margin-bottom:var(--space-lg)">
-        Bien joué ${(() => {
-          try { return Tracker.getProfil().nom || ''; }
-          catch(e) { return ''; }
-        })()} ! 🔥
-      </p>
-      <div class="express-result-stats">
-        <div class="express-result-stat">
-          <div class="express-result-val">
-            ${Utils.formatDuree(duree)}
-          </div>
-          <div class="express-result-lbl">Durée</div>
-        </div>
-        <div class="express-result-stat">
-          <div class="express-result-val">
-            ${exercices.length}
-          </div>
-          <div class="express-result-lbl">Exercices</div>
-        </div>
-        <div class="express-result-stat">
-          <div class="express-result-val">
-            ${Utils.formatVolume(
-              (() => {
-                try { return Tracker.getVolumeSemaine(); }
-                catch(e) { return 0; }
-              })()
-            )}
-          </div>
-          <div class="express-result-lbl">Vol. sem.</div>
-        </div>
-      </div>
-      <div style="margin:var(--space-lg) 0">
-        <button class="btn-primary mb-md" style="width:100%"
-                onclick="naviguer('stats')">
-          📊 Voir mes stats
-        </button>
-        <button class="btn-secondary" style="width:100%"
-                onclick="naviguer('home')">
-          🏠 Accueil
-        </button>
-      </div>
+        </div>` : ''}
     </div>`;
-
-  setTimeout(() => {
-    try { Gamification.verifierTrophees(); } catch(e) {}
-  }, 1000);
-}
-
-async function arreterExpress(exercices) {
-  const ok = await Utils.confirmer(
-    'Arrêter la séance express ?',
-    'Ta progression sera sauvegardée.'
-  );
-  if (!ok) return;
-  AppState.expressActif = false;
-  chronoSeance.arreter();
-  timerRepos.arreter();
-  try { Tracker.terminerSeance(
-    'express_' + Utils.aujourd_hui()); } catch(e) {}
-  naviguer('home');
-}
-
-// ════════════════════════════════════════════════════════════
-// PAGES DÉLÉGUÉES
-// ════════════════════════════════════════════════════════════
-function renderPageDefis() {
-  const c = document.getElementById('page-content');
-  c.innerHTML = `<div id="defis-wrapper"></div>`;
-  try { Defis.render(document.getElementById('defis-wrapper')); }
-  catch(e) { _renderPageVide('🏆', 'Défis'); }
-}
-
-function renderPageShare() {
-  const c = document.getElementById('page-content');
-  c.innerHTML = `<div id="share-wrapper"></div>`;
-  try { Share.render(document.getElementById('share-wrapper')); }
-  catch(e) { _renderPageVide('📸', 'Partage'); }
-}
-
-function renderPagePredict() {
-  const c = document.getElementById('page-content');
-  c.innerHTML = `<div id="predict-wrapper"></div>`;
-  try { Predict.render(document.getElementById('predict-wrapper')); }
-  catch(e) { _renderPageVide('🔮', 'Prédictions'); }
 }
 
 // ════════════════════════════════════════════════════════════
 // PAGE TRAINING
 // ════════════════════════════════════════════════════════════
-function renderTraining(tab = 'planning', offset = 0) {
-  const container = document.getElementById('page-content');
-  if (!container) return;
+function _rendreTraining(container) {
+  let infos    = { semaine:1, cycle:1, phase:{ nom:'Reprise', emoji:'🌱', couleur:'#8bf0bb', intensite:.65 } };
+  let seances  = [];
+  let planning = [];
 
-  const tabs = ['planning','exercices','timer','phases','recup'];
+  try { infos   = Programme.getInfosProgramme();          } catch(e) {}
+  try { seances = Programme.getAllSeances();               } catch(e) {}
+  try { planning= Programme.getSeancesSemaine();          } catch(e) {}
 
   container.innerHTML = `
-    <div class="tabs-container">
-      ${tabs.map(t => `
-        <button class="tab-btn ${tab===t?'active':''}"
-                onclick="renderTraining('${t}')">
-          ${{
-            planning:  '📅 Planning',
-            exercices: '🏋️ Exercices',
-            timer:     '⏱️ Timer',
-            phases:    '📈 Phases',
-            recup:     '🧘 Récup'
-          }[t]}
-        </button>`).join('')}
-    </div>
-    <div id="training-content"></div>`;
 
-  const content = document.getElementById('training-content');
-  switch(tab) {
-    case 'planning':  renderPlanning(content, offset); break;
-    case 'exercices': renderListeExercices(content);   break;
-    case 'timer':     renderTimerStandalone(content);  break;
-    case 'phases':    renderPhases(content);           break;
-    case 'recup':     renderRecup(content);            break;
-  }
-}
+    <!-- Infos programme -->
+    <div class="card mb-md"
+         style="background:linear-gradient(135deg,
+                var(--fd-indigo) 0%, #7b2ff7 100%);
+                border:none;color:white;
+                text-align:center">
+      <div style="font-size:2rem">
+        ${infos.phase.emoji}
+      </div>
+      <div style="font-size:1.1rem;font-weight:800;
+                  margin-top:4px">
+        ${infos.phase.nom}
+      </div>
+      <div style="font-size:.78rem;opacity:.8;
+                  margin-top:2px">
+        Semaine ${infos.semaine}
+        · Cycle ${infos.cycle}
+        · ${Math.round(infos.phase.intensite*100)}% intensité
+      </div>
 
-function renderPlanning(el, offset = 0) {
-  let semaines = [];
-  let infos    = { semaine:1, phase:{ emoji:'🌱', nom:'Reprise' } };
-  let isCustom = false;
-
-  try { semaines = Programme.getSeancesSemaine(offset); } catch(e) {}
-  try { infos    = Programme.getInfosProgramme();        } catch(e) {}
-  try { isCustom = Programme.estPlanningCustom();        } catch(e) {}
-
-  const semNum = (infos.semaine || 1) + offset;
-
-  el.innerHTML = `
-    <div class="flex items-center justify-between mb-md">
-      <button class="btn-icon"
-              onclick="renderTraining('planning',${offset-1})">
-        ◄
-      </button>
-      <div style="text-align:center">
-        <div style="font-weight:700;font-size:1rem">
-          SEMAINE ${semNum}
-        </div>
-        <div style="font-size:.72rem;color:var(--text-muted)">
-          ${infos.phase?.emoji||'🌱'} ${infos.phase?.nom||''}
-          ${isCustom
-            ? '<span style="color:var(--fd-lemon)">· ✏️ Custom</span>'
-            : ''}
+      <!-- Barre cycle -->
+      <div style="height:6px;
+                  background:rgba(255,255,255,0.2);
+                  border-radius:3px;
+                  margin-top:var(--space-md);
+                  overflow:hidden">
+        <div style="height:100%;
+                    background:var(--fd-lemon);
+                    width:${infos.progression||0}%;
+                    border-radius:3px">
         </div>
       </div>
-      <button class="btn-icon"
-              onclick="renderTraining('planning',${offset+1})">
-        ►
-      </button>
+      <div style="font-size:.65rem;opacity:.6;
+                  margin-top:4px">
+        ${infos.progression||0}% du cycle
+      </div>
     </div>
 
-    <button class="btn-secondary mb-md"
-            style="width:100%;font-size:.82rem"
-            onclick="renderProfil('programme')">
-      ⚙️ Personnaliser le programme
-    </button>
-
-    <div class="card">
-      ${semaines.map(jour => `
-        <div class="seance-card">
-          <span class="seance-day"
-                style="${jour.estAujourdhui
-                  ? 'color:var(--fd-indigo);font-weight:800':''
-                }">
+    <!-- Planning semaine -->
+    <div class="section-title">📅 Planning semaine</div>
+    <div style="display:grid;
+                grid-template-columns:repeat(7,1fr);
+                gap:3px;margin-bottom:var(--space-md)">
+      ${planning.map(jour => `
+        <div style="text-align:center;
+                    padding:var(--space-sm) 2px;
+                    background:${jour.estAujourdhui
+                      ? 'var(--fd-indigo)'
+                      : jour.seance
+                        ? 'rgba(75,75,249,0.15)'
+                        : 'var(--bg-input)'};
+                    border-radius:var(--radius-sm);
+                    cursor:${jour.seance ? 'pointer':'default'}"
+             ${jour.seance
+               ? `onclick="naviguer('live',
+                   { seanceId:'${jour.seance?.id}' })"`
+               : ''}>
+          <div style="font-size:.6rem;
+                      color:${jour.estAujourdhui
+                        ? 'white'
+                        : 'var(--text-muted)'};
+                      font-weight:${jour.estAujourdhui
+                        ? '700':'400'}">
             ${jour.label}
-          </span>
-          <div class="seance-info">
-            ${jour.seance ? `
-              <div class="seance-name">
-                ${jour.seance.emoji} ${jour.seance.nom}
-                ${jour.seance.custom
-                  ? '<span style="font-size:.6rem;color:var(--fd-lemon)"> ✏️</span>'
-                  : ''}
-              </div>
-              <div class="seance-meta">
-                ${jour.seance.exercices.length} exercices
-                · ~${jour.seance.duree_estimee}min
-              </div>` : `
-              <div class="seance-name"
-                   style="color:var(--text-muted)">
-                ✨ Récupération
-              </div>`}
           </div>
-          ${jour.seance ? `
-            <button class="badge-seance"
-                    onclick="ouvrirSeance('${jour.seance.id}')">
-              ${jour.estPasse && !jour.estAujourdhui
-                ? '📋' : '▶'} Séance
-            </button>` : `
-            <span class="badge-repos">Repos</span>`}
-        </div>`).join('')}
-    </div>`;
-}
-
-function renderListeExercices(el) {
-  const groupes = {};
-  try {
-    Object.entries(EXERCICES || {}).forEach(([ref, ex]) => {
-      if (!groupes[ex.muscle]) groupes[ex.muscle] = [];
-      groupes[ex.muscle].push({ ref, ...ex });
-    });
-  } catch(e) {}
-
-  el.innerHTML = `
-    <div class="card mb-md">
-      <input class="input" id="search-ex"
-             placeholder="🔍 Rechercher un exercice..."
-             oninput="filtrerExercices(this.value)" />
-    </div>
-    <div id="ex-list">
-      ${Object.entries(groupes).map(([muscle, exos]) => `
-        <div class="section-title">
-          ${exos?.emoji||'💪'} ${muscle}
-        </div>
-        ${exos.map(ex => `
-          <div class="exercice-card mb-md"
-               onclick="afficherDetailExercice('${ex.ref}')">
-            <div class="exercice-header">
-              <div id="list_gif_${ex.ref}"
-                   style="width:70px;height:70px;
-                          border-radius:var(--radius-md);
-                          background:var(--fd-indigo-dim);
-                          display:flex;align-items:center;
-                          justify-content:center;
-                          font-size:1.8rem;flex-shrink:0;
-                          overflow:hidden">
-                ${ex.emoji||'💪'}
-              </div>
-              <div class="exercice-details">
-                <div class="exercice-name">${ex.nom}</div>
-                <div class="exercice-muscle">${ex.muscle}</div>
-                <div class="exercice-volume">${ex.equipement}</div>
-                <div style="font-size:.75rem;margin-top:4px">
-                  ${'⭐'.repeat(ex.difficulte||1)}${'☆'.repeat(4-(ex.difficulte||1))}
-                </div>
-              </div>
-            </div>
-          </div>`).join('')}
-      `).join('')}
-    </div>`;
-
-  _observerGIFs();
-}
-
-function _observerGIFs() {
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const el  = entry.target;
-        const ref = el.dataset.ref;
-        if (ref && !el.dataset.loaded) {
-          el.dataset.loaded = 'true';
-          ExerciseGIF.chargerDans(ref, el.id);
-        }
-      }
-    });
-  }, { rootMargin:'100px' });
-
-  document.querySelectorAll('[id^="list_gif_"]')
-    .forEach(el => {
-      el.dataset.ref = el.id.replace('list_gif_', '');
-      observer.observe(el);
-    });
-}
-
-function filtrerExercices(query) {
-  const q = (query || '').toLowerCase();
-  document.querySelectorAll('.exercice-card')
-    .forEach(card => {
-      card.style.display =
-        card.textContent.toLowerCase().includes(q)
-          ? '' : 'none';
-    });
-}
-
-function afficherDetailExercice(ref) {
-  const ex    = (window.EXERCICES || {})[ref];
-  if (!ex) return;
-
-  let pr = null;
-  try { pr = Tracker.getPR(ref); } catch(e) {}
-
-  const gifUID  = `modal_gif_${ref}_${Date.now()}`;
-  const modal   = document.getElementById('modal-info');
-  const content = document.getElementById('modal-info-content');
-  if (!modal || !content) return;
-
-  content.innerHTML = `
-    <div id="${gifUID}"
-         style="width:100%;height:200px;display:flex;
-                align-items:center;justify-content:center;
-                background:var(--fd-indigo-dim);
-                border-radius:var(--radius-lg);
-                margin-bottom:var(--space-md);
-                font-size:4rem;overflow:hidden">
-      ${ex.emoji}
-    </div>
-    <div style="text-align:center;margin-bottom:var(--space-lg)">
-      <h3 style="font-size:1.3rem;font-weight:700">${ex.nom}</h3>
-      <span class="chip chip-mint">${ex.muscle}</span>
-      <span style="margin-left:var(--space-sm)">
-        ${'⭐'.repeat(ex.difficulte||1)}${'☆'.repeat(4-(ex.difficulte||1))}
-      </span>
-    </div>
-    <div class="card mb-md">
-      <div class="card-label">📍 Équipement</div>
-      <p style="font-size:.9rem;margin-top:var(--space-xs)">
-        ${ex.equipement}
-      </p>
-    </div>
-    <div class="card mb-md">
-      <div class="card-label">📖 Description</div>
-      <p style="font-size:.88rem;line-height:1.6;
-                margin-top:var(--space-xs)">
-        ${ex.description}
-      </p>
-    </div>
-    <div class="card mb-md">
-      <div class="card-label">💡 Conseils</div>
-      ${(ex.conseils||[]).map(c => `
-        <div style="display:flex;gap:var(--space-sm);
-                    padding:4px 0;font-size:.85rem">
-          <span style="color:var(--fd-mint)">✓</span>
-          <span>${c}</span>
+          <div style="font-size:.9rem;margin-top:2px">
+            ${jour.seance
+              ? jour.seance.emoji
+              : jour.estRepos ? '😴' : '·'}
+          </div>
         </div>`).join('')}
     </div>
-    ${pr ? `
-      <div class="card mb-md">
-        <div class="card-label">🏆 Record personnel</div>
-        <div class="flex justify-between mt-md">
-          <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-lemon)">
-              ${pr.rm1}kg
-            </div>
-            <div style="font-size:.7rem;color:var(--text-muted)">
-              1RM estimé
-            </div>
-          </div>
-          <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-indigo)">
-              ${pr.poids}kg
-            </div>
-            <div style="font-size:.7rem;color:var(--text-muted)">
-              Meilleur poids
-            </div>
-          </div>
-          <div class="text-center">
-            <div style="font-size:1.3rem;font-weight:800;
-                        color:var(--fd-mint)">
-              ${pr.reps}
-            </div>
-            <div style="font-size:.7rem;color:var(--text-muted)">
-              Meilleur reps
-            </div>
-          </div>
-        </div>
-      </div>` : ''}
-    <button class="btn-secondary mt-md"
-            onclick="Stats._ajouterNoteExo('${ref}')">
-      📝 Ajouter une note technique
-    </button>
+
+    <!-- Séances disponibles -->
+    <div class="section-title">🏋️ Séances</div>
+    ${seances.map(s => _renderCarteSeanceTraining(s))
+      .join('')}
+
+    <!-- Supersets -->
+    <div class="flex justify-between items-center mt-md mb-sm">
+      <div class="section-title" style="margin:0">
+        ⚡ Supersets
+      </div>
+      <button onclick="naviguer('supersets')"
+              style="background:none;border:none;
+                     font-size:.72rem;
+                     color:var(--fd-indigo);
+                     cursor:pointer;font-weight:600">
+        Gérer →
+      </button>
+    </div>
+    <div class="card"
+         style="text-align:center;padding:var(--space-md)">
+      <div style="font-size:1.5rem;margin-bottom:4px">⚡</div>
+      <div style="font-size:.82rem;color:var(--text-muted)">
+        Configure tes supersets pour maximiser ton efficacité
+      </div>
+      <button onclick="naviguer('supersets')"
+              class="btn-secondary mt-md"
+              style="font-size:.82rem">
+        Voir les supersets
+      </button>
+    </div>
   `;
-
-  modal.classList.remove('hidden');
-  document.getElementById('modal-info-close')
-    .onclick = () => modal.classList.add('hidden');
-  modal.querySelector('.modal-overlay')
-    .onclick = () => modal.classList.add('hidden');
-
-  ExerciseGIF.chargerDans(ref, gifUID);
 }
 
-// ── Timer ─────────────────────────────────────────────────────
-let timerDureeBase = 90;
+function _renderCarteSeanceTraining(seance) {
+  const warmup    = window.WARMUP?.[seance.id];
+  const supersets = Superset.getSupersets(seance.id);
 
-function renderTimerStandalone(el) {
-  el.innerHTML = `
-    <div class="timer-screen">
-      <div class="timer-title">⏱️ Timer Repos</div>
-      <div class="timer-presets">
-        ${[60,90,120,180].map(s => `
-          <button class="preset-btn ${s===90?'active':''}"
-                  onclick="selectionnerPreset(${s},this)">
-            ${s}s
-          </button>`).join('')}
-        <button class="preset-btn"
-                onclick="demanderCustomTimer()">
-          ⚙️
-        </button>
-      </div>
-      <div class="countdown-ring">
-        <svg width="200" height="200" viewBox="0 0 200 200">
-          <circle class="ring-bg" cx="100" cy="100" r="88"
-                  stroke-dasharray="${2*Math.PI*88}"/>
-          <circle class="ring-fill" id="ring-fill"
-                  cx="100" cy="100" r="88"
-                  stroke-dasharray="${2*Math.PI*88}"
-                  stroke-dashoffset="0"/>
-        </svg>
-        <div class="countdown-text">
-          <div class="countdown-number"
-               id="countdown-display">01:30</div>
-          <div class="countdown-label"
-               id="countdown-label">Prêt</div>
+  return `
+    <div class="card mb-md">
+      <div class="flex justify-between items-center mb-sm">
+        <div>
+          <div style="font-size:1rem;font-weight:700">
+            ${seance.emoji} ${seance.nom}
+          </div>
+          <div style="font-size:.72rem;
+                      color:var(--text-muted);
+                      margin-top:2px">
+            ~${seance.duree_estimee}min
+            · ${seance.exercices?.length||0} exercices
+            ${supersets.length > 0
+              ? `· ${supersets.length} superset${supersets.length>1?'s':''}`
+              : ''}
+          </div>
         </div>
-      </div>
-      <div class="timer-controls mb-md">
-        <button class="timer-adjust-btn"
-                onclick="timerRepos.ajuster(-30);updateTimerUI()">
-          -30s
-        </button>
-        <button class="btn-primary" id="btn-timer-start"
-                onclick="toggleTimer()"
-                style="flex:1;max-width:160px">
-          ▶ Démarrer
-        </button>
-        <button class="timer-adjust-btn"
-                onclick="timerRepos.ajuster(30);updateTimerUI()">
-          +30s
+        <button onclick="naviguer('live',
+                  { seanceId:'${seance.id}' })"
+                class="btn-primary"
+                style="font-size:.78rem;
+                       padding:var(--space-sm)
+                       var(--space-md)">
+          ▶ Start
         </button>
       </div>
-      <div class="flex gap-md justify-center">
-        <label class="toggle-row"
-               style="border:none;gap:var(--space-sm)">
-          <span style="font-size:.85rem">🔔 Son</span>
-          <label class="toggle">
-            <input type="checkbox"
-                   ${Utils.storage.get('ft_son',true)?'checked':''}
-                   onchange="Utils.storage.set('ft_son',this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </label>
-        <label class="toggle-row"
-               style="border:none;gap:var(--space-sm)">
-          <span style="font-size:.85rem">📳 Vibration</span>
-          <label class="toggle">
-            <input type="checkbox"
-                   ${Utils.storage.get('ft_vibration',true)?'checked':''}
-                   onchange="Utils.storage.set('ft_vibration',this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </label>
+
+      <!-- Muscles chips -->
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${(seance.muscles||[]).map(m => `
+          <span class="chip chip-indigo"
+                style="font-size:.62rem">
+            ${m}
+          </span>`).join('')}
+      </div>
+
+      <!-- Exercices preview -->
+      <div style="margin-top:var(--space-sm);
+                  font-size:.75rem;
+                  color:var(--text-muted)">
+        ${(seance.exercices||[]).slice(0, 4).map(ex => {
+          const exo = (window.EXERCICES||{})[ex.ref]||{};
+          return `${exo.emoji||'💪'} ${exo.nom||ex.ref}`;
+        }).join(' · ')}
+        ${(seance.exercices||[]).length > 4
+          ? ` · +${(seance.exercices||[]).length - 4}`
+          : ''}
       </div>
     </div>`;
-  updateTimerUI(90);
-}
-
-function selectionnerPreset(s, btn) {
-  timerDureeBase = s;
-  timerRepos.reset(s);
-  document.querySelectorAll('.preset-btn')
-    .forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  updateTimerUI(s);
-  const startBtn = document.getElementById('btn-timer-start');
-  if (startBtn) startBtn.textContent = '▶ Démarrer';
-}
-
-function toggleTimer() {
-  const btn = document.getElementById('btn-timer-start');
-  if (!timerRepos.isActif()) {
-    timerRepos.demarrer(timerDureeBase,
-      (r,t) => updateTimerUI(r,t),
-      () => {
-        updateTimerUI(0, timerDureeBase);
-        if (btn) btn.textContent = '▶ Démarrer';
-      }
-    );
-    if (btn) btn.textContent = '⏸ Pause';
-  } else {
-    timerRepos.pauseReprendre();
-    if (btn) btn.textContent =
-      timerRepos.enPause ? '▶ Reprendre' : '⏸ Pause';
-  }
-}
-
-function updateTimerUI(restant = null, total = null) {
-  const r   = restant !== null ? restant : timerRepos.restant;
-  const t   = total   !== null ? total   :
-              (timerRepos.total || timerDureeBase);
-  const pct = t > 0 ? r / t : 1;
-
-  const display = document.getElementById('countdown-display');
-  const label   = document.getElementById('countdown-label');
-  const ring    = document.getElementById('ring-fill');
-
-  if (display) display.textContent = Utils.formatDureeMin(r);
-  if (label)   label.textContent   =
-    r === 0 ? '✅ C\'est parti !' :
-    timerRepos.actif ? 'Repos...' : 'Prêt';
-  if (ring) {
-    const circ = 2 * Math.PI * 88;
-    ring.style.strokeDashoffset = circ * (1 - pct);
-    ring.style.stroke =
-      r <= 3  ? 'var(--fd-coral)' :
-      r <= 10 ? 'var(--fd-lemon)' : 'var(--fd-indigo)';
-  }
-}
-
-function demanderCustomTimer() {
-  const val = prompt('Durée en secondes (ex: 150):');
-  if (!val || isNaN(parseInt(val))) return;
-  const s = Math.max(10, Math.min(600, parseInt(val)));
-  timerDureeBase = s;
-  timerRepos.reset(s);
-  updateTimerUI(s);
-}
-
-// ── Phases ────────────────────────────────────────────────────
-function renderPhases(el) {
-  let infos = {
-    cycle:1, semaineInCycle:1, progression:0,
-    phase:{ numero:1 }
-  };
-  try { infos = Programme.getInfosProgramme(); } catch(e) {}
-
-  const phases = [
-    { num:1, nom:'Reprise',      emoji:'🌱',
-      desc:'Technique & Adaptation',
-      s:'S1-S4',   intensite:'65-70%',
-      color:'var(--fd-mint)'     },
-    { num:2, nom:'Construction', emoji:'🏗️',
-      desc:'Volume & Hypertrophie',
-      s:'S5-S8',   intensite:'75-80%',
-      color:'var(--fd-indigo)'   },
-    { num:3, nom:'Intensité',    emoji:'💥',
-      desc:'Force & Records',
-      s:'S9-S12',  intensite:'85-90%',
-      color:'var(--fd-lavender)' },
-    { num:4, nom:'Peak',         emoji:'🏆',
-      desc:'Records & Décharge',
-      s:'S13-S16', intensite:'95%+',
-      color:'var(--fd-lemon)'    }
-  ];
-
-  el.innerHTML = `
-    <div class="card mb-md" style="text-align:center">
-      <div class="card-label">
-        🔄 Cycle ${infos.cycle} — Semaine
-        ${infos.semaineInCycle}/16
-      </div>
-      <div style="margin:var(--space-md) 0">
-        <div class="progress-bar">
-          <div class="progress-fill"
-               style="width:${infos.progression||0}%"></div>
-        </div>
-        <div style="font-size:.72rem;color:var(--text-muted);
-                    margin-top:4px">
-          ${infos.progression||0}% du cycle complété
-        </div>
-      </div>
-    </div>
-    ${phases.map(p => `
-      <div class="card mb-md"
-           style="${p.num === infos.phase?.numero
-             ? `border-color:${p.color};background:${p.color}15`
-             : ''}">
-        <div class="flex items-center gap-md">
-          <div style="width:44px;height:44px;border-radius:50%;
-                      background:${p.color}22;
-                      border:2px solid ${p.color};
-                      display:flex;align-items:center;
-                      justify-content:center;
-                      font-size:1.2rem;flex-shrink:0">
-            ${p.num < (infos.phase?.numero||1) ? '✅' :
-              p.num === (infos.phase?.numero||1) ? p.emoji : '🔒'}
-          </div>
-          <div style="flex:1">
-            <div style="font-weight:700;font-size:.95rem;
-                        color:${p.num === infos.phase?.numero
-                          ? p.color : 'var(--text-primary)'}">
-              Phase ${p.num} — ${p.nom}
-              ${p.num === infos.phase?.numero
-                ? '<span style="font-size:.7rem;margin-left:4px">← Actuelle</span>'
-                : ''}
-            </div>
-            <div style="font-size:.75rem;color:var(--text-muted)">
-              ${p.desc}
-            </div>
-            <div style="font-size:.72rem;margin-top:2px">
-              <span class="chip chip-indigo">${p.s}</span>
-              <span style="color:${p.color};font-weight:600;
-                           margin-left:var(--space-sm)">
-                ${p.intensite} du max
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>`).join('')}`;
-}
-
-// ── Récup ─────────────────────────────────────────────────────
-function renderRecup(el) {
-  let etirements = [];
-  try {
-    const indexJour  =
-      Utils.indexJourSemaine(Utils.aujourd_hui());
-    const planning   = PLANNING_SEMAINE?.[indexJour];
-    const seanceId   = planning?.seanceId;
-    etirements       = seanceId
-      ? (ETIREMENTS?.[seanceId] || [])
-      : [];
-  } catch(e) {}
-
-  el.innerHTML = `
-    <div class="card mb-md">
-      <div class="card-label">🧘 Étirements du jour</div>
-      ${etirements.length === 0 ? `
-        <p style="color:var(--text-muted);
-                  padding:var(--space-md);text-align:center">
-          Lance une séance pour voir les étirements adaptés.
-        </p>` :
-        etirements.map(e => `
-          <div class="flex items-center gap-md"
-               style="padding:var(--space-sm) 0;
-                      border-bottom:1px solid var(--border-color)">
-            <span style="font-size:1.5rem">${e.gif}</span>
-            <div style="flex:1">
-              <div style="font-size:.9rem;font-weight:600">
-                ${e.nom}
-              </div>
-            </div>
-            <div style="color:var(--fd-mint);font-size:.82rem;
-                        font-weight:600">${e.duree}s</div>
-          </div>`).join('')}
-    </div>
-    <div class="card">
-      <div class="card-label">💡 Conseils récupération</div>
-      ${[
-        { emoji:'💧', titre:'Hydratation',
-          desc:'2.5 à 3L d\'eau par jour.' },
-        { emoji:'😴', titre:'Sommeil',
-          desc:'7 à 9 heures par nuit.' },
-        { emoji:'🍗', titre:'Protéines',
-          desc:'~2g/kg de poids corporel.' },
-        { emoji:'🧊', titre:'Bain froid',
-          desc:'2-3 min à 10-15°C post séance.' },
-        { emoji:'📱', titre:'Repos actif',
-          desc:'Marche légère les jours off.' }
-      ].map(c => `
-        <div style="display:flex;gap:var(--space-md);
-                    padding:var(--space-sm) 0;
-                    border-bottom:1px solid var(--border-color)">
-          <span style="font-size:1.3rem">${c.emoji}</span>
-          <div>
-            <div style="font-weight:600;font-size:.88rem">
-              ${c.titre}
-            </div>
-            <div style="font-size:.78rem;color:var(--text-muted);
-                        margin-top:2px">${c.desc}</div>
-          </div>
-        </div>`).join('')}
-    </div>`;
-}
-
-// ── Ouvrir séance ─────────────────────────────────────────────
-function ouvrirSeance(seanceId) {
-  let seance = null;
-  try { seance = Programme.getSeanceComplete(seanceId); }
-  catch(e) {}
-  if (!seance) return;
-
-  AppState.seanceChoisie = seance;
-  const container = document.getElementById('page-content');
-  if (!container) return;
-
-  container.innerHTML = `
-    <div class="flex items-center gap-md mb-md">
-      <button class="btn-icon"
-              onclick="renderTraining()">←</button>
-      <div>
-        <div style="font-weight:700;font-size:1.1rem">
-          ${seance.emoji} ${seance.nom}
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted)">
-          ${seance.exercices.length} exercices
-          · ~${seance.duree_estimee}min
-        </div>
-      </div>
-    </div>
-
-    <div class="card mb-md">
-      <div class="card-label">
-        🔥 Warm-up (${seance.warmup?.length||0} exercices)
-      </div>
-      ${(seance.warmup||[]).map(w => `
-        <div style="display:flex;justify-content:space-between;
-                    padding:var(--space-xs) 0;font-size:.85rem;
-                    border-bottom:1px solid var(--border-color)">
-          <span>${w.nom}</span>
-          <span style="color:var(--fd-mint)">
-            ${Utils.formatDuree(w.duree)}
-          </span>
-        </div>`).join('')}
-    </div>
-
-    <div class="card mb-md">
-      <div class="card-label">📋 Exercices</div>
-      ${(seance.exercicesDetails||[]).map((item, i) => {
-        const ex   = item.details;
-        let pr     = null, pred = null;
-        try { pr   = Tracker.getPR(item.ref);         } catch(e) {}
-        try { pred = Predict.predireProchainPR(item.ref); } catch(e) {}
-        const uid  = `preview_gif_${item.ref}_${i}`;
-        return `
-          <div style="display:flex;gap:var(--space-md);
-                      padding:var(--space-md) 0;
-                      border-bottom:1px solid var(--border-color);
-                      align-items:center">
-            <div id="${uid}"
-                 style="width:60px;height:60px;
-                        border-radius:var(--radius-md);
-                        background:var(--fd-indigo-dim);
-                        display:flex;align-items:center;
-                        justify-content:center;
-                        font-size:1.5rem;flex-shrink:0;
-                        overflow:hidden">
-              ${ex?.emoji||'💪'}
-            </div>
-            <div style="flex:1">
-              <div style="font-weight:600;font-size:.92rem">
-                ${i+1}. ${ex?.nom||item.ref}
-              </div>
-              <div style="font-size:.75rem;color:var(--fd-mint)">
-                ${ex?.muscle||''}
-              </div>
-              <div style="font-size:.75rem;color:var(--text-muted)">
-                ${item.series} × ${item.reps}
-                · Repos ${item.repos}s
-              </div>
-              ${pr ? `
-                <div style="font-size:.7rem;color:var(--fd-lemon);
-                            margin-top:2px">
-                  🏆 Record: ${pr.poids}kg × ${pr.reps}
-                </div>` : ''}
-              ${pred ? `
-                <div style="font-size:.68rem;color:var(--fd-mint);
-                            margin-top:2px">
-                  🔮 PR prédit: ${pred.rm1Predit}kg
-                  dans ~${pred.joursEstimes}j
-                </div>` : ''}
-            </div>
-          </div>`;
-      }).join('')}
-    </div>
-
-    <button class="btn-primary"
-            onclick="demarrerNouvelleSeance(AppState.seanceChoisie)"
-            style="position:sticky;
-                   bottom:calc(var(--nav-height)+var(--space-md))">
-      ⚡ Démarrer la séance
-    </button>`;
-
-  (seance.exercicesDetails||[]).forEach((item, i) => {
-    setTimeout(() => {
-      ExerciseGIF.chargerDans(
-        item.ref, `preview_gif_${item.ref}_${i}`
-      );
-    }, i * 100);
-  });
 }
 
 // ════════════════════════════════════════════════════════════
 // PAGE LIVE
 // ════════════════════════════════════════════════════════════
-function renderLive() {
-  const container = document.getElementById('page-content');
-  if (!container) return;
+function _rendreLive(container, options = {}) {
+  const seanceId = options.seanceId
+    || Programme.getSeanceduJour()?.id
+    || null;
 
-  const seance = AppState.seanceEnCours;
-
-  if (!seance && !AppState.seanceChoisie) {
-    renderSelecteurSeance(container);
-    return;
-  }
-  if (!seance) {
-    demarrerNouvelleSeance(AppState.seanceChoisie);
-    return;
-  }
-  renderExerciceActuel(container);
-}
-
-function renderSelecteurSeance(container) {
-  let seances   = [];
-  let prochaine = null;
-  try { seances   = Programme.getAllSeances();        } catch(e) {}
-  try { prochaine = Programme.getProchaineSeance();  } catch(e) {}
-
-  container.innerHTML = `
-    <div style="text-align:center;padding:var(--space-lg) 0;
-                margin-bottom:var(--space-md)">
-      <div style="font-size:2.5rem;margin-bottom:var(--space-sm)">
-        ⚡
-      </div>
-      <h2 style="font-size:1.3rem;font-weight:700">
-        Quelle séance aujourd'hui ?
-      </h2>
-      <button class="btn-secondary mt-md"
-              onclick="naviguer('express')"
-              style="font-size:.82rem">
-        ⚡ Séance Express 30min →
-      </button>
-    </div>
-
-    ${prochaine ? `
-      <div class="card card-indigo mb-md"
-           onclick="ouvrirSeance('${prochaine.id}')"
-           style="cursor:pointer">
-        <div style="font-size:.72rem;opacity:.8;margin-bottom:4px">
-          ⭐ Recommandée aujourd'hui
+  if (!seanceId) {
+    container.innerHTML = `
+      <div class="card mt-md"
+           style="text-align:center;
+                  padding:var(--space-xl)">
+        <div style="font-size:3rem">😴</div>
+        <div style="font-size:1.1rem;font-weight:700;
+                    margin-top:var(--space-md)">
+          Jour de repos
         </div>
-        <div style="font-size:1.1rem;font-weight:700">
-          ${prochaine.emoji} ${prochaine.nom}
-        </div>
-        <div style="font-size:.78rem;opacity:.8;margin-top:4px">
-          ${prochaine.exercices.length} exercices
-          · ~${prochaine.duree_estimee}min
-        </div>
-      </div>` : ''}
-
-    ${seances.map(s => `
-      <div class="seance-card"
-           onclick="ouvrirSeance('${s.id}')">
-        <span style="font-size:1.5rem;margin-right:var(--space-md)">
-          ${s.emoji}
-        </span>
-        <div class="seance-info">
-          <div class="seance-name">
-            ${s.nom}
-            ${s.custom
-              ? '<span style="font-size:.6rem;color:var(--fd-lemon)"> ✏️</span>'
-              : ''}
-          </div>
-          <div class="seance-meta">
-            ${s.exercices.length} exercices · ~${s.duree_estimee}min
-          </div>
-        </div>
-        <span style="color:var(--fd-indigo)">▶</span>
-      </div>`).join('')}`;
-}
-
-function demarrerNouvelleSeance(seance) {
-  AppState.seanceEnCours = seance;
-  AppState.exerciceIndex = 0;
-  AppState.serieActuelle = 1;
-  AppState.seanceChoisie = null;
-  AppState.prsSeance     = [];
-
-  try { Tracker.demarrerSeance(seance.id); } catch(e) {}
-
-  chronoSeance.demarrer(elapsed => {
-    const el = document.getElementById('chrono-global');
-    if (el) el.textContent = Utils.formatDuree(elapsed);
-  });
-
-  renderExerciceActuel(document.getElementById('page-content'));
-}
-
-function renderExerciceActuel(container) {
-  const seance = AppState.seanceEnCours;
-  if (!seance || !container) return;
-
-  const item   = seance.exercicesDetails?.[AppState.exerciceIndex];
-  const ex     = item?.details;
-  const gifUID = `live_gif_${item?.ref}_${Date.now()}`;
-
-  let derniere = null, pred = null;
-  try { derniere = Tracker.getDernierePerf(seance.id, item?.ref); } catch(e) {}
-  try { pred     = Predict.recommanderCharge(item?.ref);          } catch(e) {}
-
-  container.innerHTML = `
-    <div class="flex items-center justify-between mb-md">
-      <button class="btn-secondary btn-sm"
-              onclick="confirmerAbandon()">
-        ✕ Arrêter
-      </button>
-      <div style="text-align:center">
-        <div style="font-weight:700;font-size:.9rem">
-          ${AppState.exerciceIndex+1}/${seance.exercicesDetails.length}
-        </div>
-        <div style="font-size:.72rem;color:var(--text-muted)"
-             id="chrono-global">00:00</div>
-      </div>
-      <button class="btn-secondary btn-sm"
-              onclick="afficherDetailExercice('${item?.ref}')">
-        ℹ️ Info
-      </button>
-    </div>
-
-    <div class="exercice-card mb-md">
-      <div id="${gifUID}"
-           style="width:100%;height:220px;display:flex;
-                  align-items:center;justify-content:center;
-                  background:var(--fd-indigo-dim);
-                  border-radius:var(--radius-md) var(--radius-md) 0 0;
-                  font-size:4rem;overflow:hidden">
-        ${ex?.emoji||'💪'}
-      </div>
-
-      <div style="padding:var(--space-md);text-align:center;
-                  border-bottom:1px solid var(--border-color)">
-        <div style="font-size:1.2rem;font-weight:700">
-          ${ex?.nom||item?.ref}
-        </div>
-        <div style="font-size:.8rem;color:var(--fd-mint);
-                    margin-top:4px">
-          ${ex?.muscle||''}
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted);
-                    margin-top:4px">
-          ${item?.series} séries × ${item?.reps} reps
-          · Repos ${item?.repos}s
-        </div>
-        ${pred ? `
-          <div style="font-size:.72rem;color:var(--fd-lemon);
-                      margin-top:4px">
-            ⚡ Recommandée: <strong>${pred.charge}kg</strong>
-            (${pred.intensite}% · ${pred.fatigue?.emoji||''})
-          </div>` : ''}
-        ${derniere ? `
-          <div style="font-size:.72rem;color:var(--fd-lemon);
-                      margin-top:4px">
-            📊 Dernière: ${derniere.poids}kg × ${derniere.reps}
-          </div>` : ''}
-      </div>
-
-      <div style="padding:var(--space-sm) var(--space-md)">
-        <div class="series-indicators">
-          ${Array.from({length:item?.series||4}, (_,i) => `
-            <div class="serie-dot ${
-              i+1 <  AppState.serieActuelle ? 'done'    :
-              i+1 === AppState.serieActuelle ? 'current' : ''}">
-              ${i+1 < AppState.serieActuelle ? '✓' : i+1}
-            </div>`).join('')}
-        </div>
-      </div>
-
-      <div style="padding:var(--space-md)">
-        <div style="font-size:.85rem;font-weight:600;
-                    text-align:center;
-                    color:var(--text-secondary);
-                    margin-bottom:var(--space-sm)">
-          Série ${AppState.serieActuelle} / ${item?.series}
-        </div>
-        <div class="input-group mb-md">
-          <div style="flex:1">
-            <div class="input-label" style="text-align:center">
-              Poids (kg)
-            </div>
-            <input class="input" id="inp-poids" type="number"
-                   placeholder="${pred?.charge||derniere?.poids||'0'}"
-                   value="${pred?.charge||derniere?.poids||''}"
-                   step="2.5" />
-          </div>
-          <div style="flex:1">
-            <div class="input-label" style="text-align:center">
-              Reps
-            </div>
-            <input class="input" id="inp-reps" type="number"
-                   placeholder="${derniere?.reps||'0'}"
-                   value="${derniere?.reps||''}" />
-          </div>
-        </div>
-
-        <div class="rpe-selector">
-          <div class="rpe-label">Effort ressenti (RPE)</div>
-          <div class="rpe-grid">
-            ${Array.from({length:10}, (_,i) => `
-              <button class="rpe-btn" data-rpe="${i+1}"
-                      onclick="selectionnerRPE(${i+1},this)">
-                ${i+1}
-              </button>`).join('')}
-          </div>
-        </div>
-
-        <button class="btn-primary mt-md"
-                onclick="validerSerie()">
-          ✅ Valider série ${AppState.serieActuelle}
-        </button>
-      </div>
-    </div>
-
-    <div id="zone-repos" class="hidden">
-      <div class="card"
-           style="text-align:center;padding:var(--space-xl)">
-        <div class="timer-title">💤 Repos</div>
-        <div class="countdown-ring"
-             style="width:160px;height:160px;
-                    margin:var(--space-md) auto">
-          <svg width="160" height="160" viewBox="0 0 160 160">
-            <circle class="ring-bg" cx="80" cy="80" r="70"
-                    stroke-dasharray="${2*Math.PI*70}"/>
-            <circle class="ring-fill" id="live-ring"
-                    cx="80" cy="80" r="70"
-                    stroke-dasharray="${2*Math.PI*70}"
-                    stroke-dashoffset="0"/>
-          </svg>
-          <div class="countdown-text">
-            <div class="countdown-number"
-                 id="live-countdown"
-                 style="font-size:2.2rem">
-              ${Utils.formatDureeMin(item?.repos||90)}
-            </div>
-            <div class="countdown-label">secondes</div>
-          </div>
-        </div>
-        <div class="timer-controls">
-          <button class="timer-adjust-btn"
-                  onclick="timerRepos.ajuster(-15);
-                           updateLiveTimer()">
-            -15s
+        <p style="color:var(--text-muted);
+                  font-size:.88rem;
+                  margin-top:var(--space-sm)">
+          Aucune séance planifiée aujourd'hui.
+        </p>
+        <div style="display:grid;
+                    grid-template-columns:1fr 1fr;
+                    gap:var(--space-sm);
+                    margin-top:var(--space-lg)">
+          <button onclick="naviguer('training')"
+                  class="btn-secondary">
+            📅 Voir le programme
           </button>
-          <button class="timer-adjust-btn"
-                  onclick="passerRepos()"
-                  style="color:var(--fd-mint)">
-            ⏭ Passer
-          </button>
-          <button class="timer-adjust-btn"
-                  onclick="timerRepos.ajuster(15);
-                           updateLiveTimer()">
-            +15s
+          <button onclick="naviguer('live',
+                    { seanceId:'full_body' })"
+                  class="btn-primary">
+            ⚡ Séance express
           </button>
         </div>
-      </div>
-    </div>`;
-
-  ExerciseGIF.chargerDans(item?.ref, gifUID);
-}
-
-let rpeActuel = null;
-
-function selectionnerRPE(val, btn) {
-  rpeActuel = val;
-  document.querySelectorAll('.rpe-btn')
-    .forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-}
-
-function validerSerie() {
-  const poids = parseFloat(
-    document.getElementById('inp-poids')?.value);
-  const reps  = parseInt(
-    document.getElementById('inp-reps')?.value);
-
-  if (!poids || !reps) {
-    Utils.toast('Entre le poids et les reps !', 'error');
+      </div>`;
     return;
   }
 
-  const seance = AppState.seanceEnCours;
-  const item   = seance.exercicesDetails[AppState.exerciceIndex];
-
-  let result = { isPR: false };
+  // Charger la séance complète
+  let seanceComplete = null;
   try {
-    result = Tracker.sauvegarderSerie(
-      seance.id, item.ref, AppState.serieActuelle,
-      reps, poids, rpeActuel
-    );
+    seanceComplete = Programme.getSeanceComplete(seanceId);
   } catch(e) {}
 
-  rpeActuel = null;
-  Utils.vibrerSuccess();
-
-  if (result.isPR) {
-    AppState.prsSeance.push({ ref:item.ref, poids, reps });
-    timerRepos.jouerSon('pr');
-    Utils.toast(
-      `🏆 NOUVEAU PR ! ${poids}kg × ${reps}`, 'pr', 4000
-    );
-    try { Notifications.notifierPR(item.ref, poids, reps); } catch(e) {}
-    try { Gamification.recompenser('PR_BATTU');             } catch(e) {}
-    try { Defis.mettreAJourProgression();                   } catch(e) {}
+  if (!seanceComplete) {
+    container.innerHTML = `
+      <div class="card mt-md"
+           style="text-align:center">
+        <p>Séance introuvable.</p>
+        <button onclick="naviguer('training')"
+                class="btn-secondary mt-md">
+          ← Retour
+        </button>
+      </div>`;
+    return;
   }
 
-  if (AppState.serieActuelle < item.series) {
-    AppState.serieActuelle++;
-    lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(
-        document.getElementById('page-content')
-      );
-    });
-  } else if (
-    AppState.exerciceIndex + 1 < seance.exercicesDetails.length
-  ) {
-    AppState.exerciceIndex++;
-    AppState.serieActuelle = 1;
-    lancerTimerRepos(item.repos, () => {
-      renderExerciceActuel(
-        document.getElementById('page-content')
-      );
-    });
-  } else {
-    terminerSeance();
-  }
-}
-
-function lancerTimerRepos(secondes, callback) {
-  const zone = document.getElementById('zone-repos');
-  if (zone) zone.classList.remove('hidden');
-  zone?.scrollIntoView({ behavior:'smooth', block:'center' });
-
-  timerRepos.demarrer(secondes,
-    (r,t) => updateLiveTimerValues(r,t),
-    () => {
-      if (zone) zone.classList.add('hidden');
-      if (callback) callback();
-    }
+  // Vérifier séance déjà en cours
+  const seanceEnCours = Utils.storage.get(
+    `ft_seance_${seanceId}_${Utils.aujourd_hui()}`, null
   );
-}
-
-function updateLiveTimer() {
-  updateLiveTimerValues(timerRepos.restant, timerRepos.total);
-}
-
-function updateLiveTimerValues(restant, total) {
-  const display = document.getElementById('live-countdown');
-  const ring    = document.getElementById('live-ring');
-  if (display) display.textContent =
-    Utils.formatDureeMin(restant);
-  if (ring) {
-    const circ = 2 * Math.PI * 70;
-    const pct  = total > 0 ? restant / total : 1;
-    ring.style.strokeDashoffset = circ * (1 - pct);
-    ring.style.stroke =
-      restant <= 3  ? 'var(--fd-coral)' :
-      restant <= 10 ? 'var(--fd-lemon)' : 'var(--fd-indigo)';
-    ring.style.transition = 'stroke-dashoffset 1s linear';
-  }
-}
-
-function passerRepos() {
-  timerRepos.arreter();
-  document.getElementById('zone-repos')
-    ?.classList.add('hidden');
-  renderExerciceActuel(
-    document.getElementById('page-content')
-  );
-}
-
-async function confirmerAbandon() {
-  const ok = await Utils.confirmer(
-    'Arrêter la séance ?',
-    'Ta progression actuelle sera sauvegardée.'
-  );
-  if (!ok) return;
-  timerRepos.arreter();
-  chronoSeance.arreter();
-  try { Tracker.terminerSeance(AppState.seanceEnCours.id); }
-  catch(e) {}
-  AppState.seanceEnCours = null;
-  AppState.prsSeance     = [];
-  naviguer('home');
-}
-
-function terminerSeance() {
-  timerRepos.arreter();
-  const duree  = chronoSeance.arreter();
-  const seance = AppState.seanceEnCours;
-  const prs    = [...AppState.prsSeance];
-
-  let data = {};
-  try { data = Tracker.terminerSeance(seance.id) || {}; }
-  catch(e) {}
-
-  try { Gamification.recompenser('SEANCE_COMPLETE');  } catch(e) {}
-  try { Notifications.verifierSemaineParf();          } catch(e) {}
-  try { Defis.mettreAJourProgression();               } catch(e) {}
-
-  Utils.confetti(4000);
-  Utils.vibrerFin();
-
-  const container = document.getElementById('page-content');
-  if (!container) return;
-
-  const volume = data?.volumeTotal || 0;
-  const series = data?.series?.length || 0;
 
   container.innerHTML = `
-    <div class="fin-screen">
-      <div class="fin-emoji">🎉</div>
-      <div class="fin-title">Séance terminée !</div>
-      <p style="color:var(--text-secondary);
-                margin-bottom:var(--space-lg)">
-        Bravo ${(() => {
-          try { return Tracker.getProfil().nom||''; }
-          catch(e) { return ''; }
-        })()} ! Incroyable effort. 🔥
-      </p>
+    <div id="live-content">
+      ${_renderLiveHeader(seanceComplete)}
+      ${_renderWarmup(seanceComplete, seanceId)}
+      ${_renderExercicesLive(seanceComplete, seanceId)}
+      ${_renderEtirements(seanceComplete)}
+    </div>`;
+}
 
-      <div class="fin-stats-grid mb-md">
-        <div class="fin-stat">
-          <div class="fin-stat-value">
-            ${Utils.formatDuree(duree)}
+function _renderLiveHeader(seance) {
+  let charge = null;
+  try {
+    charge = Predict.analyserFatigue();
+  } catch(e) {}
+
+  return `
+    <div class="card mb-md"
+         style="background:linear-gradient(135deg,
+                rgba(75,75,249,0.15),
+                rgba(139,240,187,0.05));
+                border-color:var(--fd-indigo)">
+      <div class="flex justify-between items-center">
+        <div>
+          <div style="font-size:1.2rem;font-weight:800">
+            ${seance.emoji} ${seance.nom}
           </div>
-          <div class="fin-stat-label">Durée</div>
-        </div>
-        <div class="fin-stat">
-          <div class="fin-stat-value">
-            ${Utils.formatVolume(volume)}
+          <div style="font-size:.75rem;
+                      color:var(--text-muted);
+                      margin-top:2px">
+            ~${seance.duree_estimee}min
+            · ${seance.exercices?.length||0} exos
           </div>
-          <div class="fin-stat-label">Volume</div>
         </div>
-        <div class="fin-stat">
-          <div class="fin-stat-value">${series}</div>
-          <div class="fin-stat-label">Séries</div>
+        ${charge ? `
+          <div style="text-align:center">
+            <div style="font-size:1.2rem;font-weight:700;
+                        color:${charge.recommandation.couleur}">
+              ${charge.score}/100
+            </div>
+            <div style="font-size:.6rem;
+                        color:var(--text-muted)">
+              ${charge.recommandation.emoji} Forme
+            </div>
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function _renderWarmup(seance, seanceId) {
+  const warmup = seance.warmup || [];
+  if (!warmup.length) return '';
+
+  return `
+    <div class="card mb-md">
+      <div class="card-label">🔥 Échauffement</div>
+      ${warmup.map((w, i) => `
+        <div style="display:flex;align-items:center;
+                    gap:var(--space-md);
+                    padding:var(--space-sm) 0;
+                    border-bottom:1px solid
+                    var(--border-color)">
+          <div style="width:26px;height:26px;
+                      border-radius:50%;
+                      background:var(--fd-indigo-dim);
+                      display:flex;align-items:center;
+                      justify-content:center;
+                      font-size:.72rem;font-weight:700;
+                      color:var(--fd-indigo);
+                      flex-shrink:0">
+            ${i+1}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:.85rem;font-weight:600">
+              ${w.nom}
+            </div>
+            <div style="font-size:.7rem;
+                        color:var(--text-muted)">
+              ${w.description}
+            </div>
+          </div>
+          <div style="font-size:.75rem;
+                      color:var(--fd-mint);
+                      font-weight:600">
+            ${Utils.formatDuree(w.duree)}
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function _renderExercicesLive(seance, seanceId) {
+  const exos     = seance.exercicesDetails || [];
+  const supersets = seance.supersets || [];
+
+  return `
+    <div class="card mb-md">
+      <div class="flex justify-between items-center mb-md">
+        <div class="card-label">
+          🏋️ ${exos.length} exercices
         </div>
+        ${supersets.length > 0 ? `
+          <span class="chip chip-lavender"
+                style="font-size:.65rem">
+            ⚡ ${supersets.length} superset${supersets.length>1?'s':''}
+          </span>` : ''}
       </div>
 
-      ${prs.length > 0 ? `
-        <div class="pr-alert mb-md">
-          <div class="pr-alert-title">
-            🏆 ${prs.length} nouveau${prs.length>1?'x':''}
-            record${prs.length>1?'s':''} !
+      <!-- Supersets si disponibles -->
+      ${supersets.length > 0 ? `
+        <div style="margin-bottom:var(--space-md)">
+          <div style="font-size:.72rem;font-weight:700;
+                      color:var(--fd-lavender);
+                      margin-bottom:var(--space-sm)">
+            ⚡ Supersets disponibles
           </div>
-          ${prs.map(p => `
-            <div class="pr-alert-item">
-              <span>🎯</span>
-              <span>
-                ${(window.EXERCICES||{})[p.ref]?.nom||p.ref}:
-                ${p.poids}kg × ${p.reps}
-              </span>
+          ${supersets.map(ss => `
+            <div style="display:flex;
+                        justify-content:space-between;
+                        align-items:center;
+                        padding:var(--space-sm);
+                        background:rgba(191,161,255,0.08);
+                        border-radius:var(--radius-sm);
+                        margin-bottom:4px">
+              <div>
+                <span style="font-size:.82rem;
+                             font-weight:600;
+                             color:var(--fd-lavender)">
+                  ${ss.emoji} ${ss.nom}
+                </span>
+                <div style="font-size:.65rem;
+                            color:var(--text-muted)">
+                  ${ss.exercices?.length||0} exercices
+                </div>
+              </div>
+              <button onclick="Superset.lancerUI(
+                        '${ss.id}','${seanceId}')"
+                      style="padding:4px 10px;
+                             background:var(--fd-lavender);
+                             color:#09092d;border:none;
+                             border-radius:var(--radius-full);
+                             font-size:.72rem;font-weight:700;
+                             cursor:pointer">
+                ▶ Lancer
+              </button>
             </div>`).join('')}
         </div>` : ''}
 
-      <button class="btn-secondary mb-md"
-              onclick="try{Share.partager('semaine')}catch(e){}"
-              style="width:100%;font-size:.85rem">
-        📸 Partager mes stats
+      <!-- Liste exercices -->
+      ${exos.map((ex, idx) => {
+        const exo   = ex.details || {};
+        const pr    = _getPRExo(ex.ref);
+        const chargeReco = _getChargeReco(ex.ref);
+
+        return `
+          <div class="live-exo-card"
+               id="live-exo-${idx}"
+               style="padding:var(--space-md);
+                      background:var(--bg-input);
+                      border-radius:var(--radius-md);
+                      margin-bottom:var(--space-sm);
+                      border:1px solid var(--border-color)">
+
+            <!-- Header exercice -->
+            <div class="flex justify-between items-center mb-sm">
+              <div>
+                <div style="font-weight:700;font-size:.95rem">
+                  ${exo.emoji||'💪'} ${exo.nom||ex.ref}
+                </div>
+                <div style="font-size:.68rem;
+                            color:var(--fd-mint)">
+                  ${exo.muscle||''}
+                </div>
+              </div>
+              <div style="text-align:right">
+                ${pr ? `
+                  <div style="font-size:.72rem;
+                              color:var(--fd-lemon);
+                              font-weight:600">
+                    🏆 ${pr.poids}kg×${pr.reps}
+                  </div>` : ''}
+                ${chargeReco ? `
+                  <div style="font-size:.68rem;
+                              color:var(--fd-indigo)">
+                    💡 ${chargeReco.charge}kg
+                    (${chargeReco.pourcentage}%)
+                  </div>` : ''}
+              </div>
+            </div>
+
+            <!-- Séries -->
+            ${Array.from({length:ex.series}, (_,s) => `
+              <div class="serie-row"
+                   id="serie-${idx}-${s}"
+                   style="display:grid;
+                          grid-template-columns:
+                            40px 1fr 1fr 50px auto;
+                          gap:var(--space-xs);
+                          align-items:center;
+                          margin-bottom:4px">
+                <div style="font-size:.75rem;
+                            font-weight:700;
+                            color:var(--text-muted);
+                            text-align:center">
+                  S${s+1}
+                </div>
+                <input type="number"
+                       class="input"
+                       id="poids-${idx}-${s}"
+                       placeholder="${chargeReco?.charge||pr?.poids||0}"
+                       value="${chargeReco?.charge||pr?.poids||''}"
+                       step="2.5"
+                       style="padding:6px;font-size:.82rem;
+                              text-align:center" />
+                <input type="number"
+                       class="input"
+                       id="reps-${idx}-${s}"
+                       placeholder="${ex.reps?.split('-')[0]||10}"
+                       style="padding:6px;font-size:.82rem;
+                              text-align:center" />
+                <input type="number"
+                       class="input"
+                       id="rpe-${idx}-${s}"
+                       placeholder="RPE"
+                       min="1" max="10"
+                       style="padding:6px;font-size:.78rem;
+                              text-align:center" />
+                <button onclick="App.validerSerie(
+                          '${seanceId}',
+                          '${ex.ref}',
+                          ${idx}, ${s})"
+                        id="btn-serie-${idx}-${s}"
+                        style="width:32px;height:32px;
+                               border-radius:50%;
+                               background:var(--bg-card);
+                               border:2px solid var(--border-color);
+                               font-size:.9rem;cursor:pointer;
+                               display:flex;align-items:center;
+                               justify-content:center">
+                  ○
+                </button>
+              </div>`).join('')}
+
+            <!-- Conseils -->
+            ${exo.conseils?.length ? `
+              <details style="margin-top:var(--space-xs)">
+                <summary style="font-size:.68rem;
+                                color:var(--text-muted);
+                                cursor:pointer">
+                  💡 Conseils techniques
+                </summary>
+                <div style="font-size:.72rem;
+                            color:var(--text-muted);
+                            margin-top:var(--space-xs);
+                            padding-left:var(--space-sm)">
+                  ${exo.conseils.map(c =>
+                    `<div>• ${c}</div>`
+                  ).join('')}
+                </div>
+              </details>` : ''}
+          </div>`;
+      }).join('')}
+
+      <!-- Bouton terminer -->
+      <button onclick="App.terminerSeance('${seanceId}')"
+              class="btn-primary mt-md"
+              style="width:100%;font-size:.9rem;
+                     padding:var(--space-md)">
+        🏁 Terminer la séance
       </button>
 
-      <button class="btn-primary mb-md"
-              onclick="ajouterJournalPostSeance('${seance.id}')">
-        📔 Ajouter une note
-      </button>
-
-      <button class="btn-secondary"
-              onclick="naviguer('home')">
-        🏠 Retour accueil
+      <!-- Bouton arrêter -->
+      <button onclick="App.arreterSeance('${seanceId}')"
+              class="btn-secondary mt-sm"
+              style="width:100%;font-size:.82rem;
+                     color:var(--text-muted)">
+        ✕ Arrêter
       </button>
     </div>`;
-
-  AppState.seanceEnCours = null;
-  AppState.prsSeance     = [];
-  setTimeout(() => {
-    try { Gamification.verifierTrophees(); } catch(e) {}
-  }, 1500);
 }
 
-function ajouterJournalPostSeance(seanceId) {
-  const modal   = document.getElementById('modal-info');
-  const content = document.getElementById('modal-info-content');
-  if (!modal || !content) return;
+function _renderEtirements(seance) {
+  const etirements = seance.etirements || [];
+  if (!etirements.length) return '';
 
-  content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">
-      📔 Note de séance
-    </h3>
-    <textarea class="input" id="journal-texte" rows="4"
-              placeholder="Comment s'est passée la séance ?"
-              style="resize:vertical;min-height:120px">
-    </textarea>
-    <button class="btn-primary mt-md"
-            onclick="sauvegarderNoteJournal('${seanceId}')">
-      💾 Sauvegarder
-    </button>`;
-
-  modal.classList.remove('hidden');
-  document.getElementById('modal-info-close')
-    .onclick = () => modal.classList.add('hidden');
+  return `
+    <div class="card mb-md">
+      <div class="card-label">🧘 Étirements</div>
+      ${etirements.map((e, i) => `
+        <div style="display:flex;align-items:center;
+                    gap:var(--space-md);
+                    padding:var(--space-sm) 0;
+                    border-bottom:1px solid
+                    var(--border-color)">
+          <div style="font-size:1.2rem">
+            ${e.gif||'🧘'}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:.85rem;font-weight:600">
+              ${e.nom}
+            </div>
+          </div>
+          <div style="font-size:.78rem;
+                      color:var(--fd-mint);font-weight:600">
+            ${Utils.formatDuree(e.duree)}
+          </div>
+        </div>`).join('')}
+    </div>`;
 }
 
-function sauvegarderNoteJournal(seanceId) {
-  const texte = document.getElementById('journal-texte')
-    ?.value?.trim();
-  if (!texte) return;
-  try { Tracker.ajouterEntreeJournal(texte, seanceId); } catch(e) {}
-  try { Gamification.ajouterXP(25, 'journal');         } catch(e) {}
-  Utils.toast('Note sauvegardée !', 'success');
-  document.getElementById('modal-info')
-    ?.classList.add('hidden');
+function _getPRExo(ref) {
+  try { return Tracker.getPR(ref); }
+  catch(e) { return null; }
+}
+
+function _getChargeReco(ref) {
+  try { return Predict.recommanderCharge(ref); }
+  catch(e) { return null; }
 }
 
 // ════════════════════════════════════════════════════════════
 // PAGE PROFIL
 // ════════════════════════════════════════════════════════════
-function renderProfil(tab = 'moi') {
-  const container = document.getElementById('page-content');
-  if (!container) return;
+function _rendreProfil(container) {
+  let profil = { nom:'Athlète', avatar:'💪', poids:80,
+                 taille:175, objectif:'forme' };
+  let xp     = { total:0, niveau:{ emoji:'💪', numero:1, nom:'Débutant' } };
+  let streak = { count:0, max:0 };
+  let total  = 0;
+  let trophees = 0;
 
-  const tabs = [
-    'moi','stats','defis','predict','share',
-    'journal','objectifs','blessure',
-    'coach','custom','programme','outils'
-  ];
+  try { profil  = Tracker.getProfil();                        } catch(e) {}
+  try { xp      = Gamification.getXP();                      } catch(e) {}
+  try { streak  = Tracker.getStreak();                        } catch(e) {}
+  try { total   = Tracker.getTotalSeances();                  } catch(e) {}
+  try { trophees= Gamification.getTrophees()
+          .filter(t => t.debloquee).length;                   } catch(e) {}
 
   container.innerHTML = `
-    <div class="tabs-container">
-      ${tabs.map(t => `
-        <button class="tab-btn ${tab===t?'active':''}"
-                onclick="renderProfil('${t}')">
-          ${{
-            moi:        '👤 Moi',
-            stats:      '📊 Stats',
-            defis:      '🏆 Défis',
-            predict:    '🔮 Predict',
-            share:      '📸 Share',
-            journal:    '📔 Journal',
-            objectifs:  '🎯 Objectifs',
-            blessure:   '🩹 Blessure',
-            coach:      '🤖 Coach',
-            custom:     '🏋️ Mes Exos',
-            programme:  '🗓️ Programme',
-            outils:     '🔧 Outils'
-          }[t]}
-        </button>`).join('')}
-    </div>
-    <div id="profil-content"></div>`;
 
-  const content = document.getElementById('profil-content');
-  switch(tab) {
-    case 'moi':
-      renderProfilMoi(content);
-      break;
-    case 'stats':
-      try { Stats.render(content, 'dashboard'); }
-      catch(e) { _renderPageVide('📊','Stats'); }
-      break;
-    case 'defis':
-      try { Defis.render(content); }
-      catch(e) { _renderPageVide('🏆','Défis'); }
-      break;
-    case 'predict':
-      try { Predict.render(content); }
-      catch(e) { _renderPageVide('🔮','Predict'); }
-      break;
-    case 'share':
-      try { Share.render(content); }
-      catch(e) { _renderPageVide('📸','Share'); }
-      break;
-    case 'journal':    renderJournal(content);         break;
-    case 'objectifs':  renderObjectifs(content);       break;
-    case 'blessure':   renderBlessure(content);        break;
-    case 'coach':
-      try { Coach.renderCoachTab(content); }
-      catch(e) { _renderPageVide('🤖','Coach'); }
-      break;
-    case 'custom':     renderExercicesCustom(content); break;
-    case 'programme':  renderProgrammeCustom(content); break;
-    case 'outils':     renderOutils(content);          break;
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// PROFIL — MOI
-// ════════════════════════════════════════════════════════════
-function renderProfilMoi(el) {
-  let profil  = {};
-  let mesures = {};
-  let xp      = { total:0, pourcentage:0,
-    niveau:{ emoji:'💪', numero:1, nom:'Débutant', xpSuivant:500 }};
-  let streak  = { count:0, max:0 };
-
-  try { profil  = Tracker.getProfil();           } catch(e) {}
-  try { mesures = Tracker.getDerniereMesure()||{}; } catch(e) {}
-  try { xp      = Gamification.getXP();          } catch(e) {}
-  try { streak  = Tracker.getStreak();           } catch(e) {}
-
-  const avatars = [
-    '💪','🏋️','🔥','⚡','🦁',
-    '🐺','🦅','👑','🚀','💎'
-  ];
-
-  el.innerHTML = `
-    ${typeof renderBoutonDeconnexion === 'function'
-      ? renderBoutonDeconnexion()
-      : ''}
-
-    <div class="profil-card mb-md">
-      <div style="margin-bottom:var(--space-md)">
-        <div style="font-size:3rem;text-align:center;
-                    margin-bottom:var(--space-sm)">
-          ${profil.avatar||'💪'}
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;
-                    justify-content:center">
-          ${avatars.map(a => `
-            <button onclick="changerAvatar('${a}')"
-                    data-avatar="${a}"
-                    style="font-size:1.4rem;padding:4px 8px;
-                           border-radius:var(--radius-sm);
-                           border:2px solid ${
-                             (profil.avatar||'💪').trim()===a.trim()
-                               ? 'var(--fd-lemon)'
-                               : 'transparent'};
-                           background:${
-                             (profil.avatar||'💪').trim()===a.trim()
-                               ? 'rgba(249,239,119,0.1)'
-                               : 'transparent'};
-                           cursor:pointer;transition:all .2s">
-              ${a}
-            </button>`).join('')}
-        </div>
-      </div>
-
-      <div class="profil-name">${profil.nom||'Athlète'}</div>
-      <div class="profil-level">
-        ${xp.niveau.emoji} Niveau ${xp.niveau.numero}
-        — ${xp.niveau.nom}
-      </div>
-
-      <div style="margin-top:var(--space-md)">
-        <div class="flex justify-between"
-             style="font-size:.72rem;opacity:.8;margin-bottom:4px">
-          <span>${xp.total} XP</span>
-          <span>${xp.niveau.xpSuivant} XP</span>
-        </div>
-        <div style="height:6px;
-                    background:rgba(255,255,255,0.2);
-                    border-radius:99px;overflow:hidden">
-          <div style="height:100%;width:${xp.pourcentage}%;
-                      background:white;border-radius:99px;
-                      transition:width 1s"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="stats-grid mb-md">
-      <div class="stat-card">
-        <span class="stat-value">
-          ${(() => {
-            try { return Tracker.getTotalSeances(); }
-            catch(e) { return 0; }
-          })()}
-        </span>
-        <span class="stat-label">Séances</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${streak.count}🔥</span>
-        <span class="stat-label">Streak</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${streak.max}🏆</span>
-        <span class="stat-label">Max Streak</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">
-          ${(() => {
-            try { return Object.keys(Tracker.getAllPRs()).length; }
-            catch(e) { return 0; }
-          })()}
-        </span>
-        <span class="stat-label">PRs</span>
-      </div>
-    </div>
-
-    <div class="card mb-md">
-      <div class="card-label">⚖️ Mesures corporelles</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;
-                  gap:var(--space-sm);margin-top:var(--space-md)">
-        ${[
-          { id:'m-poids',    label:'Poids (kg)',
-            val: mesures.poids   ||profil.poids   ||'' },
-          { id:'m-taille',   label:'Taille (cm)',
-            val: mesures.taille  ||profil.taille  ||'' },
-          { id:'m-bras',     label:'Bras (cm)',
-            val: mesures.bras    ||'' },
-          { id:'m-poitrine', label:'Poitrine (cm)',
-            val: mesures.poitrine||'' },
-          { id:'m-taille2',  label:'Tour taille (cm)',
-            val: mesures.taille2 ||'' },
-          { id:'m-hanches',  label:'Hanches (cm)',
-            val: mesures.hanches ||'' }
-        ].map(m => `
-          <div>
-            <div class="input-label">${m.label}</div>
-            <input class="input" id="${m.id}" type="number"
-                   placeholder="${m.label}"
-                   value="${m.val}" />
-          </div>`).join('')}
-      </div>
-      <button class="btn-primary mt-md"
-              onclick="sauvegarderMesures()">
-        💾 Sauvegarder
-      </button>
-    </div>
-
-    <div class="card">
-      <div class="card-label">✏️ Modifier profil</div>
-      <div class="input-label mt-md">Prénom</div>
-      <input class="input" id="edit-nom"
-             value="${profil.nom||''}"
-             placeholder="Ton prénom" />
-      <button class="btn-primary mt-md"
-              onclick="sauvegarderProfil()">
-        💾 Sauvegarder
-      </button>
-    </div>`;
-}
-
-function changerAvatar(avatar) {
-  try { Tracker.sauvegarderProfil({ avatar }); } catch(e) {}
-
-  document.querySelectorAll('[data-avatar]').forEach(btn => {
-    const isActif = btn.dataset.avatar === avatar;
-    btn.style.border     = `2px solid ${isActif
-      ? 'var(--fd-lemon)' : 'transparent'}`;
-    btn.style.background = isActif
-      ? 'rgba(249,239,119,0.1)' : 'transparent';
-  });
-
-  Utils.toast('Avatar mis à jour !', 'success');
-  Utils.vibrerBeep();
-}
-
-function sauvegarderMesures() {
-  const data = {
-    poids:    parseFloat(
-      document.getElementById('m-poids')?.value)    ||undefined,
-    taille:   parseFloat(
-      document.getElementById('m-taille')?.value)   ||undefined,
-    bras:     parseFloat(
-      document.getElementById('m-bras')?.value)     ||undefined,
-    poitrine: parseFloat(
-      document.getElementById('m-poitrine')?.value) ||undefined,
-    taille2:  parseFloat(
-      document.getElementById('m-taille2')?.value)  ||undefined,
-    hanches:  parseFloat(
-      document.getElementById('m-hanches')?.value)  ||undefined
-  };
-
-  try { Tracker.ajouterMesure(data); } catch(e) {}
-  if (data.poids)  {
-    try { Tracker.sauvegarderProfil({ poids:data.poids });   } catch(e) {}
-    try { Tracker.ajouterPoids(data.poids);                  } catch(e) {}
-  }
-  if (data.taille) {
-    try { Tracker.sauvegarderProfil({ taille:data.taille }); } catch(e) {}
-  }
-
-  Utils.toast('Mesures sauvegardées !', 'success');
-  Utils.vibrerBeep();
-}
-
-function sauvegarderProfil() {
-  const nom = document.getElementById('edit-nom')
-    ?.value?.trim();
-  if (!nom) return;
-  try { Tracker.sauvegarderProfil({ nom }); } catch(e) {}
-  Utils.toast('Profil mis à jour !', 'success');
-}
-
-// ════════════════════════════════════════════════════════════
-// JOURNAL
-// ════════════════════════════════════════════════════════════
-function renderJournal(el) {
-  let journal = [];
-  try { journal = Tracker.getJournal(); } catch(e) {}
-
-  el.innerHTML = `
-    <button class="btn-primary mb-md"
-            onclick="ajouterEntreeJournal()">
-      + Nouvelle note
-    </button>
-    ${journal.length === 0 ? `
-      <div class="card"
-           style="text-align:center;padding:var(--space-xl)">
-        <div style="font-size:2rem;margin-bottom:var(--space-sm)">
-          📔
-        </div>
-        <p style="color:var(--text-muted)">
-          Ton journal est vide.<br>
-          Commence à noter tes séances !
-        </p>
-      </div>` :
-      journal.map(e => `
-        <div class="journal-entry">
-          <div class="journal-date">
-            ${Utils.formatDateCourt(e.date)}
-          </div>
-          ${e.seanceId ? `
-            <div class="journal-seance">
-              ${(window.SEANCES_BASE||{})[e.seanceId]?.emoji||''}
-              ${(window.SEANCES_BASE||{})[e.seanceId]?.nom
-                ||e.seanceId}
-            </div>` : ''}
-          <div class="journal-text">${e.texte}</div>
-          <button onclick="supprimerJournal('${e.id}')"
-                  style="margin-top:var(--space-sm);
-                         background:none;border:none;
-                         color:var(--text-muted);
-                         font-size:.75rem;cursor:pointer">
-            🗑️ Supprimer
-          </button>
-        </div>`).join('')}`;
-}
-
-function ajouterEntreeJournal() {
-  const modal   = document.getElementById('modal-info');
-  const content = document.getElementById('modal-info-content');
-  if (!modal || !content) return;
-
-  content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">
-      📔 Nouvelle note
-    </h3>
-    <textarea class="input" id="new-journal" rows="5"
-              placeholder="Tes pensées, sensations, objectifs..."
-              style="resize:vertical;min-height:140px">
-    </textarea>
-    <button class="btn-primary mt-md"
-            onclick="sauvegarderJournal()">
-      💾 Sauvegarder
-    </button>`;
-
-  modal.classList.remove('hidden');
-  document.getElementById('modal-info-close')
-    .onclick = () => modal.classList.add('hidden');
-}
-
-function sauvegarderJournal() {
-  const texte = document.getElementById('new-journal')
-    ?.value?.trim();
-  if (!texte) return;
-  try { Tracker.ajouterEntreeJournal(texte);           } catch(e) {}
-  try { Gamification.ajouterXP(25, 'journal');         } catch(e) {}
-  try { Defis.mettreAJourProgression();                } catch(e) {}
-  Utils.toast('Note ajoutée !', 'success');
-  document.getElementById('modal-info')
-    ?.classList.add('hidden');
-  renderProfil('journal');
-}
-
-async function supprimerJournal(id) {
-  const ok = await Utils.confirmer(
-    'Supprimer cette note ?',
-    'Cette action est irréversible.'
-  );
-  if (ok) {
-    try { Tracker.supprimerEntreeJournal(id); } catch(e) {}
-    renderProfil('journal');
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// OBJECTIFS
-// ════════════════════════════════════════════════════════════
-function renderObjectifs(el) {
-  let objectifs = [];
-  try { objectifs = Tracker.getObjectifs(); } catch(e) {}
-
-  el.innerHTML = `
-    <button class="btn-primary mb-md"
-            onclick="ajouterObjectif()">
-      + Nouvel objectif
-    </button>
-    ${objectifs.length === 0 ? `
-      <div class="card"
-           style="text-align:center;padding:var(--space-xl)">
-        <div style="font-size:2rem">🎯</div>
-        <p style="color:var(--text-muted);margin-top:var(--space-sm)">
-          Définis tes objectifs pour rester motivé !
-        </p>
-      </div>` :
-      objectifs.map(o => {
-        let pct  = 0, pred = null;
-        try { pct  = Tracker.calculerProgressionObjectif(o);  } catch(e) {}
-        try { pred = Predict.predireObjectif(o);              } catch(e) {}
-        return `
-          <div class="objectif-card">
-            <div class="objectif-header">
-              <span class="objectif-name">
-                ${o.emoji||'🎯'} ${o.nom}
-              </span>
-              <span class="objectif-pct">${pct}%</span>
-            </div>
-            <div class="progress-bar mb-md">
-              <div class="progress-fill"
-                   style="width:${pct}%;background:${
-                     pct>=100?'var(--fd-mint)':'var(--fd-indigo)'}">
-              </div>
-            </div>
-            <div class="objectif-progress">
-              <span>
-                Actuel: <strong>
-                  ${o.valeurActuelle||'?'} ${o.unite||''}
-                </strong>
-              </span>
-              <span>→ ${o.valeurCible} ${o.unite||''}</span>
-              ${o.echeance
-                ? `<span>📅 ${o.echeance}</span>` : ''}
-            </div>
-            ${pred ? `
-              <div style="font-size:.72rem;color:var(--fd-mint);
-                          margin-top:var(--space-sm)">
-                🔮 Estimé atteint :
-                ${Utils.formatDateCourt(pred.dateEstimee)}
-                (~${pred.semainesEstimees} semaines)
-              </div>` : ''}
-            <div style="margin-top:var(--space-sm)">
-              <button class="btn-secondary btn-sm"
-                      onclick="mettreAJourObjectif('${o.id}')">
-                ✏️ Mettre à jour
-              </button>
-            </div>
-          </div>`;
-      }).join('')}`;
-}
-
-function ajouterObjectif() {
-  const modal   = document.getElementById('modal-info');
-  const content = document.getElementById('modal-info-content');
-  if (!modal || !content) return;
-
-  content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">
-      🎯 Nouvel objectif
-    </h3>
-    <div class="input-label">Objectif</div>
-    <input class="input mb-md" id="obj-nom"
-           placeholder="ex: Bench Press 100kg"/>
-    <div class="flex gap-sm mb-md">
-      <div style="flex:1">
-        <div class="input-label">Valeur actuelle</div>
-        <input class="input" id="obj-actuel"
-               type="number" placeholder="85"/>
-      </div>
-      <div style="flex:1">
-        <div class="input-label">Valeur cible</div>
-        <input class="input" id="obj-cible"
-               type="number" placeholder="100"/>
-      </div>
-    </div>
-    <div class="flex gap-sm mb-md">
-      <div style="flex:1">
-        <div class="input-label">Unité</div>
-        <input class="input" id="obj-unite"
-               placeholder="kg"/>
-      </div>
-      <div style="flex:1">
-        <div class="input-label">Émoji</div>
-        <input class="input" id="obj-emoji"
-               placeholder="🏋️" maxlength="2"/>
-      </div>
-    </div>
-    <div class="input-label">Échéance (optionnel)</div>
-    <input class="input mb-md" id="obj-date" type="date"/>
-    <button class="btn-primary"
-            onclick="sauvegarderObjectif()">
-      💾 Ajouter
-    </button>`;
-
-  modal.classList.remove('hidden');
-  document.getElementById('modal-info-close')
-    .onclick = () => modal.classList.add('hidden');
-}
-
-function sauvegarderObjectif() {
-  const nom   = document.getElementById('obj-nom')
-    ?.value?.trim();
-  const cible = parseFloat(
-    document.getElementById('obj-cible')?.value);
-  if (!nom || !cible) {
-    Utils.toast('Remplis le nom et la cible !', 'error');
-    return;
-  }
-  try {
-    Tracker.ajouterObjectif({
-      nom,
-      valeurActuelle: parseFloat(
-        document.getElementById('obj-actuel')?.value) || 0,
-      valeurCible: cible,
-      unite:    document.getElementById('obj-unite')?.value || '',
-      emoji:    document.getElementById('obj-emoji')?.value || '🎯',
-      echeance: document.getElementById('obj-date')?.value  || null
-    });
-  } catch(e) {}
-  Utils.toast('Objectif ajouté !', 'success');
-  document.getElementById('modal-info')
-    ?.classList.add('hidden');
-  renderProfil('objectifs');
-}
-
-function mettreAJourObjectif(id) {
-  let obj = null;
-  try { obj = Tracker.getObjectifs().find(o => o.id === id); }
-  catch(e) {}
-  if (!obj) return;
-
-  const val = prompt(
-    `Valeur actuelle pour "${obj.nom}":`,
-    obj.valeurActuelle
-  );
-  if (!val) return;
-
-  try { Tracker.mettreAJourObjectif(id,
-    { valeurActuelle: parseFloat(val) }); } catch(e) {}
-
-  if (parseFloat(val) >= obj.valeurCible) {
-    try { Tracker.mettreAJourObjectif(id, { complete:true }); }
-    catch(e) {}
-    Utils.confetti(2000);
-    Utils.toast('🎉 Objectif atteint !', 'success', 4000);
-    try { Gamification.recompenser('DEFI_SEMAINE'); } catch(e) {}
-  }
-  renderProfil('objectifs');
-}
-
-// ════════════════════════════════════════════════════════════
-// BLESSURE
-// ════════════════════════════════════════════════════════════
-function renderBlessure(el) {
-  let blessures = [];
-  try {
-    blessures = Tracker.getBlessures().filter(b => b.active);
-  } catch(e) {}
-
-  const zones = [
-    'Épaule gauche','Épaule droite','Dos haut','Dos bas',
-    'Genou gauche','Genou droit','Coude','Poignet',
-    'Cheville','Cou'
-  ];
-
-  el.innerHTML = `
-    <div class="card mb-md">
-      <div class="card-label">🩹 Signaler une douleur</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;
-                  gap:var(--space-sm);margin:var(--space-md) 0">
-        <div>
-          <div class="input-label">Zone</div>
-          <select class="input" id="b-zone">
-            ${zones.map(z => `
-              <option>${z}</option>`).join('')}
-          </select>
-        </div>
-        <div>
-          <div class="input-label">Sévérité</div>
-          <select class="input" id="b-severite">
-            <option value="legere">🟡 Légère</option>
-            <option value="moderee">🟠 Modérée</option>
-            <option value="severe">🔴 Sévère</option>
-          </select>
-        </div>
-      </div>
-      <textarea class="input mb-md" id="b-notes" rows="2"
-                placeholder="Notes..."
-                style="resize:none"></textarea>
-      <button class="btn-primary"
-              onclick="ajouterBlessure()">
-        🩹 Signaler
-      </button>
-    </div>
-
-    ${blessures.length > 0 ? `
-      <div class="section-title">⚠️ Blessures actives</div>
-      ${blessures.map(b => `
-        <div class="card mb-md"
-             style="border-color:var(--fd-coral)">
-          <div class="flex justify-between items-center">
-            <div>
-              <div style="font-weight:600">${b.zone}</div>
-              <div style="font-size:.78rem;color:var(--fd-coral)">
-                ${b.severite==='severe'  ? '🔴' :
-                  b.severite==='moderee' ? '🟠' : '🟡'}
-                ${b.severite}
-                · depuis ${Utils.formatDateCourt(b.date)}
-              </div>
-              ${b.notes ? `
-                <div style="font-size:.78rem;
-                            color:var(--text-muted);
-                            margin-top:4px">
-                  ${b.notes}
-                </div>` : ''}
-            </div>
-            <button class="btn-secondary btn-sm"
-                    onclick="guerirBlessure('${b.id}')">
-              ✅ Guéri
-            </button>
-          </div>
-        </div>`).join('')}` : `
-      <div class="card"
-           style="text-align:center;padding:var(--space-xl)">
-        <div style="font-size:2rem">💪</div>
-        <p style="color:var(--fd-mint);margin-top:var(--space-sm)">
-          Aucune blessure active !
-        </p>
-      </div>`}`;
-}
-
-function ajouterBlessure() {
-  const zone     = document.getElementById('b-zone')?.value;
-  const severite = document.getElementById('b-severite')?.value;
-  const notes    = document.getElementById('b-notes')?.value?.trim();
-  if (!zone) return;
-  try { Tracker.ajouterBlessure(zone, severite, notes); }
-  catch(e) {}
-  Utils.toast('Blessure signalée. Sois prudent !', 'info');
-  renderProfil('blessure');
-}
-
-async function guerirBlessure(id) {
-  const ok = await Utils.confirmer('Marquer comme guéri ?', '');
-  if (ok) {
-    try { Tracker.guerirBlessure(id); } catch(e) {}
-    Utils.toast('Bien récupéré ! 💪', 'success');
-    renderProfil('blessure');
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// EXERCICES CUSTOM
-// ════════════════════════════════════════════════════════════
-function getExercicesCustom() {
-  return Utils.storage.get('ft_exercices_custom', []);
-}
-
-function sauvegarderExercicesCustom(liste) {
-  Utils.storage.set('ft_exercices_custom', liste);
-  _fusionnerExercicesCustom();
-}
-
-function _fusionnerExercicesCustom() {
-  const custom = getExercicesCustom();
-  custom.forEach(ex => {
-    if (!window.EXERCICES) window.EXERCICES = {};
-    window.EXERCICES[ex.ref] = {
-      nom:         ex.nom,
-      emoji:       ex.emoji       || '💪',
-      muscle:      ex.muscle      || 'Autre',
-      equipement:  ex.equipement  || 'Libre',
-      description: ex.description || '',
-      conseils:    ex.conseils    || [],
-      difficulte:  ex.difficulte  || 2,
-      custom:      true
-    };
-  });
-}
-
-function initExercicesCustom() {
-  _fusionnerExercicesCustom();
-}
-
-function renderExercicesCustom(el) {
-  const custom = getExercicesCustom();
-
-  el.innerHTML = `
-    <button class="btn-primary mb-md w-full"
-            onclick="ouvrirFormExercice()">
-      ➕ Créer un exercice
-    </button>
-    ${custom.length === 0 ? `
-      <div class="card"
-           style="text-align:center;padding:var(--space-xl)">
-        <div style="font-size:2rem;margin-bottom:var(--space-sm)">
-          🏋️
-        </div>
-        <p style="color:var(--text-muted);font-size:.88rem">
-          Aucun exercice personnalisé.<br>
-          Crée tes propres mouvements !
-        </p>
-      </div>` :
-      custom.map(ex => `
-        <div class="card mb-md">
-          <div class="flex items-center gap-md">
-            <div style="font-size:2rem;width:48px;
-                        text-align:center">
-              ${ex.emoji||'💪'}
-            </div>
-            <div style="flex:1">
-              <div style="font-weight:700;font-size:.95rem">
-                ${ex.nom}
-              </div>
-              <div style="font-size:.75rem;color:var(--fd-mint)">
-                ${ex.muscle}
-              </div>
-              <div style="font-size:.72rem;color:var(--text-muted)">
-                ${ex.equipement}
-                · ${'⭐'.repeat(ex.difficulte||2)}
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:4px">
-              <button class="btn-secondary btn-sm"
-                      onclick="ouvrirFormExercice('${ex.ref}')">
-                ✏️
-              </button>
-              <button class="btn-secondary btn-sm"
-                      onclick="supprimerExerciceCustom('${ex.ref}')"
-                      style="color:var(--fd-coral)">
-                🗑️
-              </button>
-            </div>
-          </div>
-        </div>`).join('')}`;
-}
-
-function ouvrirFormExercice(ref = null) {
-  const custom   = getExercicesCustom();
-  const existant = ref
-    ? custom.find(e => e.ref === ref)
-    : null;
-  const modal    = document.getElementById('modal-info');
-  const content  = document.getElementById('modal-info-content');
-  if (!modal || !content) return;
-
-  const muscles = [
-    'Pectoraux','Dos','Épaules','Biceps','Triceps',
-    'Abdominaux','Quadriceps','Ischio-jambiers',
-    'Mollets','Fessiers','Avant-bras','Autre'
-  ];
-
-  content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">
-      ${existant ? '✏️ Modifier' : '➕ Créer'} un exercice
-    </h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;
-                gap:var(--space-sm);margin-bottom:var(--space-sm)">
-      <div>
-        <div class="input-label">Nom *</div>
-        <input class="input" id="ex-nom"
-               placeholder="ex: Hip Thrust"
-               value="${existant?.nom||''}" />
-      </div>
-      <div>
-        <div class="input-label">Émoji</div>
-        <input class="input" id="ex-emoji"
-               placeholder="🏋️" maxlength="2"
-               value="${existant?.emoji||'💪'}" />
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;
-                gap:var(--space-sm);margin-bottom:var(--space-sm)">
-      <div>
-        <div class="input-label">Muscle *</div>
-        <select class="input" id="ex-muscle">
-          ${muscles.map(m => `
-            <option value="${m}"
-              ${existant?.muscle===m?'selected':''}>${m}</option>
-          `).join('')}
-        </select>
-      </div>
-      <div>
-        <div class="input-label">Difficulté</div>
-        <select class="input" id="ex-diff">
-          ${[1,2,3,4].map(d => `
-            <option value="${d}"
-              ${(existant?.difficulte||2)===d?'selected':''}>
-              ${'⭐'.repeat(d)} (${d}/4)
-            </option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="input-label">Équipement</div>
-    <input class="input mb-md" id="ex-equip"
-           placeholder="ex: Barre + rack"
-           value="${existant?.equipement||''}" />
-    <div class="input-label">Description</div>
-    <textarea class="input mb-md" id="ex-desc" rows="3"
-              placeholder="Décris l'exercice..."
-              style="resize:none">${existant?.description||''}</textarea>
-    <div class="input-label">Conseils (un par ligne)</div>
-    <textarea class="input mb-md" id="ex-conseils" rows="3"
-              style="resize:none">${
-                (existant?.conseils||[]).join('\n')
-              }</textarea>
-    <button class="btn-primary w-full"
-            onclick="sauvegarderFormExercice('${ref||''}')">
-      💾 ${existant ? 'Modifier' : 'Créer'}
-    </button>`;
-
-  modal.classList.remove('hidden');
-  document.getElementById('modal-info-close')
-    .onclick = () => modal.classList.add('hidden');
-  modal.querySelector('.modal-overlay')
-    .onclick = () => modal.classList.add('hidden');
-}
-
-function sauvegarderFormExercice(refExistant = '') {
-  const nom    = document.getElementById('ex-nom')
-    ?.value?.trim();
-  const emoji  = document.getElementById('ex-emoji')
-    ?.value?.trim() || '💪';
-  const muscle = document.getElementById('ex-muscle')?.value;
-  const diff   = parseInt(
-    document.getElementById('ex-diff')?.value) || 2;
-  const equip  = document.getElementById('ex-equip')
-    ?.value?.trim() || '';
-  const desc   = document.getElementById('ex-desc')
-    ?.value?.trim() || '';
-  const conseils = (
-    document.getElementById('ex-conseils')?.value || ''
-  ).split('\n').map(c => c.trim()).filter(Boolean);
-
-  if (!nom || !muscle) {
-    Utils.toast('Nom et muscle sont obligatoires !', 'error');
-    return;
-  }
-
-  const custom = getExercicesCustom();
-
-  if (refExistant) {
-    const idx = custom.findIndex(e => e.ref === refExistant);
-    if (idx >= 0) {
-      custom[idx] = {
-        ...custom[idx], nom, emoji, muscle,
-        difficulte: diff, equipement: equip,
-        description: desc, conseils
-      };
-    }
-  } else {
-    const ref = 'custom_' +
-      nom.toLowerCase()
-        .replace(/\s+/g,'_')
-        .replace(/[^a-z0-9_]/g,'')
-      + '_' + Date.now();
-    custom.push({
-      ref, nom, emoji, muscle,
-      difficulte: diff, equipement: equip,
-      description: desc, conseils,
-      dateCreation: Utils.aujourd_hui()
-    });
-  }
-
-  sauvegarderExercicesCustom(custom);
-  Utils.toast(
-    refExistant ? '✅ Exercice modifié !' : '✅ Exercice créé !',
-    'success'
-  );
-  document.getElementById('modal-info')
-    ?.classList.add('hidden');
-  const profil = document.getElementById('profil-content');
-  if (profil) renderExercicesCustom(profil);
-}
-
-async function supprimerExerciceCustom(ref) {
-  const ok = await Utils.confirmer(
-    'Supprimer cet exercice ?',
-    'Tes données liées seront conservées.'
-  );
-  if (!ok) return;
-  const custom = getExercicesCustom()
-    .filter(e => e.ref !== ref);
-  sauvegarderExercicesCustom(custom);
-  if (window.EXERCICES) delete window.EXERCICES[ref];
-  Utils.toast('Exercice supprimé.', 'info');
-  const el = document.getElementById('profil-content');
-  if (el) renderExercicesCustom(el);
-}
-
-// ════════════════════════════════════════════════════════════
-// PROGRAMME CUSTOM
-// ════════════════════════════════════════════════════════════
-function renderProgrammeCustom(el) {
-  let planning = [], toutes = [];
-  let isCustom = false, customs = {};
-  const joursNoms = [
-    'Lundi','Mardi','Mercredi',
-    'Jeudi','Vendredi','Samedi','Dimanche'
-  ];
-
-  try { planning = Programme.getPlanningActuel();  } catch(e) {}
-  try { toutes   = Programme.getAllSeances();       } catch(e) {}
-  try { isCustom = Programme.estPlanningCustom();  } catch(e) {}
-  try { customs  = Programme.getSeancesCustom();   } catch(e) {}
-
-  el.innerHTML = `
+    <!-- Carte profil -->
     <div class="card mb-md"
          style="background:linear-gradient(135deg,
-                rgba(75,75,249,0.2),rgba(191,161,255,0.1))">
-      <div class="flex justify-between items-center">
-        <div>
-          <div class="card-label">🗓️ Planning hebdomadaire</div>
-          <div style="font-size:.75rem;color:var(--text-muted);
-                      margin-top:4px">
-            ${isCustom
-              ? '✏️ Planning personnalisé actif'
-              : '📋 Planning par défaut'}
-          </div>
-        </div>
-        ${isCustom ? `
-          <button class="btn-secondary btn-sm"
-                  onclick="resetPlanningCustom()">
-            ↺ Réinitialiser
-          </button>` : ''}
+                var(--fd-indigo),#7b2ff7);
+                border:none;color:white;
+                text-align:center">
+      <div style="font-size:3rem;margin-bottom:4px">
+        ${profil.avatar||'💪'}
       </div>
-    </div>
-
-    <div class="card mb-md">
-      <div class="card-label mb-md">📅 Modifier le planning</div>
-      ${planning.map((p, idx) => `
-        <div class="flex items-center gap-md"
-             style="padding:var(--space-sm) 0;
-                    border-bottom:1px solid var(--border-color)">
-          <div style="width:36px;font-size:.78rem;font-weight:700;
-                      color:var(--fd-indigo)">
-            ${joursNoms[idx].slice(0,3).toUpperCase()}
-          </div>
-          <div style="flex:1">
-            <select class="input" id="planning-jour-${idx}"
-                    style="font-size:.8rem;padding:6px 8px">
-              <option value="">😴 Repos</option>
-              ${toutes.map(s => `
-                <option value="${s.id}"
-                  ${p.seanceId===s.id?'selected':''}>
-                  ${s.emoji} ${s.nom}${s.custom?' ✏️':''}
-                </option>`).join('')}
-            </select>
-          </div>
-        </div>`).join('')}
-      <button class="btn-primary mt-md w-full"
-              onclick="sauvegarderPlanningCustom()">
-        💾 Sauvegarder le planning
-      </button>
-    </div>
-
-    <div class="card mb-md">
-      <div class="flex justify-between items-center mb-md">
-        <div class="card-label">💪 Mes séances</div>
-        <button class="btn-secondary btn-sm"
-                onclick="ouvrirFormSeance()">
-          ➕ Créer
-        </button>
+      <div style="font-size:1.3rem;font-weight:800">
+        ${profil.nom}
+      </div>
+      <div style="font-size:.82rem;opacity:.8;margin-top:4px">
+        ${xp.niveau.emoji} ${xp.niveau.nom}
+        · ${xp.total} XP
       </div>
 
-      <div style="font-size:.72rem;font-weight:700;
-                  text-transform:uppercase;letter-spacing:.06em;
-                  color:var(--text-muted);
-                  margin-bottom:var(--space-sm)">
-        Séances de base
-      </div>
-      ${Object.values(window.SEANCES_BASE||{}).map(s => `
-        <div class="flex items-center justify-between"
-             style="padding:var(--space-sm) 0;
-                    border-bottom:1px solid var(--border-color)">
-          <div>
-            <div style="font-size:.88rem;font-weight:600">
-              ${s.emoji} ${s.nom}
-            </div>
-            <div style="font-size:.72rem;color:var(--text-muted)">
-              ${s.exercices.length} exercices · ${s.duree_estimee}min
-            </div>
-          </div>
-          <button class="btn-secondary btn-sm"
-                  onclick="dupliquerSeance('${s.id}')">
-            📋 Dupliquer
-          </button>
-        </div>`).join('')}
-
-      ${Object.keys(customs).length > 0 ? `
-        <div style="font-size:.72rem;font-weight:700;
-                    text-transform:uppercase;letter-spacing:.06em;
-                    color:var(--fd-lemon);
-                    margin-top:var(--space-md);
-                    margin-bottom:var(--space-sm)">
-          Mes séances ✏️
-        </div>
-        ${Object.values(customs).map(s => `
-          <div class="flex items-center justify-between"
-               style="padding:var(--space-sm) 0;
-                      border-bottom:1px solid var(--border-color)">
-            <div>
-              <div style="font-size:.88rem;font-weight:600">
-                ${s.emoji} ${s.nom}
-              </div>
-              <div style="font-size:.72rem;color:var(--text-muted)">
-                ${s.exercices.length} exercices
-                · ${s.duree_estimee}min
-              </div>
-            </div>
-            <div style="display:flex;gap:4px">
-              <button class="btn-secondary btn-sm"
-                      onclick="ouvrirFormSeance('${s.id}')">
-                ✏️
-              </button>
-              <button class="btn-secondary btn-sm"
-                      onclick="supprimerSeanceCustom('${s.id}')"
-                      style="color:var(--fd-coral)">
-                🗑️
-              </button>
-            </div>
-          </div>`).join('')}
-      ` : ''}
-    </div>`;
-}
-
-function sauvegarderPlanningCustom() {
-  const joursNoms =
-    ['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
-  const nouveau = joursNoms.map((label, idx) => ({
-    jour:     idx,
-    label,
-    seanceId: document.getElementById(
-      `planning-jour-${idx}`)?.value || null
-  }));
-  try { Programme.sauvegarderPlanning(nouveau); } catch(e) {}
-  Utils.toast('✅ Planning sauvegardé !', 'success');
-  Utils.vibrerBeep();
-  const el = document.getElementById('profil-content');
-  if (el) renderProgrammeCustom(el);
-}
-
-async function resetPlanningCustom() {
-  const ok = await Utils.confirmer(
-    'Réinitialiser le planning ?',
-    'Le planning par défaut sera restauré.'
-  );
-  if (!ok) return;
-  try { Programme.resetPlanning(); } catch(e) {}
-  Utils.toast('Planning réinitialisé !', 'info');
-  const el = document.getElementById('profil-content');
-  if (el) renderProgrammeCustom(el);
-}
-
-async function dupliquerSeance(id) {
-  try { Programme.dupliquerSeanceBase(id); } catch(e) {}
-  Utils.toast('Séance dupliquée !', 'success');
-  const el = document.getElementById('profil-content');
-  if (el) renderProgrammeCustom(el);
-}
-
-async function supprimerSeanceCustom(id) {
-  const ok = await Utils.confirmer(
-    'Supprimer cette séance ?',
-    'Elle sera retirée du planning si nécessaire.'
-  );
-  if (!ok) return;
-  try { Programme.supprimerSeanceCustom(id); } catch(e) {}
-  Utils.toast('Séance supprimée.', 'info');
-  const el = document.getElementById('profil-content');
-  if (el) renderProgrammeCustom(el);
-}
-
-function ouvrirFormSeance(id = null) {
-  let customs  = {};
-  try { customs = Programme.getSeancesCustom(); } catch(e) {}
-  const existant = id ? customs[id] : null;
-  const modal    = document.getElementById('modal-info');
-  const content  = document.getElementById('modal-info-content');
-  if (!modal || !content) return;
-
-  const toutesExos = Object.entries(window.EXERCICES || {});
-
-  content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md)">
-      ${existant ? '✏️ Modifier' : '➕ Créer'} une séance
-    </h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;
-                gap:var(--space-sm);margin-bottom:var(--space-sm)">
-      <div>
-        <div class="input-label">Nom *</div>
-        <input class="input" id="s-nom"
-               placeholder="ex: Push Day"
-               value="${existant?.nom||''}" />
-      </div>
-      <div>
-        <div class="input-label">Émoji</div>
-        <input class="input" id="s-emoji"
-               placeholder="💪" maxlength="2"
-               value="${existant?.emoji||'💪'}" />
-      </div>
-    </div>
-    <div class="input-label">Durée estimée (min)</div>
-    <input class="input mb-md" id="s-duree"
-           type="number" placeholder="60"
-           value="${existant?.duree_estimee||60}" />
-    <div class="card-label mb-sm">🏋️ Exercices</div>
-    <div id="seance-exercices-list">
-      ${(existant?.exercices||[]).map((ex, i) =>
-        _renderLigneExerciceForm(ex, i, toutesExos)
-      ).join('')}
-    </div>
-    <button class="btn-secondary mt-sm mb-md w-full"
-            onclick="ajouterLigneExercice()">
-      ➕ Ajouter un exercice
-    </button>
-    <button class="btn-primary w-full"
-            onclick="sauvegarderFormSeance('${id||''}')">
-      💾 ${existant ? 'Modifier' : 'Créer'}
-    </button>`;
-
-  window._seanceLigneCount = existant?.exercices?.length || 0;
-  modal.classList.remove('hidden');
-  document.getElementById('modal-info-close')
-    .onclick = () => modal.classList.add('hidden');
-  modal.querySelector('.modal-overlay')
-    .onclick = () => modal.classList.add('hidden');
-}
-
-function _renderLigneExerciceForm(ex = null, idx, toutesExos) {
-  return `
-    <div class="seance-exo-ligne" id="exo-ligne-${idx}"
-         style="display:grid;
-                grid-template-columns:1fr 60px 60px 60px 32px;
-                gap:4px;margin-bottom:4px;align-items:center">
-      <select class="input" id="exo-ref-${idx}"
-              style="font-size:.75rem;padding:6px 4px">
-        ${toutesExos.map(([ref, e]) => `
-          <option value="${ref}"
-            ${ex?.ref===ref?'selected':''}>
-            ${e.emoji||''} ${e.nom}
-          </option>`).join('')}
-      </select>
-      <input class="input" id="exo-series-${idx}"
-             type="number" placeholder="Sér."
-             value="${ex?.series||3}"
-             style="font-size:.75rem;padding:6px 4px;
-                    text-align:center"/>
-      <input class="input" id="exo-reps-${idx}"
-             type="text" placeholder="Reps"
-             value="${ex?.reps||'10'}"
-             style="font-size:.75rem;padding:6px 4px;
-                    text-align:center"/>
-      <input class="input" id="exo-repos-${idx}"
-             type="number" placeholder="Repos"
-             value="${ex?.repos||90}"
-             style="font-size:.75rem;padding:6px 4px;
-                    text-align:center"/>
-      <button onclick="supprimerLigneExercice(${idx})"
-              style="background:none;border:none;
-                     color:var(--fd-coral);font-size:1rem;
-                     cursor:pointer;padding:4px">
-        ✕
-      </button>
-    </div>`;
-}
-
-function ajouterLigneExercice() {
-  const toutesExos = Object.entries(window.EXERCICES || {});
-  const idx  = window._seanceLigneCount || 0;
-  window._seanceLigneCount = idx + 1;
-  const liste = document.getElementById('seance-exercices-list');
-  if (!liste) return;
-  const div = document.createElement('div');
-  div.innerHTML = _renderLigneExerciceForm(null, idx, toutesExos);
-  liste.appendChild(div.firstElementChild);
-}
-
-function supprimerLigneExercice(idx) {
-  document.getElementById(`exo-ligne-${idx}`)?.remove();
-}
-
-function sauvegarderFormSeance(idExistant = '') {
-  const nom   = document.getElementById('s-nom')
-    ?.value?.trim();
-  const emoji = document.getElementById('s-emoji')
-    ?.value?.trim() || '💪';
-  const duree = parseInt(
-    document.getElementById('s-duree')?.value) || 60;
-
-  if (!nom) {
-    Utils.toast('Entre un nom pour la séance !', 'error');
-    return;
-  }
-
-  const exercices = [];
-  document.querySelectorAll('.seance-exo-ligne')
-    .forEach(ligne => {
-      const id     = ligne.id.replace('exo-ligne-', '');
-      const ref    = document
-        .getElementById(`exo-ref-${id}`)?.value;
-      const series = parseInt(document
-        .getElementById(`exo-series-${id}`)?.value) || 3;
-      const reps   = document
-        .getElementById(`exo-reps-${id}`)?.value || '10';
-      const repos  = parseInt(document
-        .getElementById(`exo-repos-${id}`)?.value) || 90;
-      if (ref) exercices.push({ ref, series, reps, repos });
-    });
-
-  if (exercices.length === 0) {
-    Utils.toast('Ajoute au moins un exercice !', 'error');
-    return;
-  }
-
-  const data = { nom, emoji, duree_estimee:duree, exercices };
-
-  try {
-    if (idExistant) {
-      Programme.modifierSeanceCustom(idExistant, data);
-      Utils.toast('✅ Séance modifiée !', 'success');
-    } else {
-      Programme.creerSeanceCustom(data);
-      Utils.toast('✅ Séance créée !', 'success');
-    }
-  } catch(e) {
-    Utils.toast('Erreur lors de la sauvegarde.', 'error');
-    return;
-  }
-
-  document.getElementById('modal-info')
-    ?.classList.add('hidden');
-  const el = document.getElementById('profil-content');
-  if (el) renderProgrammeCustom(el);
-}
-
-// ════════════════════════════════════════════════════════════
-// OUTILS
-// ════════════════════════════════════════════════════════════
-function renderOutils(el) {
-  let config = {};
-  let langue = 'fr';
-  try { config = Notifications.getConfig(); } catch(e) {}
-  try { langue = i18n.getLangue();          } catch(e) {}
-
-  el.innerHTML = `
-
-    <!-- Langue -->
-    <div class="card mb-md">
-      <div class="card-label">🌍 Langue / Language</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;
-                  gap:var(--space-md);margin-top:var(--space-md)">
-        <button onclick="try{i18n.setLangue('fr')}catch(e){}"
-                class="langue-btn ${langue==='fr'?'active':''}">
-          <span class="langue-flag">🇫🇷</span>
-          <span class="langue-nom">Français</span>
-          ${langue==='fr'
-            ? '<span class="langue-actif">✅ Actif</span>'
-            : ''}
-        </button>
-        <button onclick="try{i18n.setLangue('en')}catch(e){}"
-                class="langue-btn ${langue==='en'?'active':''}">
-          <span class="langue-flag">🇬🇧</span>
-          <span class="langue-nom">English</span>
-          ${langue==='en'
-            ? '<span class="langue-actif">✅ Active</span>'
-            : ''}
-        </button>
-      </div>
-    </div>
-
-    <!-- Données -->
-    <div class="card mb-md">
-      <div class="card-label">💾 Données</div>
-      <input type="file" id="file-import" accept=".json"
-             style="display:none"
-             onchange="handleImport(this)" />
-      <div style="display:grid;grid-template-columns:1fr 1fr;
-                  gap:var(--space-sm);margin-top:var(--space-md)">
-        <button class="btn-secondary"
-                onclick="Utils.exporterJSON()">
-          📤 Export JSON
-        </button>
-        <button class="btn-secondary"
-                onclick="Utils.exporterCSV()">
-          📊 Export CSV
-        </button>
-        <button class="btn-secondary"
-                onclick="importerFichier()">
-          📥 Importer
-        </button>
-        <button class="btn-secondary"
-                onclick="genererQRSync()">
-          📱 QR Sync
-        </button>
-        <button class="btn-secondary"
-                style="grid-column:span 2"
-                onclick="Utils.exporterPDF()">
-          📄 Rapport PDF
-        </button>
-        <button class="btn-secondary"
-                style="grid-column:span 2"
-                onclick="naviguer('share')">
-          📸 Partager mes stats
-        </button>
-      </div>
-      <div style="font-size:.72rem;color:var(--text-muted);
-                  margin-top:var(--space-sm)">
-        Données: ${Utils.storage.taille()}
-      </div>
-    </div>
-
-    <!-- Notifications -->
-    <div class="card mb-md">
-      <div class="card-label">🔔 Notifications</div>
-      <div style="margin-top:var(--space-md)">
+      <div class="stats-grid mt-md"
+           style="background:none">
         ${[
-          { id:'rappelQuotidien', label:'Rappel quotidien'  },
-          { id:'absence1j',       label:'Absent 1 jour'     },
-          { id:'absence2j',       label:'Absent 2 jours'    },
-          { id:'absence5j',       label:'Absent 5 jours+'   },
-          { id:'streakDanger',    label:'Streak en danger'   },
-          { id:'semaineParf',     label:'Semaine parfaite'   },
-          { id:'motivationMatin', label:'Motivation matin'   }
-        ].map(n => `
-          <div class="toggle-row">
-            <span class="toggle-label">${n.label}</span>
-            <label class="toggle">
-              <input type="checkbox"
-                     ${config[n.id]?'checked':''}
-                     onchange="try{Notifications.sauvegarderConfig({'${n.id}':this.checked})}catch(e){}">
-              <span class="toggle-slider"></span>
-            </label>
+          { val:total,       label:'Séances'  },
+          { val:streak.count,label:'Streak'   },
+          { val:trophees,    label:'Trophées' }
+        ].map(s => `
+          <div>
+            <div style="font-size:1.2rem;font-weight:800">
+              ${s.val}
+            </div>
+            <div style="font-size:.65rem;opacity:.7">
+              ${s.label}
+            </div>
           </div>`).join('')}
-        <div style="margin-top:var(--space-md)">
-          <div class="input-label">Heure rappel</div>
-          <input class="input" type="time"
-                 value="${config.heureRappel||'08:00'}"
-                 onchange="try{Notifications.sauvegarderConfig({heureRappel:this.value})}catch(e){}"/>
-        </div>
-        <div style="margin-top:var(--space-md)">
-          <div class="input-label">Ton des messages</div>
-          <select class="input"
-                  onchange="try{Notifications.sauvegarderConfig({ton:this.value})}catch(e){}">
-            <option value="motivant"
-              ${config.ton==='motivant'?'selected':''}>
-              💪 Motivant
-            </option>
-            <option value="doux"
-              ${config.ton==='doux'?'selected':''}>
-              🌸 Doux
-            </option>
-            <option value="severe"
-              ${config.ton==='severe'?'selected':''}>
-              🔥 Sévère
-            </option>
-          </select>
-        </div>
-        <button class="btn-secondary mt-md"
-                onclick="try{Notifications.tester()}catch(e){}">
-          🔔 Tester une notification
-        </button>
       </div>
     </div>
 
-    <!-- Paramètres -->
-    <div class="card mb-md">
-      <div class="card-label">⚙️ Paramètres</div>
-      <div style="margin-bottom:var(--space-md)">
-        <div class="input-label">Thème</div>
-        <div style="display:grid;
-                    grid-template-columns:repeat(4,1fr);
-                    gap:var(--space-xs);
-                    margin-top:var(--space-xs)">
-          ${[
-            { val:'dark',     label:'🌙 Dark'    },
-            { val:'light',    label:'☀️ Light'   },
-            { val:'indigo',   label:'💜 Indigo'  },
-            { val:'midnight', label:'⭐ Midnight' }
-          ].map(t => {
-            const actuel = document.documentElement
-              .getAttribute('data-theme') || 'dark';
-            return `
-              <button class="theme-btn"
-                      data-theme="${t.val}"
-                      onclick="appliquerTheme('${t.val}')"
-                      style="padding:var(--space-sm) 4px;
-                             border-radius:var(--radius-sm);
-                             border:2px solid ${actuel===t.val
-                               ? 'var(--fd-indigo)'
-                               : 'var(--border-color)'};
-                             background:${actuel===t.val
-                               ? 'var(--fd-indigo-dim)'
-                               : 'var(--bg-card)'};
-                             font-size:.7rem;font-weight:600;
-                             cursor:pointer;transition:all .2s">
-                ${t.label}
-              </button>`;
-          }).join('')}
+    <!-- Sections profil -->
+    ${[
+      { id:'mon_profil', emoji:'👤', label:'Mon profil',   fn:'_renderMonProfil'  },
+      { id:'journal',    emoji:'📔', label:'Journal',      fn:'Stats.renderJournal' },
+      { id:'objectifs',  emoji:'🎯', label:'Objectifs',    fn:'Stats.renderObjectifs'},
+      { id:'blessures',  emoji:'🩹', label:'Blessures',    fn:'Stats.renderBlessures'},
+      { id:'coach',      emoji:'🤖', label:'Coach IA',     fn:'Coach.renderCoachTab'},
+      { id:'defis',      emoji:'🏆', label:'Défis',        fn:'Defis.render'      },
+      { id:'predict',    emoji:'📈', label:'Prédictions',  fn:'Predict.render'    },
+      { id:'share',      emoji:'📤', label:'Partage',      fn:'Share.render'      },
+      { id:'supersets',  emoji:'⚡', label:'Supersets',    fn:'Superset.render'   },
+      { id:'social',     emoji:'📱', label:'Réseaux sociaux',fn:'Social.render'   },
+      { id:'offline',    emoji:'📵', label:'Hors-ligne',   fn:'Offline.render'    },
+      { id:'gamification',emoji:'⭐',label:'XP & Niveaux', fn:'Gamification.renderGamificationTab'},
+      { id:'history',    emoji:'📅', label:'Historique',   fn:'History.render'    },
+      { id:'photos',     emoji:'📸', label:'Photos',       fn:'Photos.render'     },
+      { id:'settings',   emoji:'⚙️', label:'Paramètres',   fn:'_rendreSettings'   }
+    ].map(s => `
+      <div class="card mb-md"
+           style="cursor:pointer"
+           onclick="naviguer('${s.id}')">
+        <div class="flex justify-between items-center">
+          <div style="display:flex;align-items:center;
+                      gap:var(--space-md)">
+            <span style="font-size:1.3rem">
+              ${s.emoji}
+            </span>
+            <span style="font-weight:600;font-size:.92rem">
+              ${s.label}
+            </span>
+          </div>
+          <span style="color:var(--text-muted);
+                       font-size:.9rem">›</span>
         </div>
-      </div>
-      <div style="margin-bottom:var(--space-md)">
-        <div class="input-label">Objectif séances/semaine</div>
-        <select class="input"
-                onchange="Utils.storage.set(
-                  'ft_objectif_seances_semaine',
-                  parseInt(this.value))">
-          ${[3,4,5].map(n => `
-            <option value="${n}"
-              ${Utils.storage.get(
-                'ft_objectif_seances_semaine',4)===n
-                ? 'selected' : ''}>
-              ${n} séances
-            </option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <div class="input-label">Unités de poids</div>
-        <select class="input"
-                onchange="Utils.storage.set(
-                  'ft_unite_poids',this.value)">
-          <option value="kg"
-            ${Utils.storage.get('ft_unite_poids','kg')==='kg'
-              ? 'selected' : ''}>
-            ⚖️ Kilogrammes (kg)
-          </option>
-          <option value="lbs"
-            ${Utils.storage.get('ft_unite_poids','kg')==='lbs'
-              ? 'selected' : ''}>
-            🇺🇸 Livres (lbs)
-          </option>
-        </select>
-      </div>
-    </div>
+      </div>`).join('')}
 
-    <!-- Danger zone -->
-    <div class="card"
+    <!-- Déconnexion / Reset -->
+    <div class="card mb-md"
          style="border-color:rgba(255,141,150,0.3)">
-      <div class="card-label" style="color:var(--fd-coral)">
-        ⚠️ Zone danger
-      </div>
-      <button class="btn-danger mt-md w-full"
-              onclick="resetDonnees()">
+      <button onclick="UI.confirmerReset()"
+              style="width:100%;background:none;border:none;
+                     color:var(--fd-coral);font-size:.85rem;
+                     font-weight:600;cursor:pointer;
+                     padding:var(--space-sm)">
         🗑️ Réinitialiser toutes les données
       </button>
     </div>
   `;
 }
 
-// ─── Outils fonctions ─────────────────────────────────────────
-function importerFichier() {
-  document.getElementById('file-import')?.click();
+// ════════════════════════════════════════════════════════════
+// PAGE SETTINGS
+// ════════════════════════════════════════════════════════════
+function _rendreSettings(container) {
+  let config = {};
+  try { config = Notifications.getConfig(); } catch(e) {}
+
+  container.innerHTML = `
+
+    <!-- Langue -->
+    <div id="settings-langue"></div>
+
+    <!-- Notifications -->
+    <div class="card mb-md">
+      <div class="card-label">🔔 Notifications</div>
+      ${[
+        { cle:'rappelQuotidien', label:'Rappel quotidien' },
+        { cle:'absence1j',       label:'Absence 1 jour'   },
+        { cle:'streakDanger',    label:'Streak en danger' },
+        { cle:'prProche',        label:'PR en vue'        },
+        { cle:'semaineParf',     label:'Semaine parfaite' },
+        { cle:'finSeance',       label:'Fin de séance'    },
+        { cle:'decharge',        label:'Semaine décharge' }
+      ].map(n => `
+        <div class="score-row">
+          <span class="score-row-label"
+                style="font-size:.85rem">
+            ${n.label}
+          </span>
+          <label class="toggle"
+                 style="position:relative;
+                        display:inline-block;
+                        width:44px;height:24px">
+            <input type="checkbox"
+                   ${config[n.cle] ? 'checked':''}
+                   onchange="Notifications.sauvegarderConfig(
+                     {'${n.cle}': this.checked})"
+                   style="opacity:0;width:0;height:0" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>`).join('')}
+      <button onclick="Notifications.tester()"
+              class="btn-secondary mt-md"
+              style="width:100%;font-size:.82rem">
+        🔔 Tester les notifications
+      </button>
+    </div>
+
+    <!-- Données -->
+    <div class="card mb-md">
+      <div class="card-label">💾 Données</div>
+      <div style="display:grid;
+                  grid-template-columns:1fr 1fr;
+                  gap:var(--space-sm);
+                  margin-top:var(--space-sm)">
+        <button onclick="Utils.exporterJSON()"
+                class="btn-secondary"
+                style="font-size:.78rem">
+          📤 Exporter JSON
+        </button>
+        <button onclick="Utils.importerJSON()"
+                class="btn-secondary"
+                style="font-size:.78rem">
+          📥 Importer JSON
+        </button>
+      </div>
+    </div>
+
+    <!-- Objectif séances/semaine -->
+    <div class="card mb-md">
+      <div class="card-label">🎯 Objectif séances/semaine</div>
+      <div style="margin-top:var(--space-md)">
+        <div style="display:flex;gap:var(--space-sm);
+                    justify-content:center">
+          ${[2,3,4,5,6].map(n => {
+            const current = Utils.storage.get(
+              'ft_objectif_seances_semaine', 4
+            );
+            return `
+              <button onclick="Utils.storage.set(
+                        'ft_objectif_seances_semaine',${n});
+                        naviguer('settings')"
+                      style="width:44px;height:44px;
+                             border-radius:50%;
+                             font-weight:700;font-size:.9rem;
+                             cursor:pointer;
+                             background:${current===n
+                               ? 'var(--fd-indigo)'
+                               : 'var(--bg-input)'};
+                             color:${current===n
+                               ? 'white' : 'var(--text-muted)'};
+                             border:2px solid ${current===n
+                               ? 'var(--fd-indigo)'
+                               : 'var(--border-color)'}">
+                ${n}
+              </button>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Hors-ligne -->
+    <div id="offline-content"></div>
+
+    <!-- Version -->
+    <div style="text-align:center;font-size:.65rem;
+                color:var(--text-muted);
+                margin-top:var(--space-md)">
+      PowerApp v3.0 · EverGPT<br>
+      Build 2025
+    </div>
+  `;
+
+  // Charger langue + offline
+  try {
+    i18n.renderSelecteur(
+      document.getElementById('settings-langue')
+    );
+    Offline.render(
+      document.getElementById('offline-content')
+    );
+  } catch(e) {}
 }
 
-async function handleImport(input) {
-  if (!input.files?.length) return;
-  await Utils.importerJSON(input.files);
-  setTimeout(() => window.location.reload(), 1000);
-}
+// ════════════════════════════════════════════════════════════
+// ACTIONS SÉANCE
+// ════════════════════════════════════════════════════════════
+const App = {
 
-async function resetDonnees() {
-  const ok = await Utils.confirmer(
-    '⚠️ Réinitialiser TOUTES les données ?',
-    'Cette action est IRRÉVERSIBLE. Ta progression sera perdue.'
-  );
-  if (!ok) return;
-  const ok2 = await Utils.confirmer(
-    'Dernière confirmation',
-    'Es-tu absolument certain ? Exporte d\'abord tes données.'
-  );
-  if (!ok2) return;
-  try { Tracker.resetComplet(); } catch(e) {}
-  Utils.toast('Données réinitialisées.', 'info');
-  setTimeout(() => window.location.reload(), 1500);
-}
+  // Valider une série
+  validerSerie(seanceId, exoRef, exoIdx, serieIdx) {
+    const poids = parseFloat(
+      document.getElementById(`poids-${exoIdx}-${serieIdx}`)?.value
+    );
+    const reps  = parseInt(
+      document.getElementById(`reps-${exoIdx}-${serieIdx}`)?.value
+    );
+    const rpe   = parseFloat(
+      document.getElementById(`rpe-${exoIdx}-${serieIdx}`)?.value
+    ) || null;
 
-async function genererQRSync() {
-  const data    = Utils.storage.exporter();
-  const json    = JSON.stringify(data);
+    if (!poids || !reps) {
+      Utils.toast('Entre le poids et les reps !', 'error');
+      return;
+    }
+
+    let result = { isPR:false };
+    try {
+      result = Tracker.sauvegarderSerie(
+        seanceId, exoRef, serieIdx+1, reps, poids, rpe
+      );
+    } catch(e) {}
+
+    // Marquer la série comme faite
+    const btn = document.getElementById(
+      `btn-serie-${exoIdx}-${serieIdx}`
+    );
+    if (btn) {
+      btn.textContent = '✅';
+      btn.style.background  = 'var(--fd-mint)';
+      btn.style.borderColor = 'var(--fd-mint)';
+    }
+
+    // Timer repos
+    try {
+      const seanceInfo = (window.SEANCES_BASE||{})[seanceId];
+      const exo = seanceInfo?.exercices?.[exoIdx];
+      const reposDuree = exo?.repos || 75;
+      timerRepos.demarrer(reposDuree);
+    } catch(e) {}
+
+    if (result.isPR) {
+      try { timerRepos.jouerSon('pr'); } catch(e) {}
+      try { Gamification.recompenser('PR_BATTU'); } catch(e) {}
+      try {
+        Notifications.notifierPR(exoRef, poids, reps);
+      } catch(e) {}
+      Utils.toast(
+        `🏆 Nouveau record ! ${poids}kg × ${reps}`,
+        'pr', 4000
+      );
+    } else {
+      Utils.vibrerSuccess();
+      Utils.toast(`✅ Série validée !`, 'success', 1500);
+    }
+
+    // XP série
+    try {
+      Gamification.recompenser('SEANCE_COMPLETE');
+    } catch(e) {}
+
+    // Offline queue si hors ligne
+    try {
+      if (!Offline.estEnLigne()) {
+        Offline.ajouterAction('pr_battu', {
+          exoRef, poids, reps, rpe,
+          date: Utils.aujourd_hui()
+        });
+      }
+    } catch(e) {}
+  },
+
+  // Terminer une séance complète
+  async terminerSeance(seanceId) {
+    try {
+      // Stats finales
+      const duree  = Tracker.getDureeSeance?.(seanceId) || 0;
+      const volume = Tracker.getVolumeSemaine?.() || 0;
+      const prs    = Tracker.getPRsSeance?.(seanceId) || 0;
+      const seance = (window.SEANCES_BASE||{})[seanceId];
+      const nom    = seance?.nom || 'Séance';
+
+      // Marquer séance complète
+      try {
+        Tracker.terminerSeance(seanceId);
+      } catch(e) {}
+
+      // Gamification
+      try {
+        Gamification.recompenser('SEANCE_COMPLETE');
+        Gamification.verifierTrophees();
+      } catch(e) {}
+
+      // Défis
+      try {
+        Defis.mettreAJourProgression();
+      } catch(e) {}
+
+      // Notification fin séance
+      try {
+        Notifications.notifierFinSeance(nom, duree, volume);
+      } catch(e) {}
+
+      // Vérifier semaine parfaite
+      try {
+        Notifications.verifierSemaineParf();
+      } catch(e) {}
+
+      // Vérifier décharge
+      try {
+        if (Programme.isDecharge?.()) {
+          Notifications.notifierDecharge();
+        }
+      } catch(e) {}
+
+      // Offline queue
+      try {
+        if (!Offline.estEnLigne()) {
+          Offline.ajouterAction('seance_complete', {
+            seanceId,
+            date:   Utils.aujourd_hui(),
+            duree, volume
+          });
+        }
+      } catch(e) {}
+
+      // Confetti + son
+      Utils.confetti(3000);
+      try { timerRepos.jouerSon('pr'); } catch(e) {}
+      Utils.vibrer([200,100,200,100,400]);
+
+      // Modal résumé
+      _afficherResumSeance(seanceId, duree, volume, prs);
+
+    } catch(e) {
+      console.error('[App] Erreur terminer séance:', e);
+      naviguer('home');
+    }
+  },
+
+  // Arrêter en cours de route
+  async arreterSeance(seanceId) {
+    const ok = await Utils.confirmer(
+      'Arrêter la séance ?',
+      'Ta progression sera sauvegardée.'
+    );
+    if (!ok) return;
+
+    try {
+      Tracker.terminerSeance?.(seanceId);
+    } catch(e) {}
+
+    Utils.toast('Séance arrêtée.', 'info');
+    naviguer('home');
+  },
+
+  // Humeur / Fatigue depuis home
+  setHumeur(humeur) {
+    try {
+      Tracker.sauvegarderHumeur(humeur);
+      Gamification.recompenser('HUMEUR');
+      Utils.toast(`Humeur: ${humeur}`, 'success', 1500);
+      naviguer('home');
+    } catch(e) {}
+  },
+
+  setFatigue(niveau) {
+    try {
+      Tracker.sauvegarderFatigue(niveau);
+      Utils.toast('Fatigue enregistrée.', 'success', 1500);
+      naviguer('home');
+    } catch(e) {}
+  }
+};
+
+// ════════════════════════════════════════════════════════════
+// RÉSUMÉ FIN DE SÉANCE
+// ════════════════════════════════════════════════════════════
+function _afficherResumSeance(seanceId, duree, volume, prs) {
   const modal   = document.getElementById('modal-info');
   const content = document.getElementById('modal-info-content');
-  if (!modal || !content) return;
+  if (!modal || !content) {
+    naviguer('home');
+    return;
+  }
+
+  const seance = (window.SEANCES_BASE||{})[seanceId]
+    || { nom:'Séance', emoji:'💪' };
 
   content.innerHTML = `
-    <h3 style="margin-bottom:var(--space-md);text-align:center">
-      📱 QR Code Sync
-    </h3>
-    <p style="font-size:.82rem;color:var(--text-muted);
-              text-align:center;margin-bottom:var(--space-md)">
-      Scanne ce QR sur ton autre appareil.
-    </p>
-    <div style="text-align:center">
-      <canvas id="qr-canvas" width="200" height="200"
-              style="border-radius:var(--radius-md);
-                     background:white;padding:8px">
-      </canvas>
+    <div style="text-align:center;
+                padding:var(--space-md)">
+      <div style="font-size:3rem;margin-bottom:4px">
+        🏁
+      </div>
+      <div style="font-size:1.3rem;font-weight:800;
+                  color:var(--fd-mint);
+                  margin-bottom:var(--space-sm)">
+        Séance terminée !
+      </div>
+      <div style="font-size:.88rem;
+                  color:var(--text-muted);
+                  margin-bottom:var(--space-lg)">
+        ${seance.emoji} ${seance.nom}
+      </div>
+
+      <div class="stats-grid mb-md">
+        ${[
+          {
+            label:'Volume',
+            val:Utils.formatVolume(volume),
+            color:'var(--fd-mint)'
+          },
+          {
+            label:'Durée',
+            val:Utils.formatDuree(duree),
+            color:'var(--fd-indigo)'
+          },
+          {
+            label:'Records',
+            val:prs,
+            color:'var(--fd-lemon)'
+          }
+        ].map(s => `
+          <div class="stat-card">
+            <span class="stat-value"
+                  style="color:${s.color}">
+              ${s.val}
+            </span>
+            <span class="stat-label">${s.label}</span>
+          </div>`).join('')}
+      </div>
+
+      <!-- Actions post-séance -->
+      <div style="display:grid;
+                  grid-template-columns:1fr 1fr;
+                  gap:var(--space-sm)">
+        <button onclick="
+            document.getElementById('modal-info')
+              .classList.add('hidden');
+            Social._ouvrirTemplate('semaine_story')"
+                class="btn-secondary"
+                style="font-size:.78rem">
+          📱 Partager
+        </button>
+        <button onclick="
+            document.getElementById('modal-info')
+              .classList.add('hidden');
+            naviguer('home')"
+                class="btn-primary"
+                style="font-size:.78rem">
+          🏠 Accueil
+        </button>
+      </div>
     </div>
-    <p style="font-size:.72rem;color:var(--text-muted);
-              text-align:center;margin-top:var(--space-md)">
-      ${(json.length/1024).toFixed(1)} KB
-    </p>`;
+  `;
 
   modal.classList.remove('hidden');
   document.getElementById('modal-info-close')
-    .onclick = () => modal.classList.add('hidden');
-
-  await Utils.genererQR(
-    json.substring(0, 500),
-    document.getElementById('qr-canvas')
-  );
+    .onclick = () => {
+      modal.classList.add('hidden');
+      naviguer('home');
+    };
 }
 
-console.log('✅ App.js v3.0 chargé — PowerApp complet !');
+// ════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════
+const UI = {
+
+  toggleMenu() {
+    const menu = document.getElementById('app-menu');
+    menu?.classList.toggle('hidden');
+  },
+
+  fermerMenu() {
+    document.getElementById('app-menu')
+      ?.classList.add('hidden');
+  },
+
+  async confirmerReset() {
+    const ok = await Utils.confirmer(
+      '⚠️ Réinitialiser ?',
+      'Toutes tes données seront supprimées définitivement.'
+    );
+    if (!ok) return;
+
+    localStorage.clear();
+    Utils.toast('Données supprimées.', 'info');
+    setTimeout(() => window.location.reload(), 1000);
+  }
+};
+
+// ════════════════════════════════════════════════════════════
+// PAGE NUTRITION (placeholder)
+// ════════════════════════════════════════════════════════════
+function _rendreNutrition(container) {
+  let profil = { poids:80 };
+  try { profil = Tracker.getProfil(); } catch(e) {}
+  const prot = Math.round((profil.poids||80) * 2);
+  const cal  = Math.round((profil.poids||80) * 35);
+  const eau  = ((profil.poids||80) * 0.035).toFixed(1);
+
+  container.innerHTML = `
+    <div class="card mb-md"
+         style="text-align:center;
+                border-color:var(--fd-mint)">
+      <div style="font-size:2rem">🥗</div>
+      <div style="font-weight:700;font-size:1.1rem;
+                  margin-top:var(--space-sm)">
+        Recommandations nutrition
+      </div>
+      <div style="font-size:.75rem;
+                  color:var(--text-muted);
+                  margin-top:4px">
+        Basé sur ton profil (${profil.poids||80}kg)
+      </div>
+    </div>
+
+    ${[
+      { emoji:'🥩', label:'Protéines',  val:`${prot}g/jour`,   color:'var(--fd-coral)' },
+      { emoji:'🔥', label:'Calories',   val:`~${cal} kcal`,    color:'var(--fd-lemon)' },
+      { emoji:'💧', label:'Eau',        val:`${eau}L/jour`,    color:'var(--fd-indigo)'},
+      { emoji:'⏰', label:'Repas pré-séance', val:'2-3h avant',color:'var(--fd-mint)'  },
+      { emoji:'🥛', label:'Post-séance',val:'Protéines+glucides 30min', color:'var(--fd-lavender)'}
+    ].map(r => `
+      <div class="card mb-md">
+        <div class="flex justify-between items-center">
+          <div style="display:flex;align-items:center;
+                      gap:var(--space-md)">
+            <span style="font-size:1.5rem">
+              ${r.emoji}
+            </span>
+            <div>
+              <div style="font-weight:600;
+                          font-size:.88rem">
+                ${r.label}
+              </div>
+            </div>
+          </div>
+          <div style="font-size:.92rem;font-weight:800;
+                      color:${r.color}">
+            ${r.val}
+          </div>
+        </div>
+      </div>`).join('')}
+
+    <div class="card"
+         style="text-align:center;
+                padding:var(--space-lg);
+                opacity:.6">
+      <div style="font-size:1.5rem">🚀</div>
+      <div style="font-size:.82rem;
+                  color:var(--text-muted);
+                  margin-top:var(--space-sm)">
+        Module Nutrition complet — Bientôt disponible
+      </div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════
+// INIT PRINCIPAL
+// ════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    console.log('🚀 PowerApp v3.0 — Init...');
+
+    // 1. i18n
+    try { i18n.init(); } catch(e) {}
+
+    // 2. Vérifier onboarding
+    const profil = Utils.storage.get('ft_profil', null);
+    if (!profil?.nom) {
+      _afficherOnboarding();
+      return;
+    }
+
+    // 3. Afficher l'app
+    document.getElementById('splash-screen')
+      .style.display = 'none';
+    document.getElementById('app-wrapper')
+      .style.display = 'flex';
+
+    // 4. Inits modules
+    try { Tracker.init?.();        } catch(e) {}
+    try { Programme.getDateDebut(); } catch(e) {}
+
+    // 5. Gamification
+    try { Gamification.verifierTrophees(); } catch(e) {}
+
+    // 6. Notifications
+    try { await Notifications.init(); } catch(e) {}
+
+    // 7. ✅ Offline + PWA
+    try { Offline.init();        } catch(e) {}
+    try { Offline.initInstall(); } catch(e) {}
+
+    // 8. Vérification comeback
+    try {
+      const jours = Tracker.getJoursAbsence();
+      if (jours >= 7) {
+        Utils.storage.set('ft_comeback', true);
+        Gamification.verifierTrophees();
+      }
+    } catch(e) {}
+
+    // 9. Vérifier décharge auto
+    try {
+      if (Programme.isDecharge?.()) {
+        setTimeout(() => {
+          Notifications.notifierDecharge();
+        }, 5000);
+      }
+    } catch(e) {}
+
+    // 10. Sync offline queue si en ligne
+    try {
+      if (Offline.estEnLigne()
+          && Offline._pendingQueue?.length > 0) {
+        setTimeout(() => Offline.syncPendingQueue(), 4000);
+      }
+    } catch(e) {}
+
+    // 11. Navigation initiale
+    naviguer('home');
+
+    // 12. XP header
+    _updateHeaderXP();
+
+    console.log('✅ PowerApp v3.0 — Prêt !');
+
+  } catch(e) {
+    console.error('[App] Erreur init:', e);
+    // Afficher l'app quand même
+    document.getElementById('splash-screen')
+      ?.style.setProperty('display', 'none');
+    document.getElementById('app-wrapper')
+      ?.style.setProperty('display', 'flex');
+    naviguer('home');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// ONBOARDING
+// ════════════════════════════════════════════════════════════
+function _afficherOnboarding() {
+  document.getElementById('splash-screen')
+    .style.display = 'none';
+  const ob = document.getElementById('onboarding-screen');
+  ob.classList.remove('hidden');
+
+  let etape = 1;
+  const data = { nom:'', poids:null, taille:null, objectif:'forme', niveau:'intermediaire' };
+
+  ob.innerHTML = _renderEtapeOnboarding(etape, data);
+}
+
+function _renderEtapeOnboarding(etape, data) {
+  const etapes = [
+    {
+      titre:    'Bienvenue sur PowerApp ! 🏋️',
+      sousTitre:'Ton coach fitness personnel',
+      contenu: `
+        <div style="margin-top:var(--space-lg)">
+          <div class="input-label">Ton prénom *</div>
+          <input class="input mb-md" id="ob-nom"
+                 placeholder="ex: Alex"
+                 value="${data.nom}"
+                 autocomplete="given-name" />
+          <div class="input-label">Ton poids (kg)</div>
+          <input class="input mb-md" id="ob-poids"
+                 type="number"
+                 placeholder="ex: 80"
+                 value="${data.poids||''}" />
+          <div class="input-label">Ta taille (cm)</div>
+          <input class="input" id="ob-taille"
+                 type="number"
+                 placeholder="ex: 178"
+                 value="${data.taille||''}" />
+        </div>`
+    },
+    {
+      titre:    'Ton objectif 🎯',
+      sousTitre:'Qu\'est-ce qui te motive ?',
+      contenu: `
+        <div style="display:grid;gap:var(--space-sm);
+                    margin-top:var(--space-lg)">
+          ${[
+            { val:'prise_masse', label:'💪 Prise de masse' },
+            { val:'perte_poids', label:'⬇️ Perte de poids' },
+            { val:'seche',       label:'🔥 Sèche'          },
+            { val:'force',       label:'🏋️ Force'           },
+            { val:'endurance',   label:'🏃 Endurance'       },
+            { val:'forme',       label:'✨ Forme générale'  }
+          ].map(o => `
+            <button onclick="_selectObj('${o.val}', this)"
+                    class="btn-secondary ob-obj"
+                    style="${data.objectif===o.val
+                      ? 'border-color:var(--fd-indigo);'
+                        + 'background:rgba(75,75,249,.15)'
+                      : ''}">
+              ${o.label}
+            </button>`).join('')}
+        </div>`
+    },
+    {
+      titre:    'Ton niveau 📊',
+      sousTitre:'Pour adapter ton programme',
+      contenu: `
+        <div style="display:grid;gap:var(--space-sm);
+                    margin-top:var(--space-lg)">
+          ${[
+            { val:'debutant',      label:'🌱 Débutant',       desc:'< 6 mois'      },
+            { val:'intermediaire', label:'💪 Intermédiaire',  desc:'6 mois — 2 ans'},
+            { val:'avance',        label:'🔥 Avancé',         desc:'2 ans +'       }
+          ].map(n => `
+            <button onclick="_selectNiv('${n.val}', this)"
+                    class="btn-secondary ob-niv"
+                    style="text-align:left;
+                           ${data.niveau===n.val
+                             ? 'border-color:var(--fd-indigo);'
+                               + 'background:rgba(75,75,249,.15)'
+                             : ''}">
+              <div style="font-weight:700">${n.label}</div>
+              <div style="font-size:.72rem;
+                          color:var(--text-muted)">
+                ${n.desc}
+              </div>
+            </button>`).join('')}
+        </div>`
+    },
+    {
+      titre:    'C\'est parti ! 🚀',
+      sousTitre:'Ton programme est prêt',
+      contenu: `
+        <div style="text-align:center;
+                    padding:var(--space-xl) 0">
+          <div style="font-size:4rem;
+                      margin-bottom:var(--space-md)">
+            ⚡
+          </div>
+          <div style="font-size:1.1rem;font-weight:700;
+                      margin-bottom:var(--space-sm)">
+            Prêt ${data.nom} !
+          </div>
+          <div style="font-size:.85rem;
+                      color:var(--text-muted);
+                      line-height:1.6">
+            Ton programme personnalisé est configuré.<br>
+            Commence ta première séance dès maintenant !
+          </div>
+        </div>`
+    }
+  ];
+
+  const e = etapes[etape-1];
+
+  return `
+    <div style="max-width:480px;margin:0 auto;
+                padding:var(--space-lg)">
+
+      <!-- Progress dots -->
+      <div style="display:flex;justify-content:center;
+                  gap:8px;margin-bottom:var(--space-lg)">
+        ${[1,2,3,4].map(i => `
+          <div style="width:${etape===i ? 24:8}px;
+                      height:8px;
+                      border-radius:4px;
+                      background:${etape===i
+                        ? 'var(--fd-indigo)'
+                        : 'var(--border-color)'};
+                      transition:all .3s">
+          </div>`).join('')}
+      </div>
+
+      <div style="font-size:1.3rem;font-weight:800;
+                  margin-bottom:4px">
+        ${e.titre}
+      </div>
+      <div style="font-size:.82rem;
+                  color:var(--text-muted);
+                  margin-bottom:var(--space-md)">
+        ${e.sousTitre}
+      </div>
+
+      ${e.contenu}
+
+      <div style="margin-top:var(--space-xl)">
+        ${etape < 4 ? `
+          <button onclick="_suivantOb(${etape})"
+                  class="btn-primary"
+                  style="width:100%;font-size:.9rem">
+            Suivant →
+          </button>` : `
+          <button onclick="_terminerOb()"
+                  class="btn-primary"
+                  style="width:100%;font-size:.9rem">
+            🚀 Commencer !
+          </button>`}
+        ${etape > 1 ? `
+          <button onclick="_renderEtapeOb(${etape-1})"
+                  class="btn-secondary mt-sm"
+                  style="width:100%;font-size:.85rem">
+            ← Retour
+          </button>` : ''}
+      </div>
+    </div>`;
+}
+
+// Onboarding helpers
+let _obData = {
+  nom:'', poids:null, taille:null,
+  objectif:'forme', niveau:'intermediaire'
+};
+
+function _selectObj(val, btn) {
+  _obData.objectif = val;
+  document.querySelectorAll('.ob-obj').forEach(b => {
+    b.style.borderColor = '';
+    b.style.background  = '';
+  });
+  btn.style.borderColor = 'var(--fd-indigo)';
+  btn.style.background  = 'rgba(75,75,249,.15)';
+}
+
+function _selectNiv(val, btn) {
+  _obData.niveau = val;
+  document.querySelectorAll('.ob-niv').forEach(b => {
+    b.style.borderColor = '';
+    b.style.background  = '';
+  });
+  btn.style.borderColor = 'var(--fd-indigo)';
+  btn.style.background  = 'rgba(75,75,249,.15)';
+}
+
+function _suivantOb(etapeActuelle) {
+  if (etapeActuelle === 1) {
+    const nom   = document.getElementById('ob-nom')?.value?.trim();
+    const poids = parseFloat(document.getElementById('ob-poids')?.value);
+    const taille = parseFloat(document.getElementById('ob-taille')?.value);
+    if (!nom) { Utils.toast('Entre ton prénom !', 'error'); return; }
+    _obData.nom    = nom;
+    _obData.poids  = poids || null;
+    _obData.taille = taille || null;
+  }
+  const ob = document.getElementById('onboarding-screen');
+  ob.innerHTML = _renderEtapeOnboarding(etapeActuelle + 1, _obData);
+}
+
+function _renderEtapeOb(etape) {
+  const ob = document.getElementById('onboarding-screen');
+  ob.innerHTML = _renderEtapeOnboarding(etape, _obData);
+}
+
+function _terminerOb() {
+  try {
+    const profil = {
+      nom:      _obData.nom || 'Athlète',
+      poids:    _obData.poids,
+      taille:   _obData.taille,
+      objectif: _obData.objectif,
+      niveau:   _obData.niveau,
+      avatar:   '💪',
+      dateDebut: Utils.aujourd_hui()
+    };
+
+    Utils.storage.set('ft_profil', profil);
+    Programme.setDateDebut(Utils.aujourd_hui());
+    Gamification.ajouterXP(200, 'Première séance');
+
+    // Masquer onboarding
+    document.getElementById('onboarding-screen')
+      .classList.add('hidden');
+    document.getElementById('app-wrapper')
+      .style.display = 'flex';
+
+    naviguer('home');
+    Utils.toast(`Bienvenue ${profil.nom} ! 🎉`, 'success', 4000);
+    Utils.confetti(2000);
+
+  } catch(e) {
+    console.error('[App] Erreur onboarding:', e);
+    window.location.reload();
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// DÉMARRAGE
+// ════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  // Splash screen → 2 secondes minimum
+  setTimeout(init, 800);
+});
+
+// Gestion du bouton retour
+window.addEventListener('popstate', () => {
+  retourArriere();
+});
+
+// Expositions globales
+window.naviguer      = naviguer;
+window.retourArriere = retourArriere;
+window.App           = App;
+window.UI            = UI;
+
+console.log('✅ App.js v3.0 chargé');
