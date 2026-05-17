@@ -68,25 +68,27 @@ const Share = {
 
   // ─── OBTENIR PLAYLIST DU JOUR ─────────────────────────────
   getPlaylistDuJour() {
-    const seance  = Programme.getSeanceduJour();
-    const phase   = Programme.getPhaseActuelle();
-    const heatmap = Tracker.getHeatmapData(1);
-    const estRepos = !seance;
+  const seance  = Programme.getSeanceduJour?.() || null;
+  const phase   = Programme.getPhaseActuelle?.() || { nom:'Construction' };
+  const estRepos = !seance;
 
-    if (estRepos) return this.PLAYLISTS.repos;
+  let playlist;
 
-    // Adapter selon séance + phase
-    if (seance?.id?.includes('jambes')) return this.PLAYLISTS.jambes;
-    if (seance?.id?.includes('cardio')) return this.PLAYLISTS.cardio;
-
+  if (estRepos)                                    playlist = this.PLAYLISTS.repos;
+  else if (seance?.id?.includes('jambes'))         playlist = this.PLAYLISTS.jambes;
+  else if (seance?.id?.includes('cardio'))         playlist = this.PLAYLISTS.cardio;
+  else {
     switch(phase.nom) {
-      case 'Reprise':      return this.PLAYLISTS.reprise;
-      case 'Construction': return this.PLAYLISTS.construction;
-      case 'Intensité':    return this.PLAYLISTS.intensite;
-      case 'Peak':         return this.PLAYLISTS.peak;
-      default:             return this.PLAYLISTS.construction;
+      case 'Reprise':      playlist = this.PLAYLISTS.reprise;      break;
+      case 'Construction': playlist = this.PLAYLISTS.construction; break;
+      case 'Intensité':    playlist = this.PLAYLISTS.intensite;    break;
+      case 'Peak':         playlist = this.PLAYLISTS.peak;         break;
+      default:             playlist = this.PLAYLISTS.construction;
     }
-  },
+  }
+
+  return playlist;
+},
 
   // ─── GÉNÉRER CARTE STATS (Canvas) ─────────────────────────
   async genererCarte(type = 'semaine') {
@@ -682,137 +684,157 @@ const Share = {
 
   // ─── RENDER PAGE PARTAGE ──────────────────────────────────
   render(container) {
-    if (!container) return;
+  if (!container) return;
 
-    const playlist = this.getPlaylistDuJour();
-    const phase    = Programme.getPhaseActuelle();
+  const playlist = this.getPlaylistDuJour();
+  const phase    = Programme.getPhaseActuelle?.() || { nom:'', emoji:'💪' };
 
-    container.innerHTML = `
+  container.innerHTML = `
 
-      <!-- Apple Music du jour -->
-      <div class="card mb-md"
-           style="background:linear-gradient(135deg,
-                  rgba(250,40,40,0.15) 0%,
-                  rgba(75,75,249,0.15) 100%);
-                  border-color:rgba(250,40,40,0.4)">
-        <div class="card-label" style="color:#ff3b30">
-          🎵 Apple Music — Playlist du jour
+    <!-- Apple Music / YouTube -->
+    <div class="card mb-md"
+         style="background:linear-gradient(135deg,
+                rgba(250,40,40,0.12) 0%,
+                rgba(75,75,249,0.12) 100%);
+                border-color:rgba(250,40,40,0.35)">
+      <div class="card-label" style="color:#ff3b30">
+        🎵 Musique — Playlist du jour
+      </div>
+
+      <div style="margin-top:var(--space-md)">
+        <div style="font-size:2rem;margin-bottom:var(--space-sm)">
+          ${playlist.emoji}
         </div>
-        <div style="margin-top:var(--space-md)">
-          <div style="font-size:2rem;margin-bottom:var(--space-sm)">
-            ${playlist.emoji}
-          </div>
-          <div style="font-weight:700;font-size:1.1rem">
-            ${playlist.nom}
-          </div>
-          <div style="font-size:.78rem;color:var(--text-muted);
-                      margin-top:4px">
-            ${playlist.description} · ${playlist.genre}
-          </div>
-          <div style="font-size:.72rem;color:var(--text-muted);
-                      margin-top:4px">
-            📍 Phase ${phase.nom} ${phase.emoji}
-          </div>
+        <div style="font-weight:700;font-size:1.1rem">
+          ${playlist.nom}
         </div>
-        <a href="${playlist.url}"
-           target="_blank"
-           style="display:flex;align-items:center;justify-content:center;
-                  gap:var(--space-sm);width:100%;
-                  margin-top:var(--space-md);
-                  padding:var(--space-md);
-                  background:#ff3b30;color:white;
-                  border-radius:var(--radius-full);
-                  font-weight:700;font-size:.9rem;
-                  text-decoration:none">
-          🎵 Ouvrir dans Apple Music
-        </a>
-
-        <!-- Toutes les playlists -->
-        <div style="margin-top:var(--space-md)">
-          <div style="font-size:.72rem;font-weight:600;
-                      color:var(--text-muted);
-                      text-transform:uppercase;
-                      letter-spacing:.06em;
-                      margin-bottom:var(--space-sm)">
-            Toutes les playlists
-          </div>
-          ${Object.entries(this.PLAYLISTS).map(([key, pl]) => `
-            <div style="display:flex;align-items:center;
-                        justify-content:space-between;
-                        padding:var(--space-sm) 0;
-                        border-bottom:1px solid var(--border-color)">
-              <div>
-                <span style="font-size:.88rem;font-weight:600">
-                  ${pl.emoji} ${pl.nom}
-                </span>
-                <span style="font-size:.7rem;color:var(--text-muted);
-                             margin-left:8px">
-                  ${pl.genre}
-                </span>
-              </div>
-              <a href="${pl.url}" target="_blank"
-                 style="font-size:.72rem;color:#ff3b30;
-                        text-decoration:none;font-weight:600">
-                Ouvrir →
-              </a>
-            </div>`).join('')}
+        <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px">
+          ${playlist.description} · ${playlist.genre}
+        </div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
+          📍 Phase ${phase.nom} ${phase.emoji}
         </div>
       </div>
 
-      <!-- Partage cartes -->
-      <div class="section-title">📸 Partager mes stats</div>
+      <!-- 2 boutons : Apple Music + YouTube -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;
+                  gap:var(--space-sm);margin-top:var(--space-md)">
+        <a href="${playlist.url}"
+           target="_blank"
+           rel="noopener"
+           style="display:flex;align-items:center;justify-content:center;
+                  gap:6px;padding:var(--space-md);
+                  background:#ff3b30;color:white;
+                  border-radius:var(--radius-full);
+                  font-weight:700;font-size:.82rem;
+                  text-decoration:none;text-align:center">
+          🍎 Apple Music
+        </a>
+        <a href="${playlist.urlYoutube}"
+           target="_blank"
+           rel="noopener"
+           style="display:flex;align-items:center;justify-content:center;
+                  gap:6px;padding:var(--space-md);
+                  background:#ff0000;color:white;
+                  border-radius:var(--radius-full);
+                  font-weight:700;font-size:.82rem;
+                  text-decoration:none;text-align:center">
+          ▶ YouTube
+        </a>
+      </div>
 
-      ${[
-        { type:'semaine', emoji:'📅', titre:'Résumé semaine',
-          desc:'Séances, volume, streak, heatmap' },
-        { type:'pr',      emoji:'🏆', titre:'Mes records',
-          desc:'Top 3 exercices + 1RM estimé' },
-        { type:'streak',  emoji:'🔥', titre:'Mon streak',
-          desc:'Jours consécutifs + record' },
-        { type:'profil',  emoji:'👤', titre:'Mon profil',
-          desc:'Niveau, XP, trophées, stats' }
-      ].map(carte => `
-        <div class="card mb-md">
-          <div class="flex items-center gap-md mb-md">
-            <div style="font-size:2rem">${carte.emoji}</div>
+      <!-- Toutes les playlists -->
+      <div style="margin-top:var(--space-md)">
+        <div style="font-size:.72rem;font-weight:600;
+                    color:var(--text-muted);
+                    text-transform:uppercase;
+                    letter-spacing:.06em;
+                    margin-bottom:var(--space-sm)">
+          Toutes les playlists
+        </div>
+        ${Object.entries(this.PLAYLISTS).map(([key, pl]) => `
+          <div style="display:flex;align-items:center;
+                      justify-content:space-between;
+                      padding:var(--space-sm) 0;
+                      border-bottom:1px solid var(--border-color)">
             <div>
-              <div style="font-weight:700">${carte.titre}</div>
-              <div style="font-size:.75rem;color:var(--text-muted)">
-                ${carte.desc}
-              </div>
+              <span style="font-size:.88rem;font-weight:600">
+                ${pl.emoji} ${pl.nom}
+              </span>
+              <span style="font-size:.7rem;color:var(--text-muted);
+                           margin-left:8px">
+                ${pl.genre}
+              </span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <a href="${pl.url}" target="_blank" rel="noopener"
+                 style="font-size:.7rem;color:#ff3b30;
+                        text-decoration:none;font-weight:600">
+                🍎
+              </a>
+              <a href="${pl.urlYoutube}" target="_blank" rel="noopener"
+                 style="font-size:.7rem;color:#ff0000;
+                        text-decoration:none;font-weight:600">
+                ▶
+              </a>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Partage cartes -->
+    <div class="section-title">📸 Partager mes stats</div>
+
+    ${[
+      { type:'semaine', emoji:'📅', titre:'Résumé semaine',
+        desc:'Séances, volume, streak, heatmap' },
+      { type:'pr',      emoji:'🏆', titre:'Mes records',
+        desc:'Top 3 exercices + 1RM estimé' },
+      { type:'streak',  emoji:'🔥', titre:'Mon streak',
+        desc:'Jours consécutifs + record' },
+      { type:'profil',  emoji:'👤', titre:'Mon profil',
+        desc:'Niveau, XP, trophées, stats' }
+    ].map(carte => `
+      <div class="card mb-md">
+        <div class="flex items-center gap-md mb-md">
+          <div style="font-size:2rem">${carte.emoji}</div>
+          <div>
+            <div style="font-weight:700">${carte.titre}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">
+              ${carte.desc}
             </div>
           </div>
+        </div>
 
-          <!-- Aperçu canvas -->
-          <div id="preview-${carte.type}"
-               style="width:100%;height:200px;
-                      background:var(--bg-input);
-                      border-radius:var(--radius-md);
-                      display:flex;align-items:center;
-                      justify-content:center;
-                      font-size:.82rem;color:var(--text-muted);
-                      margin-bottom:var(--space-md);
-                      overflow:hidden;cursor:pointer"
-               onclick="Share.afficherApercu('${carte.type}')">
-            Cliquer pour aperçu 👆
-          </div>
+        <div id="preview-${carte.type}"
+             style="width:100%;height:180px;
+                    background:var(--bg-input);
+                    border-radius:var(--radius-md);
+                    display:flex;align-items:center;
+                    justify-content:center;
+                    font-size:.82rem;color:var(--text-muted);
+                    margin-bottom:var(--space-md);
+                    overflow:hidden;cursor:pointer"
+             onclick="Share.afficherApercu('${carte.type}')">
+          👆 Cliquer pour aperçu
+        </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;
-                      gap:var(--space-sm)">
-            <button onclick="Share.telecharger('${carte.type}')"
-                    class="btn-secondary"
-                    style="font-size:.82rem">
-              💾 Télécharger
-            </button>
-            <button onclick="Share.partager('${carte.type}')"
-                    class="btn-primary"
-                    style="font-size:.82rem">
-              📤 Partager
-            </button>
-          </div>
-        </div>`).join('')}
-    `;
-  },
+        <div style="display:grid;grid-template-columns:1fr 1fr;
+                    gap:var(--space-sm)">
+          <button onclick="Share.telecharger('${carte.type}')"
+                  class="btn-secondary"
+                  style="font-size:.82rem">
+            💾 Télécharger
+          </button>
+          <button onclick="Share.partager('${carte.type}')"
+                  class="btn-primary"
+                  style="font-size:.82rem">
+            📤 Partager
+          </button>
+        </div>
+      </div>`).join('')}
+  `;
+},
 
   // ─── AFFICHER APERÇU ──────────────────────────────────────
   async afficherApercu(type) {
