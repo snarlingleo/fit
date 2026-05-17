@@ -622,15 +622,7 @@ function renderAccueil() {
         <span style="color:var(--fd-indigo);font-size:1.2rem">→</span>
       </div>
     </div>
-  `;
-}
-
-  requestAnimationFrame(() => {
-    const canvas = document.getElementById('anneau-semaine');
-    if (canvas) {
-      Utils.graphiques.anneau(canvas, seanceDJ, objectif, '#4b4bf9');
-    }
-  });
+`;
 }
 
 function selectionnerHumeur(h) {
