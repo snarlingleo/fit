@@ -17,7 +17,7 @@ const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css',
+  './style.css',
 
   // JS Core
   './js/utils.js',
