@@ -66,16 +66,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     lancerApp();
   }
 });
-  // Init i18n en premier
-  i18n.init();
-
-  const profil = Tracker.getProfil();
-  if (!profil.nom || profil.nom === 'Athlète') {
-    afficherOnboarding();
-  } else {
-    lancerApp();
-  }
-});
 
 // ─── SERVICE WORKER ───────────────────────────────────────────
 async function initServiceWorker() {
