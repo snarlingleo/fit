@@ -7,58 +7,64 @@ const Share = {
 
   // ─── PLAYLISTS APPLE MUSIC FRANCE ─────────────────────────
   PLAYLISTS: {
-    reprise: {
-      nom:         'Motivation Sport',
-      description: 'Pour bien démarrer',
-      emoji:       '🌱',
-      url: `https://music.apple.com/fr/search?term=${
-        encodeURIComponent(playlist.nom)
-      }`,
-      genre:       'Pop / Urban'
-    },
-    construction: {
-      nom:         'Rap Français 2024',
-      description: 'Pour les séances intenses',
-      emoji:       '💪',
-      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
-      genre:       'Rap FR'
-    },
-    intensite: {
-      nom:         'Électro Workout',
-      description: 'Pour dépasser tes limites',
-      emoji:       '🔥',
-      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
-      genre:       'Electronic / EDM'
-    },
-    peak: {
-      nom:         'Hip-Hop Classiques',
-      description: 'Pour les jours de PR',
-      emoji:       '🏆',
-      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
-      genre:       'Hip-Hop'
-    },
-    jambes: {
-      nom:         'Rap FR Essentiels',
-      description: 'Pour les séances jambes',
-      emoji:       '🦵',
-      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
-      genre:       'Rap Français'
-    },
-    cardio: {
-      nom:         'Dance Hits',
-      description: 'Rythme parfait pour le cardio',
-      emoji:       '🚴',
-      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
-      genre:       'Dance / Pop'
-    },
-    repos: {
-      nom:         'Méditation & Bien-être',
-      description: 'Stretching & récupération',
-      emoji:       '😴',
-      url:         'https://music.apple.com/fr/playlist/a-list-pop/pl.5ee8333dbe944d9f9151e97d92d3eset',
-      genre:       'Ambient / Chill'
-    }
+  reprise: {
+    nom:         'Motivation Fitness',
+    description: 'Pour bien démarrer',
+    emoji:       '🌱',
+    // Recherche Apple Music FR → toujours disponible
+    url:         'https://music.apple.com/fr/search?term=motivation+fitness+workout',
+    urlYoutube:  'https://www.youtube.com/results?search_query=motivation+fitness+playlist',
+    genre:       'Pop / Urban'
   },
+  construction: {
+    nom:         'Rap FR Workout',
+    description: 'Pour les séances intenses',
+    emoji:       '💪',
+    url:         'https://music.apple.com/fr/search?term=rap+francais+workout+2024',
+    urlYoutube:  'https://www.youtube.com/results?search_query=rap+francais+sport+playlist+2024',
+    genre:       'Rap FR'
+  },
+  intensite: {
+    nom:         'Électro Sport',
+    description: 'Pour dépasser tes limites',
+    emoji:       '🔥',
+    url:         'https://music.apple.com/fr/search?term=electro+sport+workout',
+    urlYoutube:  'https://www.youtube.com/results?search_query=electro+sport+workout+playlist',
+    genre:       'Electronic / EDM'
+  },
+  peak: {
+    nom:         'Hip-Hop Gym',
+    description: 'Pour les jours de PR',
+    emoji:       '🏆',
+    url:         'https://music.apple.com/fr/search?term=hip+hop+gym+workout',
+    urlYoutube:  'https://www.youtube.com/results?search_query=hip+hop+gym+workout+playlist',
+    genre:       'Hip-Hop'
+  },
+  jambes: {
+    nom:         'Hard Rap FR',
+    description: 'Pour les séances jambes',
+    emoji:       '🦵',
+    url:         'https://music.apple.com/fr/search?term=hard+rap+francais+sport',
+    urlYoutube:  'https://www.youtube.com/results?search_query=hard+rap+francais+sport',
+    genre:       'Rap Français'
+  },
+  cardio: {
+    nom:         'Dance Cardio Mix',
+    description: 'Rythme parfait pour le cardio',
+    emoji:       '🚴',
+    url:         'https://music.apple.com/fr/search?term=dance+cardio+workout',
+    urlYoutube:  'https://www.youtube.com/results?search_query=dance+cardio+workout+playlist',
+    genre:       'Dance / Pop'
+  },
+  repos: {
+    nom:         'Chill Récupération',
+    description: 'Stretching & récupération',
+    emoji:       '😴',
+    url:         'https://music.apple.com/fr/search?term=chill+relaxation+stretching',
+    urlYoutube:  'https://www.youtube.com/results?search_query=chill+stretching+music+playlist',
+    genre:       'Ambient / Chill'
+  }
+},
 
   // ─── OBTENIR PLAYLIST DU JOUR ─────────────────────────────
   getPlaylistDuJour() {
